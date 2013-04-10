@@ -1,0 +1,6 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+gcc -D_GNUCC -E -DCIL=1 $1 -o ${1%.c}.i
+$DIR/../obj/x86_LINUX/cilly.asm.exe --out ${1%.c}.cil.c ${1%.c}.i
+gcc -D_GNUCC -E ${1%.c}.cil.c -o ${1%.c}.cil.i
