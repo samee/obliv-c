@@ -1,0 +1,9 @@
+Find out who uses src/frontc/cprint (pretty printing is done in ocamlutils/pretty).
+
+Make sure you can't have obliv pointers
+
+Not sure what the parser currently does in the following line, but I need the 'obliv' applied to the int, and not the whole array.
+  obliv int x[5];
+Also check this on typedefs
+
+TODO floating point and enum types

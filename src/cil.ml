@@ -4270,6 +4270,7 @@ class defaultCilPrinterClass : cilPrinter = object (self)
       "const", [] -> text "const", false
           (* Put the aconst inside the attribute list *)
     | "aconst", [] when not !msvcMode -> text "__const__", true
+    | "obliv", [] -> text "obliv", false
     | "thread", [] when not !msvcMode -> text "__thread", false
 (*
     | "used", [] when not !msvcMode -> text "__attribute_used__", false 

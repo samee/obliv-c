@@ -116,6 +116,7 @@ let init_lexicon _ =
   List.iter 
     (fun (key, builder) -> H.add lexicon key builder)
     [ ("auto", fun loc -> AUTO loc);
+      ("obliv", fun loc -> OBLIV loc);
       ("const", fun loc -> CONST loc);
       ("__const", fun loc -> CONST loc);
       ("__const__", fun loc -> CONST loc);
