@@ -6,8 +6,6 @@ module H = Hashtbl
 
 let hasOblivAttr = List.exists (function Attr("obliv",_) -> true | _ -> false);;
 
-(* TODO check obliv array length (variable) in decl *)
-
 let rec firstSome f l = match l with
 | [] -> None
 | (x::xs) -> match f x with Some r -> Some r
@@ -48,6 +46,16 @@ let isOblivSimple t = match t with
 let isNonOblivSimple t = match t with
 | TInt(_,a) | TFloat(_,a) -> not (hasOblivAttr a)
 | _ -> false
+
+(* Pre-flattening them becomes harder after the CFG is already made *)
+let rec isOblivBlock b = 
+  if hasOblivAttr b.battrs then true
+  else match b.bstmts with 
+  | [s] -> begin match s.skind with (* only one statement *)
+           | Block b2 -> isOblivBlock b2
+           | _ -> false
+           end
+  | _ -> false
 
 (* Is t1 -> t2 conversion valid with regard to oblivious-ness *)
 (* vtype ensures stupid types do not show up in declarations or casts.
@@ -93,6 +101,17 @@ class typeCheckVisitor = object
           end
       | _ -> instr
       ))
+
+  (* TODO check if break/continue goes through obliv if *)
+  method vstmt s = ChangeDoChildrenPost (s, fun s -> match s.skind with
+    | If(e,tb,fb,l) -> 
+        if isOblivSimple (typeOf e) then
+          if isOblivBlock tb then s
+          else
+            E.s (E.error "Cannot use obliv-type expression as a condition")
+        else s
+    | _ -> s
+  )
 
   method vexpr e = ChangeDoChildrenPost (e, fun exp -> match exp with
   | UnOp (op,e,t) -> if isOblivSimple (typeOf e) then

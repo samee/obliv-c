@@ -239,6 +239,10 @@ let transformOffsetOf (speclist, dtype) member =
   let resultExpr = CAST (sizeofType, SINGLE_INIT addrExpr) in
   resultExpr
 
+
+let oblivState (s:statement): statement = 
+  BLOCK ({ blabels = []; battrs = [("obliv",[])]; bstmts = [s] }
+         , get_statementloc s)
 %}
 
 %token <string * Cabs.cabsloc> IDENT
@@ -869,6 +873,10 @@ statement:
                 	{IF (smooth_expression (fst $2), $3, NOP $1, $1)}
 |   IF paren_comma_expression statement ELSE statement
 	                {IF (smooth_expression (fst $2), $3, $5, (*handleLoc*) $1)}
+|   OBLIV IF paren_comma_expression statement              %prec IF
+                        {IF (smooth_expression (fst $3), oblivState $4, NOP $2, $2)}
+|   OBLIV IF paren_comma_expression statement ELSE statement
+                        {IF (smooth_expression (fst $3), oblivState $4, oblivState $6, $2)}
 |   SWITCH paren_comma_expression statement
                         {SWITCH (smooth_expression (fst $2), $3, (*handleLoc*) $1)}
 |   WHILE paren_comma_expression statement

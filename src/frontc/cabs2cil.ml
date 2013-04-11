@@ -836,9 +836,12 @@ module BlockChunk =
 
 
     let c2block (c: chunk) : block = 
-      { battrs = [];
-        bstmts = pushPostIns c;
-      } 
+      let slist = pushPostIns c in
+      let res = { battrs = []; bstmts = pushPostIns c; } in
+      match slist with
+      | [{skind = Block ({battrs = [Attr("obliv",[])]; bstmts=sl2} as b)}] 
+          -> b
+      | _ -> res
 
     (* Add an instruction at the end. Never refer to this instruction again 
      * after you call this *)

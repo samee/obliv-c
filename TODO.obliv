@@ -6,4 +6,8 @@ Not sure what the parser currently does in the following line, but I need the 'o
   obliv int x[5];
 Also check this on typedefs
 
-TODO floating point and enum types
+floating point and enum types
+check obliv array length (variable) in decl
+special case: disallow/warn obliv variables in printf
+warn if 'obliv if' has non-obliv condition
+
