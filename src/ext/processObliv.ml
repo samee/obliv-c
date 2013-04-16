@@ -1,5 +1,6 @@
 
 open Pretty
+open Printf
 open Cil
 module E = Errormsg
 module H = Hashtbl
@@ -131,6 +132,95 @@ class typeCheckVisitor = object
   )
 end
 
+let oblivIntType = addOblivType intType
+let oblivCharType = addOblivType charType
+let oblivBoolType = oblivCharType
+
+(* FIXME these functions should use custom structs, not obliv int *)
+let condAssignKnown = 
+  let fargTypes = ["dest",TPtr(oblivIntType,[]),[]
+                  ;"cond",TPtr(oblivBoolType,[]),[]
+                  ;"bitcount",intType,[]
+                  ;"val",TInt(ILongLong,[]),[]
+                  ] in
+  let ftype = TFun (TVoid [],Some fargTypes,false,[]) in
+  let fvar = makeGlobalVar "__obliv_c__condAssignKnown" ftype in
+  Lval (Var fvar,NoOffset)
+
+let setLessThan = 
+  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
+                  ;"op1",TPtr(oblivIntType,[]),[]
+                  ;"op2",TPtr(oblivIntType,[]),[]
+                  ;"bitcount",intType,[]
+                  ] in
+  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
+  let fvar = makeGlobalVar "__obliv_c__setLessThan" ftype in
+  Lval (Var fvar,NoOffset)
+
+let setLogicalAnd = 
+  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
+                  ;"op1",TPtr(oblivBoolType,[]),[]
+                  ;"op2",TPtr(oblivBoolType,[]),[]
+                  ] in
+  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
+  let fvar = makeGlobalVar "__obliv_c__setLogicalAnd" ftype in
+  Lval (Var fvar,NoOffset)
+
+let setLogicalXor = 
+  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
+                  ;"op1",TPtr(oblivBoolType,[]),[]
+                  ;"op2",TPtr(oblivBoolType,[]),[]
+                  ] in
+  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
+  let fvar = makeGlobalVar "__obliv_c__setLogicalXor" ftype in
+  Lval (Var fvar,NoOffset)
+
+class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
+  inherit nopCilVisitor
+  method vstmt s = match s.skind with
+  | Instr ilist -> 
+      let f instr = match instr with
+      | Set(v,CastE(destt,srcx),loc) when isOblivSimple destt -> begin
+            let isize = SizeOf (typeOf(Lval v)) in
+            let condval = (Var curCond,NoOffset) in
+            Call(None,condAssignKnown,[AddrOf v;AddrOf condval;isize;srcx],loc)
+          end
+      | _ -> instr
+      in
+      ChangeTo (mkStmt (Instr (List.map f ilist)))
+  | If(c,tb,fb,loc) when isOblivBlock tb ->
+      let cv = makeTempVar curFunc oblivBoolType in
+      let ct = makeTempVar curFunc oblivBoolType in
+      let cf = makeTempVar curFunc oblivBoolType in
+      let addrOfV v = mkAddrOf (var v) in
+      let boolsize = SizeOf oblivBoolType in
+      let visitSubBlock cond blk = 
+        visitCilBlock (new codegenVisitor curFunc cond) blk in
+      let cs = mkStmt (Instr 
+        [ Set (var cv,c,loc) (* oblivify TODO *)
+        ; Call(None,setLogicalAnd,[addrOfV ct;addrOfV cv;addrOfV curCond
+                                  ;boolsize],loc)
+        ; Call(None,setLogicalXor,[addrOfV cf;addrOfV ct;addrOfV curCond
+                                  ;boolsize],loc)
+        ]) in
+      let ts = mkStmt (Block (visitSubBlock ct tb)) in
+      let fs = mkStmt (Block (visitSubBlock cf fb)) in
+      ChangeTo (mkStmt (Block {battrs=[]; bstmts=[cs;ts;fs]}))
+  | _ -> DoChildren
+  method vblock b = if isOblivBlock b
+    then ChangeDoChildrenPost 
+          ( { b with battrs = dropAttribute "obliv" b.battrs }
+          , fun x -> x)
+    else DoChildren
+end
+
+let trueCond = makeGlobalVar "__obliv_c__trueCond" oblivBoolType
+
+let genFunc g = match g with
+| GFun(f,loc) -> GFun(visitCilFunction (new codegenVisitor f trueCond) f,loc)
+| _ -> g
+;;
+
 let feature : featureDescr =
   { fd_name = "processObliv";
     fd_enabled = ref false;
@@ -138,7 +228,9 @@ let feature : featureDescr =
     fd_extraopt = [];
     fd_doit = 
     (function (f: file) -> 
-      let lwVisitor = new typeCheckVisitor in
-      visitCilFileSameGlobals lwVisitor f);
+      let tcVisitor = new typeCheckVisitor in
+      visitCilFileSameGlobals tcVisitor f;
+      mapGlobals f genFunc
+    );
     fd_post_check = true;
   } 
