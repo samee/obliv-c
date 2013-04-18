@@ -86,7 +86,7 @@ endif
 ifdef USE_LLVM
   CILLY_FEATURES += llvmutils llvmgen llvmssa llvm
 endif
-CILLY_FEATURES += processObliv
+CILLY_FEATURES += simplifyTagged processObliv
 # Add the EXTRAFEATURES
 CILLY_FEATURES += @EXTRAFEATURES@
 

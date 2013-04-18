@@ -147,6 +147,15 @@ let condAssignKnown =
   let fvar = makeGlobalVar "__obliv_c__condAssignKnown" ftype in
   Lval (Var fvar,NoOffset)
 
+let copySimpleObliv =
+  let fargTypes = ["dest",TPtr(oblivIntType,[]),[]
+                  ;"src",TPtr(oblivIntType,[]),[]
+                  ;"bitcount",intType,[]
+                  ] in
+  let ftype = TFun (TVoid [], Some fargTypes,false,[]) in
+  let fvar = makeGlobalVar "__obliv_c__copySimpleObliv" ftype in
+  Lval (Var fvar,NoOffset)
+
 let setLessThan = 
   let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
                   ;"op1",TPtr(oblivIntType,[]),[]
@@ -175,33 +184,58 @@ let setLogicalXor =
   let fvar = makeGlobalVar "__obliv_c__setLogicalXor" ftype in
   Lval (Var fvar,NoOffset)
 
+let setNeq =
+  let fargTypes = ["dest",TPtr(oblivIntType,[]),[]
+                  ;"op1",TPtr(oblivIntType,[]),[]
+                  ;"op1",TPtr(oblivIntType,[]),[]
+                  ;"bitcount",intType,[]
+                  ] in
+  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
+  let fvar = makeGlobalVar "__obliv_c__setNeq" ftype in
+  Lval (Var fvar,NoOffset)
+
+
+(* Just copy doesn't cut it. Need a single function for op-and-assign *)
+let codegenInstr curCond (instr:instr) : instr = 
+  let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
+                      (typeAttrs (typeOfLval lv)) in
+  match instr with
+  | Set(v,BinOp(op,Lval(e1),Lval(e2),t),loc) 
+      when isOblivSimple t && simptemp v ->
+        begin match op with
+        | Lt -> Call(None,setLessThan,
+                  [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
+        | LAnd -> Call(None,setLogicalAnd,
+                  [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
+        | Ne -> Call(None,setNeq,
+                  [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
+        | _ -> instr
+        end
+  | Set(v,CastE(destt,srcx),loc) when isOblivSimple destt -> begin
+        let isize = SizeOf (typeOf(Lval v)) in
+        let condval = (Var curCond,NoOffset) in
+        Call(None,condAssignKnown,[AddrOf v;AddrOf condval;isize;srcx],loc)
+      end
+  | _ -> instr
+
+
 class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
   inherit nopCilVisitor
   method vstmt s = match s.skind with
   | Instr ilist -> 
-      let f instr = match instr with
-      | Set(v,CastE(destt,srcx),loc) when isOblivSimple destt -> begin
-            let isize = SizeOf (typeOf(Lval v)) in
-            let condval = (Var curCond,NoOffset) in
-            Call(None,condAssignKnown,[AddrOf v;AddrOf condval;isize;srcx],loc)
-          end
-      | _ -> instr
-      in
-      ChangeTo (mkStmt (Instr (List.map f ilist)))
+      ChangeTo (mkStmt (Instr (List.map (codegenInstr curCond) ilist)))
   | If(c,tb,fb,loc) when isOblivBlock tb ->
-      let cv = makeTempVar curFunc oblivBoolType in
-      let ct = makeTempVar curFunc oblivBoolType in
-      let cf = makeTempVar curFunc oblivBoolType in
-      let addrOfV v = mkAddrOf (var v) in
-      let boolsize = SizeOf oblivBoolType in
+      let cv = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
+      let ct = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
+      let cf = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
       let visitSubBlock cond blk = 
         visitCilBlock (new codegenVisitor curFunc cond) blk in
       let cs = mkStmt (Instr 
-        [ Set (var cv,c,loc) (* oblivify TODO *)
-        ; Call(None,setLogicalAnd,[addrOfV ct;addrOfV cv;addrOfV curCond
-                                  ;boolsize],loc)
-        ; Call(None,setLogicalXor,[addrOfV cf;addrOfV ct;addrOfV curCond
-                                  ;boolsize],loc)
+        [ codegenInstr curCond (Set (var cv,c,loc))
+        ; codegenInstr curCond (Set (var ct,
+            BinOp(LAnd,Lval(var cv),Lval(var curCond),oblivBoolType),loc))
+        ; codegenInstr curCond (Set (var cf,
+            BinOp(Ne  ,Lval(var ct),Lval(var curCond),oblivBoolType),loc))
         ]) in
       let ts = mkStmt (Block (visitSubBlock ct tb)) in
       let fs = mkStmt (Block (visitSubBlock cf fb)) in
@@ -221,6 +255,14 @@ let genFunc g = match g with
 | _ -> g
 ;;
 
+(* If this gets too slow, merge it with codegen *)
+class rmSimplifyVisitor = object
+  inherit nopCilVisitor
+  method vattr at = match at with 
+  | Attr(s,[]) when s = SimplifyTagged.simplifyTempTok -> ChangeTo []
+  | _ -> DoChildren
+end
+
 let feature : featureDescr =
   { fd_name = "processObliv";
     fd_enabled = ref false;
@@ -230,7 +272,8 @@ let feature : featureDescr =
     (function (f: file) -> 
       let tcVisitor = new typeCheckVisitor in
       visitCilFileSameGlobals tcVisitor f;
-      mapGlobals f genFunc
+      mapGlobals f genFunc;
+      visitCilFileSameGlobals (new rmSimplifyVisitor) f
     );
     fd_post_check = true;
   } 

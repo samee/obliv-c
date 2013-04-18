@@ -90,6 +90,7 @@ let makeCFGFeature : C.featureDescr =
 let features : C.featureDescr list = 
   [ Epicenter.feature;
     Simplify.feature;
+    SimplifyTagged.feature;
     Canonicalize.feature;
     Callgraph.feature;
     Logwrites.feature;
