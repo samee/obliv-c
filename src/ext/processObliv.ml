@@ -5,6 +5,10 @@ open Cil
 module E = Errormsg
 module H = Hashtbl
 
+(* Initialized during type-checking *)
+let oblivBitType = ref (TVoid [])
+let oblivBitPtr  = ref (TVoid [])
+
 let hasOblivAttr = List.exists (function Attr("obliv",_) -> true | _ -> false);;
 
 let rec firstSome f l = match l with
@@ -58,12 +62,94 @@ let rec isOblivBlock b =
            end
   | _ -> false
 
+let oblivIntType = addOblivType intType
+let oblivCharType = addOblivType charType
+let oblivBoolType = oblivCharType
+
+let widestType =  let tinfo = { tname = "widest_t"
+                              ; ttype = TInt (ILongLong,[])
+                              ; treferenced = true
+                              } in TNamed (tinfo,[])
+
+let dummyType = TVoid []
+let oblivBoolTarget = ref dummyType
+let oblivCharTarget = ref dummyType
+let oblivIntTarget = ref dummyType
+let oblivShortTarget = ref dummyType
+let oblivLongTarget = ref dummyType
+let oblivLLongTarget = ref dummyType
+
+let dummyExp = Const (CChr 'x')
+let condAssignKnown = ref dummyExp
+let condSimpleObliv = ref dummyExp
+let setLessThan = ref dummyExp
+let setLogicalAnd = ref dummyExp
+let setLogicalXor = ref dummyExp
+let setNotEqual = ref dummyExp
+
+let updateOblivBitType ci = begin
+  oblivBitType := TComp(ci,[]);
+  oblivBitPtr := TPtr(!oblivBitType,[]);
+  let types = 
+    [oblivBoolTarget,"__obliv_c__bool",1
+    ;oblivCharTarget,"__obliv_c__char",bitsSizeOf charType
+    ;oblivIntTarget,"__obliv_c__int",bitsSizeOf intType
+    ;oblivShortTarget,"__obliv_c__short",bitsSizeOf (TInt(IShort,[]))
+    ;oblivLongTarget,"__obliv_c__long",bitsSizeOf (TInt(ILong,[]))
+    ;oblivLLongTarget,"__obliv_c__lLong",bitsSizeOf (TInt(ILongLong,[]))
+    ] in
+  List.iter (fun (tref,tname,bits) ->
+    tref := let ti = { tname = tname
+                     ; ttype = TArray(!oblivBitType,Some (integer bits),[])
+                     ; treferenced = true } in TNamed(ti,[])) types;
+  (* TODO some of these pointer types should be const *)
+  condAssignKnown := begin
+    let fargTypes = [ "dest",!oblivBitPtr,[]; "cond",!oblivBitPtr,[]
+                    ; "bitcount",intType,[]; "val",widestType,[] ] in
+    let ftype = TFun (TVoid [],Some fargTypes,false,[]) in
+    Lval (Var (makeGlobalVar "__obliv_c__condAssignKnown" ftype),NoOffset)
+  end;
+  condSimpleObliv := begin
+    let fargTypes = [ "dest",!oblivBitPtr,[]; "src",!oblivBitPtr,[]
+                    ; "bitcount",intType,[] ] in
+    let ftype = TFun (TVoid [], Some fargTypes, false, []) in
+    Lval (Var (makeGlobalVar "__obliv_c__copySimpleObliv" ftype),NoOffset)
+  end;
+  setNotEqual := begin
+    let fargTypes = ["dest",!oblivBitPtr,[]
+                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]
+                    ;"bitcount",intType,[]] in
+    let ftype = TFun(TVoid[], Some fargTypes, false, []) in
+    Lval (Var (makeGlobalVar "__obliv_c__setNotEqual" ftype),NoOffset)
+  end;
+  setLessThan := begin
+    let fargTypes = ["dest",!oblivBitPtr,[]
+                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]
+                    ;"bitcount",intType,[] ] in
+    let ftype = TFun (TVoid [], Some fargTypes, false, []) in
+    Lval (Var (makeGlobalVar "__obliv_c__setLessThan" ftype),NoOffset)
+  end;
+  setLogicalAnd := begin
+    let fargTypes = ["dest",!oblivBitPtr,[]
+                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]] in
+    let ftype = TFun (TVoid[], Some fargTypes, false, []) in
+    Lval (Var (makeGlobalVar "__obliv_c__setBitAnd" ftype),NoOffset)
+  end;
+  setLogicalXor := begin
+    let fargTypes = ["dest",!oblivBitPtr,[]
+                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]] in
+    let ftype = TFun (TVoid[], Some fargTypes, false, []) in
+    Lval (Var (makeGlobalVar "__obliv_c__setBitXor" ftype),NoOffset)
+  end
+end
+
 (* Is t1 -> t2 conversion valid with regard to oblivious-ness *)
 (* vtype ensures stupid types do not show up in declarations or casts.
  * So isOblivSimple can assume stupid types do not exist. *)
 let invalidOblivConvert t1 t2 = isOblivSimple t1 && isNonOblivSimple t2
 
-let conversionError () = E.s (E.error "cannot convert obliv type to non-obliv")
+let conversionError loc =
+  E.s (E.error "%s:%i:cannot convert obliv type to non-obliv" loc.file loc.line)
 
 class typeCheckVisitor = object
   inherit nopCilVisitor
@@ -77,7 +163,7 @@ class typeCheckVisitor = object
     fun instr -> match instr with
       | Set (lv,exp,loc) -> 
           if invalidOblivConvert (typeOf exp) (typeOfLval lv) then
-            conversionError()
+            conversionError loc
           else instr
       | Call (lvopt,f,args,loc) ->
           begin match typeOf f with
@@ -85,20 +171,22 @@ class typeCheckVisitor = object
               let targs = argsToList targsPack in
               let rec matchArgs a b = match a,b with
               | _,[] -> ()
-              | [],_ -> E.s (E.error "too few arguments to function")
+              | [],_ -> E.s (E.error "%s:%i:too few arguments to function"
+                              loc.file loc.line)
               | a::al, (_,b,_)::bl -> 
-                  if invalidOblivConvert (typeOf a) b then conversionError()
+                  if invalidOblivConvert (typeOf a) b then conversionError loc
                   else matchArgs al bl
               in
               matchArgs args targs;
               match lvopt with 
               | Some lv -> 
                   if invalidOblivConvert tr (typeOfLval lv) then
-                    conversionError()
+                    conversionError loc
                   else instr
               | None -> instr
             end
-          | _ -> E.s (E.error "trying to call non-function")
+          | _ -> E.s (E.error "%s:%i:trying to call non-function" loc.file
+                        loc.line)
           end
       | _ -> instr
       ))
@@ -108,8 +196,9 @@ class typeCheckVisitor = object
     | If(e,tb,fb,l) -> 
         if isOblivSimple (typeOf e) then
           if isOblivBlock tb then s
-          else
-            E.s (E.error "Cannot use obliv-type expression as a condition")
+          else E.s (E.error 
+            "%s:%i:Cannot use obliv-type expression as a condition" l.file
+            l.line)
         else s
     | _ -> s
   )
@@ -130,69 +219,13 @@ class typeCheckVisitor = object
                      else exp
   | _ -> exp
   )
+
+  method vglob v = begin match v with 
+  | GCompTag(ci,loc) when ci.cname = "OblivBit" ->  
+      updateOblivBitType ci; DoChildren
+  | _ -> DoChildren
+  end
 end
-
-let oblivIntType = addOblivType intType
-let oblivCharType = addOblivType charType
-let oblivBoolType = oblivCharType
-
-(* FIXME these functions should use custom structs, not obliv int *)
-let condAssignKnown = 
-  let fargTypes = ["dest",TPtr(oblivIntType,[]),[]
-                  ;"cond",TPtr(oblivBoolType,[]),[]
-                  ;"bitcount",intType,[]
-                  ;"val",TInt(ILongLong,[]),[]
-                  ] in
-  let ftype = TFun (TVoid [],Some fargTypes,false,[]) in
-  let fvar = makeGlobalVar "__obliv_c__condAssignKnown" ftype in
-  Lval (Var fvar,NoOffset)
-
-let copySimpleObliv =
-  let fargTypes = ["dest",TPtr(oblivIntType,[]),[]
-                  ;"src",TPtr(oblivIntType,[]),[]
-                  ;"bitcount",intType,[]
-                  ] in
-  let ftype = TFun (TVoid [], Some fargTypes,false,[]) in
-  let fvar = makeGlobalVar "__obliv_c__copySimpleObliv" ftype in
-  Lval (Var fvar,NoOffset)
-
-let setLessThan = 
-  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
-                  ;"op1",TPtr(oblivIntType,[]),[]
-                  ;"op2",TPtr(oblivIntType,[]),[]
-                  ;"bitcount",intType,[]
-                  ] in
-  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
-  let fvar = makeGlobalVar "__obliv_c__setLessThan" ftype in
-  Lval (Var fvar,NoOffset)
-
-let setLogicalAnd = 
-  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
-                  ;"op1",TPtr(oblivBoolType,[]),[]
-                  ;"op2",TPtr(oblivBoolType,[]),[]
-                  ] in
-  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
-  let fvar = makeGlobalVar "__obliv_c__setLogicalAnd" ftype in
-  Lval (Var fvar,NoOffset)
-
-let setLogicalXor = 
-  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
-                  ;"op1",TPtr(oblivBoolType,[]),[]
-                  ;"op2",TPtr(oblivBoolType,[]),[]
-                  ] in
-  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
-  let fvar = makeGlobalVar "__obliv_c__setLogicalXor" ftype in
-  Lval (Var fvar,NoOffset)
-
-let setNeq =
-  let fargTypes = ["dest",TPtr(oblivIntType,[]),[]
-                  ;"op1",TPtr(oblivIntType,[]),[]
-                  ;"op1",TPtr(oblivIntType,[]),[]
-                  ;"bitcount",intType,[]
-                  ] in
-  let ftype = TFun (TVoid [], Some fargTypes, false, []) in
-  let fvar = makeGlobalVar "__obliv_c__setNeq" ftype in
-  Lval (Var fvar,NoOffset)
 
 
 (* Just copy doesn't cut it. Need a single function for op-and-assign *)
@@ -203,18 +236,18 @@ let codegenInstr curCond (instr:instr) : instr =
   | Set(v,BinOp(op,Lval(e1),Lval(e2),t),loc) 
       when isOblivSimple t && simptemp v ->
         begin match op with
-        | Lt -> Call(None,setLessThan,
+        | Lt -> Call(None,!setLessThan,
                   [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
-        | LAnd -> Call(None,setLogicalAnd,
+        | LAnd -> Call(None,!setLogicalAnd,
                   [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
-        | Ne -> Call(None,setNeq,
+        | Ne -> Call(None,!setNotEqual,
                   [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
         | _ -> instr
         end
   | Set(v,CastE(destt,srcx),loc) when isOblivSimple destt -> begin
         let isize = SizeOf (typeOf(Lval v)) in
         let condval = (Var curCond,NoOffset) in
-        Call(None,condAssignKnown,[AddrOf v;AddrOf condval;isize;srcx],loc)
+        Call(None,!condAssignKnown,[AddrOf v;AddrOf condval;isize;srcx],loc)
       end
   | _ -> instr
 
@@ -272,6 +305,7 @@ let feature : featureDescr =
     (function (f: file) -> 
       let tcVisitor = new typeCheckVisitor in
       visitCilFileSameGlobals tcVisitor f;
+      SimplifyTagged.feature.fd_doit f;
       mapGlobals f genFunc;
       visitCilFileSameGlobals (new rmSimplifyVisitor) f
     );

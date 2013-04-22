@@ -1,9 +1,0 @@
-#!/bin/bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-SRC=$1
-
-shift
-
-gcc -D_GNUCC -E -DCIL=1 $SRC -o ${SRC%.c}.i
-$DIR/../obj/x86_LINUX/cilly.asm.exe --out ${SRC%.c}.cil.c ${SRC%.c}.i $@
-gcc -D_GNUCC -E ${SRC%.c}.cil.c -o ${SRC%.c}.cil.i
