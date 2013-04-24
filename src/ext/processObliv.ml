@@ -10,8 +10,6 @@ let oblivBitType = ref (TVoid [])
 let oblivBitPtr  = ref (TVoid [])
 let oblivConstBitPtr = ref (TVoid [])
 
-let hasOblivAttr = List.exists (function Attr("obliv",_) -> true | _ -> false);;
-
 let rec firstSome f l = match l with
 | [] -> None
 | (x::xs) -> match f x with Some r -> Some r
@@ -22,6 +20,7 @@ let hasOblivAttr = hasAttribute "obliv"
 let addOblivAttr a = if not (hasOblivAttr a) 
                        then addAttribute (Attr("obliv",[])) a
                        else a
+let dropOblivAttr a = dropAttribute "obliv" a
 
 let addOblivType t = typeAddAttributes [Attr("obliv",[])] t
 
@@ -261,15 +260,6 @@ let codegenInstr curCond (instr:instr) : instr =
   in
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
-  begin match instr with
-  | Set(v,BinOp(Eq,Lval(e1),Lval(e2),t),loc) -> 
-      ignore (Pretty.printf "Equal result type: '%a'\n" d_type t);
-      ignore (Pretty.printf "Equal param type: '%a' '%a'\n" 
-        d_type (typeOfLval e1) d_type (typeOfLval e2));
-      Printf.printf "isSimpleObliv result: %B\n" (isOblivSimple t);
-      Printf.printf "simptemp result: %B\n" (simptemp v)
-  | _ -> ()
-  end;
   match instr with
   | Set(v,BinOp(op,Lval(e1),Lval(e2),t),loc) 
   (* TODO fold this up *)
@@ -300,7 +290,9 @@ let codegenInstr curCond (instr:instr) : instr =
 class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
   inherit nopCilVisitor
   method vtype t = match t with
-  | TInt(k,a) when hasOblivAttr a -> ChangeTo (setTypeAttrs (intTargetType k) a)
+  | TInt(k,a) when hasOblivAttr a -> 
+      let a2 = dropOblivAttr a in
+      ChangeTo (setTypeAttrs (intTargetType k) a2)
   | _ -> DoChildren
 
   method vstmt s = match s.skind with
@@ -354,9 +346,11 @@ let feature : featureDescr =
     (function (f: file) -> 
       let tcVisitor = new typeCheckVisitor in
       visitCilFileSameGlobals tcVisitor f;
+      (*
       SimplifyTagged.feature.fd_doit f;
       mapGlobals f genFunc;
       visitCilFileSameGlobals (new rmSimplifyVisitor) f
+      *)
     );
     fd_post_check = true;
   } 
