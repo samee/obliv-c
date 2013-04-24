@@ -8,13 +8,14 @@ module H = Hashtbl
 (* Initialized during type-checking *)
 let oblivBitType = ref (TVoid [])
 let oblivBitPtr  = ref (TVoid [])
+let oblivConstBitPtr = ref (TVoid [])
 
 let hasOblivAttr = List.exists (function Attr("obliv",_) -> true | _ -> false);;
 
 let rec firstSome f l = match l with
 | [] -> None
 | (x::xs) -> match f x with Some r -> Some r
-                         | None -> firstSome f xs
+                          | None -> firstSome f xs
 
 
 let hasOblivAttr = hasAttribute "obliv"
@@ -79,6 +80,17 @@ let oblivShortTarget = ref dummyType
 let oblivLongTarget = ref dummyType
 let oblivLLongTarget = ref dummyType
 
+(* signed-ness affects code generation (e.g. signed vs unsigned comparison)
+ * but not the generated data type *)
+let intTargetType k = match k with
+| IChar | ISChar | IUChar -> !oblivCharTarget
+| IBool -> !oblivBoolTarget
+| IInt | IUInt -> !oblivIntTarget
+| IShort | IUShort -> !oblivShortTarget
+| ILong | IULong -> !oblivLongTarget
+| ILongLong | IULongLong -> !oblivLLongTarget
+;;
+
 let dummyExp = Const (CChr 'x')
 let condAssignKnown = ref dummyExp
 let condSimpleObliv = ref dummyExp
@@ -86,10 +98,17 @@ let setLessThan = ref dummyExp
 let setLogicalAnd = ref dummyExp
 let setLogicalXor = ref dummyExp
 let setNotEqual = ref dummyExp
+let setEqualTo = ref dummyExp
+
+let oblivBitsSizeOf t = begin match t with
+| TInt(IBool,_) -> 1
+| _ -> bitsSizeOf t
+end
 
 let updateOblivBitType ci = begin
   oblivBitType := TComp(ci,[]);
   oblivBitPtr := TPtr(!oblivBitType,[]);
+  oblivConstBitPtr := typeAddAttributes [Attr("const",[])] !oblivBitPtr;
   let types = 
     [oblivBoolTarget,"__obliv_c__bool",1
     ;oblivCharTarget,"__obliv_c__char",bitsSizeOf charType
@@ -99,45 +118,46 @@ let updateOblivBitType ci = begin
     ;oblivLLongTarget,"__obliv_c__lLong",bitsSizeOf (TInt(ILongLong,[]))
     ] in
   List.iter (fun (tref,tname,bits) ->
-    tref := let ti = { tname = tname
-                     ; ttype = TArray(!oblivBitType,Some (integer bits),[])
-                     ; treferenced = true } in TNamed(ti,[])) types;
-  (* TODO some of these pointer types should be const *)
+    let ti = { tname = tname
+             ; ttype = TArray(!oblivBitType,Some (integer bits),[])
+             ; treferenced = true } in
+    tref := TNamed(ti,[])
+    ) types;
+  let compops = 
+    [setEqualTo,"__obliv_c__setEqualTo"
+    ;setNotEqual,"__obliv_c__setNotEqual"
+    ;setLessThan,"__obliv_c__setLessThan"
+    ] in
+  List.iter (fun(fref,fname) -> 
+    let fargTypes = ["dest",!oblivBitPtr,[]
+                    ;"op1",!oblivConstBitPtr,[] ;"op2",!oblivConstBitPtr,[]
+                    ;"bitcount",!typeOfSizeOf,[]
+                    ] in
+    let ftype = TFun (TVoid [],Some fargTypes,false,[]) in
+    fref := Lval (Var (makeGlobalVar fname ftype),NoOffset)
+    ) compops;
+  (* TODO roll these up *)
   condAssignKnown := begin
-    let fargTypes = [ "dest",!oblivBitPtr,[]; "cond",!oblivBitPtr,[]
+    let fargTypes = [ "dest",!oblivBitPtr,[]; "cond",!oblivConstBitPtr,[]
                     ; "bitcount",intType,[]; "val",widestType,[] ] in
     let ftype = TFun (TVoid [],Some fargTypes,false,[]) in
     Lval (Var (makeGlobalVar "__obliv_c__condAssignKnown" ftype),NoOffset)
   end;
   condSimpleObliv := begin
-    let fargTypes = [ "dest",!oblivBitPtr,[]; "src",!oblivBitPtr,[]
+    let fargTypes = [ "dest",!oblivBitPtr,[]; "src",!oblivConstBitPtr,[]
                     ; "bitcount",intType,[] ] in
     let ftype = TFun (TVoid [], Some fargTypes, false, []) in
     Lval (Var (makeGlobalVar "__obliv_c__copySimpleObliv" ftype),NoOffset)
   end;
-  setNotEqual := begin
-    let fargTypes = ["dest",!oblivBitPtr,[]
-                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]
-                    ;"bitcount",intType,[]] in
-    let ftype = TFun(TVoid[], Some fargTypes, false, []) in
-    Lval (Var (makeGlobalVar "__obliv_c__setNotEqual" ftype),NoOffset)
-  end;
-  setLessThan := begin
-    let fargTypes = ["dest",!oblivBitPtr,[]
-                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]
-                    ;"bitcount",intType,[] ] in
-    let ftype = TFun (TVoid [], Some fargTypes, false, []) in
-    Lval (Var (makeGlobalVar "__obliv_c__setLessThan" ftype),NoOffset)
-  end;
   setLogicalAnd := begin
     let fargTypes = ["dest",!oblivBitPtr,[]
-                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]] in
+                    ;"op1",!oblivConstBitPtr,[];"op2",!oblivConstBitPtr,[]] in
     let ftype = TFun (TVoid[], Some fargTypes, false, []) in
     Lval (Var (makeGlobalVar "__obliv_c__setBitAnd" ftype),NoOffset)
   end;
   setLogicalXor := begin
     let fargTypes = ["dest",!oblivBitPtr,[]
-                    ;"op1",!oblivBitPtr,[];"op2",!oblivBitPtr,[]] in
+                    ;"op1",!oblivConstBitPtr,[];"op2",!oblivConstBitPtr,[]] in
     let ftype = TFun (TVoid[], Some fargTypes, false, []) in
     Lval (Var (makeGlobalVar "__obliv_c__setBitXor" ftype),NoOffset)
   end
@@ -230,18 +250,43 @@ end
 
 (* Just copy doesn't cut it. Need a single function for op-and-assign *)
 let codegenInstr curCond (instr:instr) : instr = 
+  let namedOblivTInt tv = match tv with
+  | TNamed ({tname = tn},[]) -> 
+      begin match tn with
+      | "__obliv_c__bool" | "__obliv_c__char" | "__obliv_c__short"
+      | "__obliv_c__long" | "__obliv_c__int"  | "__obliv_c__lLong" -> true
+      | _ -> false
+      end
+  | _ -> false
+  in
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
+  begin match instr with
+  | Set(v,BinOp(Eq,Lval(e1),Lval(e2),t),loc) -> 
+      ignore (Pretty.printf "Equal result type: '%a'\n" d_type t);
+      ignore (Pretty.printf "Equal param type: '%a' '%a'\n" 
+        d_type (typeOfLval e1) d_type (typeOfLval e2));
+      Printf.printf "isSimpleObliv result: %B\n" (isOblivSimple t);
+      Printf.printf "simptemp result: %B\n" (simptemp v)
+  | _ -> ()
+  end;
   match instr with
   | Set(v,BinOp(op,Lval(e1),Lval(e2),t),loc) 
+  (* TODO fold this up *)
       when isOblivSimple t && simptemp v ->
+        let size t = 
+          if namedOblivTInt t then
+            raise (Failure "fix this mess, the types are already named")
+          else kinteger !kindOfSizeOf (oblivBitsSizeOf t) in
         begin match op with
         | Lt -> Call(None,!setLessThan,
-                  [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
+                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
         | LAnd -> Call(None,!setLogicalAnd,
-                  [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
+                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
         | Ne -> Call(None,!setNotEqual,
-                  [AddrOf v;AddrOf e1;AddrOf e2;SizeOf t],loc)
+                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
+        | Eq -> Call(None,!setEqualTo,
+                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
         | _ -> instr
         end
   | Set(v,CastE(destt,srcx),loc) when isOblivSimple destt -> begin
@@ -254,6 +299,10 @@ let codegenInstr curCond (instr:instr) : instr =
 
 class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
   inherit nopCilVisitor
+  method vtype t = match t with
+  | TInt(k,a) when hasOblivAttr a -> ChangeTo (setTypeAttrs (intTargetType k) a)
+  | _ -> DoChildren
+
   method vstmt s = match s.skind with
   | Instr ilist -> 
       ChangeTo (mkStmt (Instr (List.map (codegenInstr curCond) ilist)))
