@@ -85,13 +85,13 @@ void __obliv_c__feedOblivBits(OblivBit* dest, int party
                              ,const bool* src,size_t size)
   { while(size--) __obliv_c__feedOblivBool(dest++,party,*(src++)); }
 
-void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
-                              ,widest_t v,size_t size)
+inline void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
+                                     ,widest_t v,size_t size)
 { spec->dest=dest;
   spec->src=v;
   spec->size=size;
 }
-void __obliv_c__feedOblivInputs(OblivInputs* spec,size_t count,int party)
+inline void __obliv_c__feedOblivInputs(OblivInputs* spec,size_t count,int party)
 { while(count--)
   { bool bits[sizeof(widest_t)];
     int i;
@@ -104,12 +104,14 @@ void __obliv_c__feedOblivInputs(OblivInputs* spec,size_t count,int party)
   }
 }
 
-bool __obliv_c__revealOblivBool(OblivBit* dest,int party)
-{ if(party==0 || party!=currentProto.thisParty) return false;
+inline bool __obliv_c__revealOblivBool(const OblivBit* dest,int party)
+{ if(party!=0 && party!=currentProto.thisParty) return false;
   else return dest->val;
 }
-widest_t __obliv_c__revealOblivBits(OblivBit* dest,size_t size,int party)
+inline widest_t __obliv_c__revealOblivBits
+  (const OblivBit* dest,size_t size,int party)
 { widest_t rv=0;
+  if(party!=0 && party!=currentProto.thisParty) return false;
   while(size-->0) rv=(rv<<1)+(dest++)->val;
   return rv;
 }
@@ -317,3 +319,38 @@ void __obliv_c__condSub(const OblivBit* c,OblivBit* dest
   for(i=0;i<size;++i) __obliv_c__setBitAnd(t+i,c,x+i);
   __obliv_c__setBitsSub(dest,NULL,dest,t,NULL,size);
 }
+
+// ---- Translated versions of obliv.h functions ----------------------
+
+// TODO remove __obliv_c prefix and make these functions static/internal
+
+void setupOblivBool(OblivInputs* spec, OblivBit* dest, bool v)
+  { __obliv_c__setupOblivBits(spec,dest,v,1); }
+void setupOblivChar(OblivInputs* spec, OblivBit* dest, char v)
+  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
+void setupOblivInt(OblivInputs* spec, OblivBit* dest, int v)
+  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
+void setupOblivShort(OblivInputs* spec, OblivBit* dest, short v)
+  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
+void setupOblivLong(OblivInputs* spec, OblivBit* dest, long v)
+  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
+void setupOblivLLong(OblivInputs* spec, OblivBit* dest, long long v)
+  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
+
+void feedOblivInputs(OblivInputs* spec, size_t count, int party)
+  { __obliv_c__feedOblivInputs(spec,count,party); }
+
+bool revealOblivBool(const OblivBit* src,int party)
+  { return __obliv_c__revealOblivBool(src,party); }
+char revealOblivChar(const OblivBit* src,int party)
+  { return (char)__obliv_c__revealOblivBits(src,bitsize(char),party); }
+int revealOblivInt(const OblivBit* src,int party)
+  { return (int)__obliv_c__revealOblivBits(src,bitsize(int),party); }
+short revealOblivShort(const OblivBit* src,int party)
+  { return (short)__obliv_c__revealOblivBits(src,bitsize(short),party); }
+long revealOblivLong(const OblivBit* src,int party)
+  { return (long)__obliv_c__revealOblivBits(src,bitsize(long),party); }
+long long revealOblivLLong(const OblivBit* src,int party)
+  { return (long long)__obliv_c__revealOblivBits(src,bitsize(long long)
+                                                 ,party); }
+

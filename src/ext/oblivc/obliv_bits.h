@@ -2,23 +2,12 @@
 #define OBLIV_BITS_H
 #include<stddef.h> // size_t
 #include<stdbool.h>
+// This file gets included in every C intermediate file generated from obliv-C
 
 // TODO make parameter orders more consistent: dest, src, size, cond etc.
 
-// Internals of this struct may change. Do not rely on fields
-typedef struct {
-  int sock;
-  int yaoCount,xorCount;
-  int partyCount, thisParty;
-  // Other state for OT, random keys etc.
-} ProtocolDesc;
-
-typedef struct OblivInputs {
-  // private fields, do not use directly
-  unsigned long long src;
-  struct OblivBit* dest;
-  size_t size;
-} OblivInputs;
+// import common types
+#include<obliv_types.h>
 
 typedef long long widest_t;
 typedef struct OblivBit {
@@ -58,6 +47,7 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a);
 void __obliv_c__flipBit(OblivBit* dest); // Avoids a struct copy
 
+/*
 // Obliv input/output
 // Hate the inconsistency: it is Bit everywhere but here it is Bool
 // feedOblivInput ignores its bool parameter if party != thisParty
@@ -72,6 +62,7 @@ void __obliv_c__feedOblivInputs(OblivInputs* spec,size_t count,int party);
 bool __obliv_c__revealOblivBool(OblivBit* dest,int party);
 widest_t __obliv_c__revealOblivBits(OblivBit* dest,size_t size,int party); 
   // cast out result
+  */
 // End protocol-specific zone
 
 // Careful with this function: obliv things must be done in-sync by all parties

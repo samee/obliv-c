@@ -43,3 +43,9 @@ inline void __obliv_c__setupOblivBits(...) {...}
 // This one has been transalated from obliv bool
 void setupOblivBool(OblivInputs* spec, OblivBit* dest, bool v);
   { __obliv_c__setupOblivBits(spec,dest,v,1); }
+  
+  
+So the process is:
+* Typecheck (and assign obliv type to expressions)
+* Simplify
+* Typechange and Codegen

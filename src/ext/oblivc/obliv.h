@@ -1,45 +1,31 @@
 #ifndef OBLIV_H
 #define OBLIV_H
-#include<obliv_bits.h>
 
-#ifdef __GNUC__
-#define inline __inline__
-#endif
+#include<obliv_types.h>
 
-inline void setupOblivBool(OblivInputs* spec, OblivBit* dest, bool v)
-  { __obliv_c__setupOblivBits(spec,dest,v,1); }
-inline void setupOblivChar(OblivInputs* spec, OblivBit* dest, char v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-inline void setupOblivInt(OblivInputs* spec, OblivBit* dest, int v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-inline void setupOblivShort(OblivInputs* spec, OblivBit* dest, short v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-inline void setupOblivLong(OblivInputs* spec, OblivBit* dest, long v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-inline void setupOblivLLong(OblivInputs* spec, OblivBit* dest, long long v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
+// This header should only have functions directly used by the user,
+//   not functions that will appear in the generated C code.
+//   Moreover, including this function in an obliv-C file should still
+//   keep it a valid obliv-C file after preprocessing. So e.g., no magic
+//   conversion from obliv int to OblivBits* inside inline functions.
+//   In fact, user code should never be aware of OblivBits type.
 
-inline void feedOblivInputs(OblivInputs* spec, size_t count, int party)
-  { __obliv_c__feedOblivInputs(spec,count,party); }
+// Right now, just input/output functions are here
 
-inline bool revealOblivBool(OblivBit* src,int party)
-  { return __obliv_c__revealOblivBool(src,party); }
-inline char revealOblivChar(OblivBit* src,int party)
-  { return (char)__obliv_c__revealOblivBits(src,bitsize(char),party); }
-inline int revealOblivInt(OblivBit* src,int party)
-  { return (int)__obliv_c__revealOblivBits(src,bitsize(int),party); }
-inline short revealOblivShort(OblivBit* src,int party)
-  { return (short)__obliv_c__revealOblivBits(src,bitsize(short),party); }
-inline long revealOblivLong(OblivBit* src,int party)
-  { return (long)__obliv_c__revealOblivBits(src,bitsize(long),party); }
-inline long long revealOblivLLong(OblivBit* src,int party)
-  { return (long long)__obliv_c__revealOblivBits(src,bitsize(long long)
-                                                 ,party); }
+void setupOblivBool(OblivInputs* spec, obliv bool* dest, bool v);
+void setupOblivChar(OblivInputs* spec, obliv char* dest, char v);
+void setupOblivInt(OblivInputs* spec, obliv int* dest, int v);
+void setupOblivShort(OblivInputs* spec, obliv short* dest, short v);
+void setupOblivLong(OblivInputs* spec, obliv long* dest, long v);
+void setupOblivLLong(OblivInputs* spec, obliv long long * dest, long long v);
 
-#undef bitsize
+void feedOblivInputs(OblivInputs* spec, size_t count, int party);
 
-#ifdef __GNUC__
-#undef inline
-#endif
+bool revealOblivBool(const obliv bool* src,int party);
+char revealOblivChar(const obliv char* src,int party);
+int revealOblivInt(const obliv int* src,int party);
+short revealOblivShort(const obliv short* src,int party);
+long revealOblivLong(const obliv long* src,int party);
+long long revealOblivLLong(const obliv long long* src,int party);
 
 #endif // OBLIV_H
