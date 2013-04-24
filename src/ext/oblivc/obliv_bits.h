@@ -39,31 +39,12 @@ void __obliv_c__assignBitKnown(OblivBit* dest, bool value);
 void __obliv_c__copyBit(OblivBit* dest, const OblivBit* src);
 bool __obliv_c__bitIsKnown(const OblivBit* bit,bool* val);
 
-// Begin protocol-specific zone
 // TODO error vars
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a);
 void __obliv_c__flipBit(OblivBit* dest); // Avoids a struct copy
-
-/*
-// Obliv input/output
-// Hate the inconsistency: it is Bit everywhere but here it is Bool
-// feedOblivInput ignores its bool parameter if party != thisParty
-// revealOblivOutput always returns false if party != thisParty
-void __obliv_c__feedOblivBool(OblivBit* dest,int party,bool a);
-void __obliv_c__feedOblivBits(OblivBit* dest,int party
-                             ,const bool* src,size_t size);
-void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
-                              ,widest_t v,size_t size);
-void __obliv_c__feedOblivInputs(OblivInputs* spec,size_t count,int party);
-// Output is simpler
-bool __obliv_c__revealOblivBool(OblivBit* dest,int party);
-widest_t __obliv_c__revealOblivBits(OblivBit* dest,size_t size,int party); 
-  // cast out result
-  */
-// End protocol-specific zone
 
 // Careful with this function: obliv things must be done in-sync by all parties
 // Therefore actions in if(currentParty==me) {...} must not touch obliv data

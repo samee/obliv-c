@@ -64,7 +64,7 @@ let rec isOblivBlock b =
 
 let oblivIntType = addOblivType intType
 let oblivCharType = addOblivType charType
-let oblivBoolType = oblivCharType
+let oblivBoolType = addOblivType (TInt(IBool,[]))
 
 let widestType =  let tinfo = { tname = "widest_t"
                               ; ttype = TInt (ILongLong,[])
@@ -246,9 +246,35 @@ class typeCheckVisitor = object
   end
 end
 
+let constAttr = Attr("const",[])
+let voidFunc name argTypes =
+  let ftype = TFun(TVoid [], Some argTypes,false,[]) in
+  Lval(Var(makeGlobalVar name ftype),NoOffset)
+
+
+let setComparison fname dest s1 s2 loc = 
+  let optype = typeOfLval s1 in
+  let coptype = typeAddAttributes [constAttr] optype in
+  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
+                  ;"s1",TPtr(coptype,[]),[];"s2",TPtr(coptype,[]),[]
+                  ;"bitcount",!typeOfSizeOf,[]
+                  ] in
+  let func = voidFunc fname fargTypes in
+  Call(None,func,[AddrOf dest; AddrOf s1; AddrOf s2
+                 ;kinteger !kindOfSizeOf (oblivBitsSizeOf optype)],loc)
+
+let setLogicalOp fname dest s1 s2 loc = 
+  let cbool = typeAddAttributes [constAttr] oblivBoolType in
+  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
+                  ;"s1",TPtr(cbool,[]),[];"s2",TPtr(cbool,[]),[]
+                  ;"bitcount",!typeOfSizeOf,[]
+                  ] in
+  let func = voidFunc fname fargTypes in
+  Call(None,func,[AddrOf dest; AddrOf s1; AddrOf s2],loc)
 
 (* Just copy doesn't cut it. Need a single function for op-and-assign *)
 let codegenInstr curCond (instr:instr) : instr = 
+  (*
   let namedOblivTInt tv = match tv with
   | TNamed ({tname = tn},[]) -> 
       begin match tn with
@@ -258,32 +284,28 @@ let codegenInstr curCond (instr:instr) : instr =
       end
   | _ -> false
   in
+  *)
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
   match instr with
   | Set(v,BinOp(op,Lval(e1),Lval(e2),t),loc) 
   (* TODO fold this up *)
       when isOblivSimple t && simptemp v ->
-        let size t = 
-          if namedOblivTInt t then
-            raise (Failure "fix this mess, the types are already named")
-          else kinteger !kindOfSizeOf (oblivBitsSizeOf t) in
         begin match op with
-        | Lt -> Call(None,!setLessThan,
-                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
-        | LAnd -> Call(None,!setLogicalAnd,
-                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
-        | Ne -> Call(None,!setNotEqual,
-                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
-        | Eq -> Call(None,!setEqualTo,
-                  [AddrOf v;AddrOf e1;AddrOf e2;size t],loc)
+        | Lt -> setComparison "__obliv_c__setLessThan" v e1 e2 loc
+        | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
+        | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
+        | LAnd -> setLogicalOp "__obliv_c__setLogicalAnd" v e1 e2 loc
         | _ -> instr
         end
+  (*
+  (* FIXME this is all wrong: uses SizeOf, doesn't check source etc. *)
   | Set(v,CastE(destt,srcx),loc) when isOblivSimple destt -> begin
         let isize = SizeOf (typeOf(Lval v)) in
         let condval = (Var curCond,NoOffset) in
-        Call(None,!condAssignKnown,[AddrOf v;AddrOf condval;isize;srcx],loc)
+        Call(None,!condAssignKnown,[StartOf v;StartOf condval;isize;srcx],loc)
       end
+  *)
   | _ -> instr
 
 
@@ -298,6 +320,7 @@ class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
   method vstmt s = match s.skind with
   | Instr ilist -> 
       ChangeTo (mkStmt (Instr (List.map (codegenInstr curCond) ilist)))
+      (*
   | If(c,tb,fb,loc) when isOblivBlock tb ->
       let cv = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
       let ct = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
@@ -314,7 +337,9 @@ class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
       let ts = mkStmt (Block (visitSubBlock ct tb)) in
       let fs = mkStmt (Block (visitSubBlock cf fb)) in
       ChangeTo (mkStmt (Block {battrs=[]; bstmts=[cs;ts;fs]}))
+    *)
   | _ -> DoChildren
+
   method vblock b = if isOblivBlock b
     then ChangeDoChildrenPost 
           ( { b with battrs = dropAttribute "obliv" b.battrs }
@@ -346,11 +371,9 @@ let feature : featureDescr =
     (function (f: file) -> 
       let tcVisitor = new typeCheckVisitor in
       visitCilFileSameGlobals tcVisitor f;
-      (*
       SimplifyTagged.feature.fd_doit f;
       mapGlobals f genFunc;
       visitCilFileSameGlobals (new rmSimplifyVisitor) f
-      *)
     );
     fd_post_check = true;
   } 

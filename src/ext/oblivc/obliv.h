@@ -21,11 +21,11 @@ void setupOblivLLong(OblivInputs* spec, obliv long long * dest, long long v);
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party);
 
-bool revealOblivBool(const obliv bool* src,int party);
-char revealOblivChar(const obliv char* src,int party);
-int revealOblivInt(const obliv int* src,int party);
-short revealOblivShort(const obliv short* src,int party);
-long revealOblivLong(const obliv long* src,int party);
-long long revealOblivLLong(const obliv long long* src,int party);
+bool revealOblivBool(obliv bool src,int party);
+char revealOblivChar(obliv char src,int party);
+int revealOblivInt(obliv int src,int party);
+short revealOblivShort(obliv short src,int party);
+long revealOblivLong(obliv long src,int party);
+long long revealOblivLLong(obliv long long src,int party);
 
 #endif // OBLIV_H
