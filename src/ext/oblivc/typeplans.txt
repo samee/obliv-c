@@ -1,0 +1,45 @@
+The entire obliv-c program has to properly typecheck after preprocessing.
+So the following cannot work:
+
+// obliv.h
+
+inline void setupOblivBool(OblivInputs* spec, OblivBit* dest, bool v)
+  { __obliv_c__setupOblivBits(spec,dest,v,1); }
+
+// test.c
+
+int main()
+{
+  obliv bool x;
+  OblivInput oi;
+  setupOblivBool(&oi,&x,true);
+  return 0;
+}
+
+This is because obliv bool* input won't match with OblivBit*. This is creating
+all sorts of problems with implicit casts into Obliv* obliv, something
+that shouldn't exist.
+
+So instead, we need this:
+
+// obliv.h
+
+void setupOblivBool(OblivInputs* spec, obliv bool* dest, bool v);
+
+// test.c
+
+int main()
+{
+  obliv bool x;
+  OblivInput oi;
+  setupOblivBool(&oi,&x,true);
+  return 0;
+}
+
+// obliv_bits.h
+
+inline void __obliv_c__setupOblivBits(...) {...}
+
+// This one has been transalated from obliv bool
+void setupOblivBool(OblivInputs* spec, OblivBit* dest, bool v);
+  { __obliv_c__setupOblivBits(spec,dest,v,1); }
