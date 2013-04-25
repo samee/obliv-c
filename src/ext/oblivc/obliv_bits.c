@@ -1,6 +1,10 @@
 #include <obliv_bits.h>
 #include <stdio.h> // XXX
 
+// Q: What's with all these casts to and from void* ?
+// A: Code generation becomes easier without the need for extraneous casts.
+//      Might fix it some day. But user code never sees these anyway.
+
 // Right now, we do not support multiple protocols at the same time
 ProtocolDesc currentProto;
 
@@ -148,34 +152,41 @@ void bitwiseOp(OblivBit* dest,const OblivBit* a,const OblivBit* b,size_t size
   { while(size-->0) f(dest++,a++,b++); }
 
 
-void __obliv_c__setBitwiseAnd (OblivBit* dest
-                              ,const OblivBit* op1,const OblivBit* op2
+void __obliv_c__setBitwiseAnd (void* vdest
+                              ,const void* vop1,const void* vop2
                               ,size_t size)
-  { bitwiseOp(dest,op1,op2,size,__obliv_c__setBitAnd); }
+  { bitwiseOp(vdest,vop1,vop2,size,__obliv_c__setBitAnd); }
 
-void __obliv_c__setBitwiseOr  (OblivBit* dest
-                              ,const OblivBit* op1,const OblivBit* op2
+void __obliv_c__setBitwiseOr  (void* vdest
+                              ,const void* vop1,const void* vop2
                               ,size_t size)
-  { bitwiseOp(dest,op1,op2,size,__obliv_c__setBitOr); }
+  { bitwiseOp(vdest,vop1,vop2,size,__obliv_c__setBitOr); }
 
-void __obliv_c__setBitwiseXor (OblivBit* dest
-                              ,const OblivBit* op1,const OblivBit* op2
+void __obliv_c__setBitwiseXor (void* vdest
+                              ,const void* vop1,const void* vop2
                               ,size_t size)
-  { bitwiseOp(dest,op1,op2,size,__obliv_c__setBitXor); }
+  { bitwiseOp(vdest,vop1,vop2,size,__obliv_c__setBitXor); }
 
-void __obliv_c__setBitwiseNot (OblivBit* dest,const OblivBit* op,size_t size)
-  { while(size-->0) __obliv_c__setBitNot(dest++,op++); }
+void __obliv_c__setBitwiseNot (void* vdest,const void* vop,size_t size)
+{ OblivBit *dest = vdest;
+  const OblivBit *op = vop;
+  while(size-->0) __obliv_c__setBitNot(dest++,op++); 
+}
 
-void __obliv_c__setBitwiseNotInPlace (OblivBit* dest,size_t size)
-  { while(size-->0) __obliv_c__flipBit(dest++); }
+void __obliv_c__setBitwiseNotInPlace (void* vdest,size_t size)
+{ OblivBit *dest=vdest; 
+  while(size-->0) __obliv_c__flipBit(dest++); 
+}
 
 // carryIn and/or carryOut can be NULL, in which case they are ignored
-void __obliv_c__setBitsAdd (OblivBit* dest,OblivBit* carryOut
-                           ,const OblivBit* op1,const OblivBit* op2
-                           ,const OblivBit* carryIn
+void __obliv_c__setBitsAdd (void* vdest,void* carryOut
+                           ,const void* vop1,const void* vop2
+                           ,const void* carryIn
                            ,size_t size)
 {
   OblivBit carry,bxc,axc,t;
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
   size_t skipLast;
   if(size==0)
   { if(carryIn && carryOut) __obliv_c__copyBit(carryOut,carryIn);
@@ -200,11 +211,13 @@ void __obliv_c__setBitsAdd (OblivBit* dest,OblivBit* carryOut
   }
 }
 
-void __obliv_c__setBitsSub (OblivBit* dest, OblivBit* borrowOut
-                           ,const OblivBit* op1,const OblivBit* op2
-                           ,const OblivBit* borrowIn,size_t size)
+void __obliv_c__setBitsSub (void* vdest, void* borrowOut
+                           ,const void* vop1,const void* vop2
+                           ,const void* borrowIn,size_t size)
 {
   OblivBit borrow,bxc,bxa,t;
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
   size_t skipLast;
   if(size==0)
   { if(borrowIn && borrowOut) __obliv_c__copyBit(borrowOut,borrowIn);
@@ -230,33 +243,37 @@ void __obliv_c__setBitsSub (OblivBit* dest, OblivBit* borrowOut
   }
 }
 
-void __obliv_c__setSignExtend (OblivBit* dest, size_t dsize
-                              ,const OblivBit* src, size_t ssize)
+void __obliv_c__setSignExtend (void* vdest, size_t dsize
+                              ,const void* vsrc, size_t ssize)
 {
   if(ssize>dsize) ssize=dsize;
-  __obliv_c__copyBits(dest,src,ssize);
-  const OblivBit* s = src+ssize-1;
+  OblivBit *dest = vdest;
+  __obliv_c__copyBits(vdest,vsrc,ssize);
+  const OblivBit* s = ((const OblivBit*)vsrc)+ssize-1;
   dsize-=ssize;
   dest+=ssize;
   while(dsize-->0) __obliv_c__copyBit(dest++,s);
 }
-void __obliv_c__setZeroExtend (OblivBit* dest, size_t dsize
-                              ,const OblivBit* src, size_t ssize)
+void __obliv_c__setZeroExtend (void* vdest, size_t dsize
+                              ,const void* vsrc, size_t ssize)
 {
   if(ssize>dsize) ssize=dsize;
-  __obliv_c__copyBits(dest,src,ssize);
+  OblivBit *dest = vdest;
+  __obliv_c__copyBits(vdest,vsrc,ssize);
   dsize-=ssize;
   dest+=ssize;
   while(dsize-->0) __obliv_c__assignBitKnown(dest++,0);
 }
-void __obliv_c__ifThenElse (OblivBit* dest, const OblivBit* tsrc
-                           ,const OblivBit* fsrc, size_t size
-                           ,const OblivBit* cond)
+void __obliv_c__ifThenElse (void* vdest, const void* vtsrc
+                           ,const void* vfsrc, size_t size
+                           ,const void* vcond)
 {
   OblivBit x,a;
+  OblivBit *dest=vdest;
+  const OblivBit *tsrc=vtsrc, *fsrc=vfsrc;
   while(size-->0)
   { __obliv_c__setBitXor(&x,tsrc,fsrc);
-    __obliv_c__setBitAnd(&a,cond,&x);
+    __obliv_c__setBitAnd(&a,vcond,&x);
     __obliv_c__setBitXor(dest,&a,fsrc);
     ++dest; ++fsrc; ++tsrc;
   }
@@ -278,26 +295,32 @@ void __obliv_c__setLessThanUnit (OblivBit* ltOut
     op1++; op2++;
   }
 }
-void __obliv_c__setLessThan (OblivBit* dest
-                            ,const OblivBit* op1,const OblivBit* op2
+void __obliv_c__setLessThan (void* vdest
+                            ,const void* vop1,const void* vop2
                             ,size_t size)
 {
+  OblivBit *dest=vdest;
+  const OblivBit *op1 = vop1, *op2 =  vop2;
   __obliv_c__assignBitKnown(dest,0);
   __obliv_c__setLessThanUnit(dest,op1,op2,size,dest);
 }
 
-void __obliv_c__setEqualTo (OblivBit* dest
-                           ,const OblivBit* op1,const OblivBit* op2
+void __obliv_c__setEqualTo (void* vdest
+                           ,const void* vop1,const void* vop2
                            ,size_t size)
 {
+  OblivBit *dest=vdest;
+  const OblivBit *op1 = vop1, *op2 =  vop2;
   __obliv_c__setNotEqual(dest,op1,op2,size);
   __obliv_c__flipBit(dest);
 }
-void __obliv_c__setNotEqual (OblivBit* dest
-                            ,const OblivBit* op1,const OblivBit* op2
+void __obliv_c__setNotEqual (void* vdest
+                            ,const void* vop1,const void* vop2
                             ,size_t size)
 {
   OblivBit t;
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
   __obliv_c__assignBitKnown(dest,0);
   while(size-->0)
   { __obliv_c__setBitXor(&t,op1++,op2++);
@@ -305,19 +328,19 @@ void __obliv_c__setNotEqual (OblivBit* dest
   }
 }
 
-void __obliv_c__condAdd(const OblivBit* c,OblivBit* dest
-                       ,const OblivBit* x,size_t size)
+void __obliv_c__condAdd(const void* vc,void* vdest
+                       ,const void* vx,size_t size)
 { OblivBit t[size];
   int i;
-  for(i=0;i<size;++i) __obliv_c__setBitAnd(t+i,c,x+i);
-  __obliv_c__setBitsAdd(dest,NULL,dest,t,NULL,size);
+  for(i=0;i<size;++i) __obliv_c__setBitAnd(t+i,vc,((OblivBit*)vx)+i);
+  __obliv_c__setBitsAdd(vdest,NULL,vdest,t,NULL,size);
 }
-void __obliv_c__condSub(const OblivBit* c,OblivBit* dest
-                       ,const OblivBit* x,size_t size)
+void __obliv_c__condSub(const void* vc,void* vdest
+                       ,const void* vx,size_t size)
 { OblivBit t[size];
   int i;
-  for(i=0;i<size;++i) __obliv_c__setBitAnd(t+i,c,x+i);
-  __obliv_c__setBitsSub(dest,NULL,dest,t,NULL,size);
+  for(i=0;i<size;++i) __obliv_c__setBitAnd(t+i,vc,((OblivBit*)vx)+i);
+  __obliv_c__setBitsSub(vdest,NULL,vdest,t,NULL,size);
 }
 
 // ---- Translated versions of obliv.h functions ----------------------
