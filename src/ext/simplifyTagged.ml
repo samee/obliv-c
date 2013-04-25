@@ -147,10 +147,7 @@ let rec makeThreeAddress
       E.s (bug "Simplify: There should not be a \"?:\" operator here.")
   | UnOp(uo, e1, tres) -> 
       UnOp(uo, makeBasic setTemp e1, tres)
-  | CastE(t, e) -> begin match e with 
-                   | Lval(Var _,NoOffset) when typeEqual (typeOf e) t -> e
-                   | _ ->  CastE(t, makeBasic setTemp e)
-                   end
+  | CastE(t, e) -> CastE(t, makeBasic setTemp e)
   | AddrOf lv -> begin
       if not(!simplAddrOf) then e else
       match simplifyLval setTemp lv with 
