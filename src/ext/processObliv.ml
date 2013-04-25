@@ -212,7 +212,7 @@ class typeCheckVisitor = object
         let tr = addOblivType t2 in
         BinOp(op,e1,e2,tr)
       else exp
-  | CastE (t,e) when typeEqual t (typeOf e) -> e
+  | CastE (t,e) when t = typeOf e -> e
   | CastE (t,e) -> if isOblivSimple (typeOf e) && not (isOblivSimple t) 
                      then mkCast e (addOblivType t)
                      else exp
