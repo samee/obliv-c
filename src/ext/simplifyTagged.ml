@@ -123,7 +123,8 @@ let makeSimplifyTemp f t = makeTempVar f (typeAddAttributes [simplifyTemp] t)
 
 (* Not yet needed *)
 let typeEqual t1 t2 = 
-  dropAttribute simplifyTempTok t1 = dropAttribute simplifyTempTok t2
+  dropAttribute simplifyTempTok (typeAttrs t1) 
+   = dropAttribute simplifyTempTok (typeAttrs t2)
 
 exception BitfieldAccess
 
@@ -146,8 +147,10 @@ let rec makeThreeAddress
       E.s (bug "Simplify: There should not be a \"?:\" operator here.")
   | UnOp(uo, e1, tres) -> 
       UnOp(uo, makeBasic setTemp e1, tres)
-  | CastE(t, e) -> 
-      if typeOf e = t then e else CastE(t, makeBasic setTemp e)
+  | CastE(t, e) -> begin match e with 
+                   | Lval(Var _,NoOffset) when typeEqual (typeOf e) t -> e
+                   | _ ->  CastE(t, makeBasic setTemp e)
+                   end
   | AddrOf lv -> begin
       if not(!simplAddrOf) then e else
       match simplifyLval setTemp lv with 
