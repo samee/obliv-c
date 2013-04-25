@@ -121,6 +121,10 @@ let simplifyTemp = Attr(simplifyTempTok,[])
 
 let makeSimplifyTemp f t = makeTempVar f (typeAddAttributes [simplifyTemp] t)
 
+(* Not yet needed *)
+let typeEqual t1 t2 = 
+  dropAttribute simplifyTempTok t1 = dropAttribute simplifyTempTok t2
+
 exception BitfieldAccess
 
 (* Turn an expression into a three address expression (and queue some 
@@ -143,7 +147,7 @@ let rec makeThreeAddress
   | UnOp(uo, e1, tres) -> 
       UnOp(uo, makeBasic setTemp e1, tres)
   | CastE(t, e) -> 
-      CastE(t, makeBasic setTemp e)
+      if typeOf e = t then e else CastE(t, makeBasic setTemp e)
   | AddrOf lv -> begin
       if not(!simplAddrOf) then e else
       match simplifyLval setTemp lv with 
@@ -263,6 +267,7 @@ and simplifyLval
       in
       let a' = if !simpleMem then makeBasic setTemp a' else a' in
       Mem (mkCast a' (typeForCast restoff)), restoff
+  | Var _, NoOffset -> lv
   (* We are taking this variable's address; but suppress simplification if it's a simple function
    * call in no-convert-function-calls mode*)
   | Var v, off when v.vaddrof && (!convertDirectCalls || not (isFunctionType (typeOfLval lv) ))  ->
