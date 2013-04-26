@@ -252,22 +252,53 @@ let setLogicalOp fname dest s1 s2 loc =
   let func = voidFunc fname fargTypes in
   Call(None,func,[AddrOf dest; AddrOf s1; AddrOf s2],loc)
 
+let setKnownInt v k x loc = 
+  let fargTypes = ["dest",TPtr(typeOfLval v,[]),[]
+                  ;"bitcount",!typeOfSizeOf,[]
+                  ;"value",TInt(ILongLong,[]),[]
+                  ] in
+  let func = voidFunc "__obliv_c__setSignedKnown" fargTypes in
+  Call(None,func,[ AddrOf v; kinteger !kindOfSizeOf (oblivBitsSizeOf (typeOf x))
+                 ; CastE(TInt(ILongLong,[]),x) 
+                 ],loc)
+
+let trueCond = makeGlobalVar "__obliv_c__trueCond" oblivBoolType
+
+(* Codegen, when conditions don't matter *)
+let codegenUncondInstr (instr:instr) : instr = match instr with
+| Set(v,BinOp(op,Lval e1,Lval e2,t),loc) when isOblivSimple t ->
+    begin match op with
+    | Lt -> setComparison "__obliv_c__setLessThan" v e1 e2 loc
+    | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
+    | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
+    | LAnd -> setLogicalOp "__obliv_c__setLogicalAnd" v e1 e2 loc
+    | _ -> instr
+    end
+| Set(v,CastE(TInt(k,a) as dt,x),loc) when isOblivSimple dt -> 
+    if not (isOblivSimple (typeOf x)) then
+      setKnownInt v k x loc
+    else instr
+      (* TODO
+    (* (* Sign/zero extend already truncates in the library *)
+    else if source is wider then
+      truncate
+      *)
+    (* Think harder about extending laws *)
+    else if dest is signed then
+      setSignExtend
+    else setZeroExtend
+    *)
+| _ -> instr
+
+
 (* Just copy doesn't cut it. Need a single function for op-and-assign *)
 let codegenInstr curCond (instr:instr) : instr = 
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
-  match instr with
-  | Set(v,BinOp(op,Lval(e1),Lval(e2),t),loc) 
-      when isOblivSimple t && simptemp v ->
-        begin match op with
-        | Lt -> setComparison "__obliv_c__setLessThan" v e1 e2 loc
-        | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
-        | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
-        | LAnd -> setLogicalOp "__obliv_c__setLogicalAnd" v e1 e2 loc
-        | _ -> instr
-        end
+  if curCond == trueCond then codegenUncondInstr instr
+  else match instr with 
+  | Set(v,_,_) when simptemp v -> codegenUncondInstr instr
   | _ -> instr
-
 
 class typeFixVisitor : cilVisitor = object
   inherit nopCilVisitor
@@ -284,24 +315,22 @@ class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
   method vstmt s = match s.skind with
   | Instr ilist -> 
       ChangeTo (mkStmt (Instr (List.map (codegenInstr curCond) ilist)))
-      (*
   | If(c,tb,fb,loc) when isOblivBlock tb ->
       let cv = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
       let ct = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
       let cf = SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType in
       let visitSubBlock cond blk = 
         visitCilBlock (new codegenVisitor curFunc cond) blk in
-      let cs = mkStmt (Instr 
-        [ codegenInstr curCond (Set (var cv,c,loc))
-        ; codegenInstr curCond (Set (var ct,
-            BinOp(LAnd,Lval(var cv),Lval(var curCond),oblivBoolType),loc))
-        ; codegenInstr curCond (Set (var cf,
-            BinOp(Ne  ,Lval(var ct),Lval(var curCond),oblivBoolType),loc))
-        ]) in
+      let cs = mkStmt (Instr (List.map (codegenInstr trueCond)
+        [ Set (var cv,c,loc)
+        ; Set (var ct,BinOp(LAnd,Lval(var cv)
+                                ,Lval(var curCond),oblivBoolType),loc)
+        ; Set (var cf,BinOp(Ne  ,Lval(var ct)
+                                ,Lval(var curCond),oblivBoolType),loc)
+        ])) in
       let ts = mkStmt (Block (visitSubBlock ct tb)) in
       let fs = mkStmt (Block (visitSubBlock cf fb)) in
       ChangeTo (mkStmt (Block {battrs=[]; bstmts=[cs;ts;fs]}))
-    *)
   | _ -> DoChildren
 
   method vblock b = if isOblivBlock b
@@ -310,8 +339,6 @@ class codegenVisitor (curFunc:fundec) (curCond:varinfo) : cilVisitor = object
           , fun x -> x)
     else DoChildren
 end
-
-let trueCond = makeGlobalVar "__obliv_c__trueCond" oblivBoolType
 
 let genFunc g = match g with
 | GFun(f,loc) -> GFun(visitCilFunction (new codegenVisitor f trueCond) f,loc)

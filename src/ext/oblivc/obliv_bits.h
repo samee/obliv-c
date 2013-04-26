@@ -29,6 +29,8 @@ typedef OblivBit __obliv_c__short[bitsize(short)];
 typedef OblivBit __obliv_c__long[bitsize(long)];
 typedef OblivBit __obliv_c__lLong[bitsize(long long)];
 
+const __obliv_c__bool __obliv_c__trueCond = {{true,true}};
+
 // TODO protocol initialization functions
 void setCurrentParty(ProtocolDesc* pd, int party);
 void execOblivProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
