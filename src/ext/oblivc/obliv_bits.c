@@ -123,16 +123,18 @@ inline widest_t __obliv_c__revealOblivBits
 int __obliv_c__currentParty() { return currentProto.thisParty; }
 
 void __obliv_c__setSignedKnown
-  (OblivBit* dest, size_t size, long long signed value)
+  (void* vdest, size_t size, long long signed value)
 {
+  OblivBit* dest=vdest;
   while(size-->0)
   { __obliv_c__assignBitKnown(dest,value&1);
     value>>=1; dest++;
   }
 }
 void __obliv_c__setUnsignedKnown
-  (OblivBit* dest, size_t size, long long unsigned value)
+  (void* vdest, size_t size, long long unsigned value)
 {
+  OblivBit* dest=vdest;
   while(size-->0)
   { __obliv_c__assignBitKnown(dest,value&1);
     value>>=1; dest++;

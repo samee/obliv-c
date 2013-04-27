@@ -29,7 +29,7 @@ typedef OblivBit __obliv_c__short[bitsize(short)];
 typedef OblivBit __obliv_c__long[bitsize(long)];
 typedef OblivBit __obliv_c__lLong[bitsize(long long)];
 
-const __obliv_c__bool __obliv_c__trueCond = {{true,true}};
+static const __obliv_c__bool __obliv_c__trueCond = {{true,true}};
 
 // TODO protocol initialization functions
 void setCurrentParty(ProtocolDesc* pd, int party);
@@ -57,9 +57,9 @@ int  __obliv_c__currentParty();
 //   to the same object).
 // unconditional versions:
 void __obliv_c__setSignedKnown
-  (OblivBit* dest, size_t size,signed long long value);
+  (void * dest, size_t size,signed long long value);
 void __obliv_c__setUnsignedKnown
-  (OblivBit* dest, size_t size,unsigned long long value);
+  (void * dest, size_t size,unsigned long long value);
 void __obliv_c__setBitsKnown(OblivBit* dest, const bool* value, size_t size);
 void __obliv_c__copyBits(OblivBit* dest, const OblivBit* src, size_t size);
 // allBitsKnown leave dest in an unspecified state if all bits are not known
@@ -111,6 +111,15 @@ void __obliv_c__setNotEqual (void* dest
                             ,size_t size);
 
 // Conditionals (TODO other operators) that may be faster at times
+static inline 
+void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size
+                               ,widest_t val)
+{
+  OblivBit ov[bitsize(widest_t)];
+  __obliv_c__setSignedKnown(ov,size,val);
+  __obliv_c__ifThenElse(dest,ov,dest,size,cond);
+}
+
 void __obliv_c__condAdd(const void* c,void* dest
                        ,const void* x,size_t size);
 

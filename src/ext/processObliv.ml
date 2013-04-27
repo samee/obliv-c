@@ -244,22 +244,40 @@ let setComparison fname dest s1 s2 loc =
                  ;kinteger !kindOfSizeOf (oblivBitsSizeOf optype)],loc)
 
 let setLogicalOp fname dest s1 s2 loc = 
-  let cbool = typeAddAttributes [constAttr] oblivBoolType in
-  let fargTypes = ["dest",TPtr(oblivBoolType,[]),[]
-                  ;"s1",TPtr(cbool,[]),[];"s2",TPtr(cbool,[]),[]
+  (*
+  let cbool = typeAddAttributes [constAttr] oblivBoolType in *)
+  let cOblivBitPtr = TPtr(typeAddAttributes [Attr("const",[])] 
+                                            !oblivBitType,[]) in
+  let fargTypes = ["dest",!oblivBitPtr,[]
+                  ;"s1",cOblivBitPtr,[];"s2",cOblivBitPtr,[]
                   ;"bitcount",!typeOfSizeOf,[]
                   ] in
   let func = voidFunc fname fargTypes in
-  Call(None,func,[AddrOf dest; AddrOf s1; AddrOf s2],loc)
+  Call(None,func,[CastE(!oblivBitPtr,AddrOf dest)
+                 ;CastE(cOblivBitPtr,AddrOf s1)
+                 ;CastE(cOblivBitPtr,AddrOf s2)],loc)
 
 let setKnownInt v k x loc = 
   let fargTypes = ["dest",TPtr(typeOfLval v,[]),[]
                   ;"bitcount",!typeOfSizeOf,[]
-                  ;"value",TInt(ILongLong,[]),[]
+                  ;"value",widestType,[]
                   ] in
   let func = voidFunc "__obliv_c__setSignedKnown" fargTypes in
   Call(None,func,[ AddrOf v; kinteger !kindOfSizeOf (oblivBitsSizeOf (typeOf x))
-                 ; CastE(TInt(ILongLong,[]),x) 
+                 ; CastE(widestType,CastE(TInt(k,[]),x))
+                 ],loc)
+
+let xoBitsSizeOf t = kinteger !kindOfSizeOf (oblivBitsSizeOf t)
+
+let condSetKnownInt c v k x loc = 
+  let fargTypes = ["cond",TPtr(oblivBoolType,[]),[]
+                  ;"dest",TPtr(typeOfLval v,[]),[]
+                  ;"size",!typeOfSizeOf,[]
+                  ;"val",widestType,[]
+                  ] in
+  let func = voidFunc "__obliv_c__condAssignKnown" fargTypes in
+  Call(None,func,[ AddrOf (var c); AddrOf v; xoBitsSizeOf (typeOf x)
+                 ; CastE(widestType,CastE(TInt(k,[]),x))
                  ],loc)
 
 let trueCond = makeGlobalVar "__obliv_c__trueCond" oblivBoolType
@@ -271,7 +289,7 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
     | Lt -> setComparison "__obliv_c__setLessThan" v e1 e2 loc
     | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
     | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
-    | LAnd -> setLogicalOp "__obliv_c__setLogicalAnd" v e1 e2 loc
+    | LAnd -> setLogicalOp "__obliv_c__setBitAnd" v e1 e2 loc
     | _ -> instr
     end
 | Set(v,CastE(TInt(k,a) as dt,x),loc) when isOblivSimple dt -> 
@@ -298,6 +316,10 @@ let codegenInstr curCond (instr:instr) : instr =
   if curCond == trueCond then codegenUncondInstr instr
   else match instr with 
   | Set(v,_,_) when simptemp v -> codegenUncondInstr instr
+  | Set(v,CastE(TInt(k,a),x),loc) when isOblivSimple (typeOfLval v) ->
+      if isOblivSimple (typeOf x) then
+        instr (* TODO *)
+      else condSetKnownInt curCond v k x loc
   | _ -> instr
 
 class typeFixVisitor : cilVisitor = object
