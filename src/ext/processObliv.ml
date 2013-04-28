@@ -382,6 +382,16 @@ let feature : featureDescr =
     fd_extraopt = [];
     fd_doit = 
     (function (f: file) -> 
+      (*
+      let showFunc g = match g with
+      | GFun(fn,loc) -> 
+          ignore (Pretty.printf "%s '%a' '%a'\n" fn.svar.vname
+                  d_attrlist (typeAttrs fn.svar.vtype)
+                  d_attrlist fn.svar.vattr)
+      | _ -> ()
+      in
+      iterGlobals f showFunc;
+      *)
       let tcVisitor = new typeCheckVisitor in
       visitCilFileSameGlobals tcVisitor f;
       SimplifyTagged.feature.fd_doit f; (* Note: this can screw up type equality
