@@ -147,6 +147,15 @@ let conversionError loc =
 
 class typeCheckVisitor = object
   inherit nopCilVisitor
+
+  val funcOblivness = Hashtbl.create 100
+  method isFuncObliv vinfo = 
+    if vinfo.vglob && isFunctionType vinfo.vtype 
+      then try Hashtbl.find funcOblivness vinfo.vname
+           with Not_found -> false
+      else raise (Invalid_argument 
+        "typeCheckVisitor#isFuncObliv expects a global function")
+
   method vtype vtype = match checkOblivType vtype with
     | None -> DoChildren
     | Some cat -> if cat = "unimplemented" 
@@ -222,6 +231,17 @@ class typeCheckVisitor = object
   method vglob v = begin match v with 
   | GCompTag(ci,loc) when ci.cname = "OblivBit" ->  
       updateOblivBitType ci; DoChildren
+  | GVarDecl (vi,loc) | GFun ({svar=vi},loc) when isFunctionType vi.vtype ->
+      let no = hasOblivAttr (typeAttrs vi.vtype) in
+      ignore (Pretty.printf "In function %s, type %a\n" vi.vname d_type
+        vi.vtype);
+      begin try let oo = Hashtbl.find funcOblivness vi.vname in
+            if oo <> no 
+              then E.s (E.error "Function %s was previously declared with \
+                          different obliviousness" vi.vname)
+            with Not_found -> Hashtbl.add funcOblivness vi.vname no
+      end; 
+      DoChildren
   | _ -> DoChildren
   end
 end
@@ -393,7 +413,7 @@ let feature : featureDescr =
       iterGlobals f showFunc;
       *)
       let tcVisitor = new typeCheckVisitor in
-      visitCilFileSameGlobals tcVisitor f;
+      visitCilFileSameGlobals (tcVisitor :> cilVisitor) f;
       SimplifyTagged.feature.fd_doit f; (* Note: this can screw up type equality
                                                  checks *)
       mapGlobals f genFunc;
