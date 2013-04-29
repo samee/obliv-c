@@ -1,10 +1,16 @@
 Find out who uses src/frontc/cprint (pretty printing is done in ocamlutils/pretty).
 
+Cast to obliv on return needs to go through known() functions
+
 Make sure you can't have obliv pointers
 
 Not sure what the parser currently does in the following line, but I need the 'obliv' applied to the int, and not the whole array.
   obliv int x[5];
 Also check this on typedefs
+
+Right now this turns both to const: extern const int x; int x = 5; Should be 
+illegal. Need to hack CIL attribute parsing for this. Same problem with obliv
+instead of const.
 
 floating point and enum types
 check obliv array length (variable) in decl

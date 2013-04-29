@@ -348,7 +348,6 @@ void __obliv_c__condSub(const void* vc,void* vdest
 // ---- Translated versions of obliv.h functions ----------------------
 
 // TODO remove __obliv_c prefix and make these functions static/internal
-
 void setupOblivBool(OblivInputs* spec, OblivBit* dest, bool v)
   { __obliv_c__setupOblivBits(spec,dest,v,1); }
 void setupOblivChar(OblivInputs* spec, OblivBit* dest, char v)
@@ -365,17 +364,18 @@ void setupOblivLLong(OblivInputs* spec, OblivBit* dest, long long v)
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
   { __obliv_c__feedOblivInputs(spec,count,party); }
 
-bool revealOblivBool(const OblivBit* src,int party)
-  { return __obliv_c__revealOblivBool(src,party); }
-char revealOblivChar(const OblivBit* src,int party)
-  { return (char)__obliv_c__revealOblivBits(src,bitsize(char),party); }
-int revealOblivInt(const OblivBit* src,int party)
-  { return (int)__obliv_c__revealOblivBits(src,bitsize(int),party); }
-short revealOblivShort(const OblivBit* src,int party)
-  { return (short)__obliv_c__revealOblivBits(src,bitsize(short),party); }
-long revealOblivLong(const OblivBit* src,int party)
-  { return (long)__obliv_c__revealOblivBits(src,bitsize(long),party); }
-long long revealOblivLLong(const OblivBit* src,int party)
-  { return (long long)__obliv_c__revealOblivBits(src,bitsize(long long)
+// TODO pass const values by ref later
+bool revealOblivBool(__obliv_c__bool src,int party)
+  { return __obliv_c__revealOblivBool(src.bits,party); }
+char revealOblivChar(__obliv_c__char src,int party)
+  { return (char)__obliv_c__revealOblivBits(src.bits,bitsize(char),party); }
+int revealOblivInt(__obliv_c__int src,int party)
+  { return (int)__obliv_c__revealOblivBits(src.bits,bitsize(int),party); }
+short revealOblivShort(__obliv_c__short src,int party)
+  { return (short)__obliv_c__revealOblivBits(src.bits,bitsize(short),party); }
+long revealOblivLong(__obliv_c__long src,int party)
+  { return (long)__obliv_c__revealOblivBits(src.bits,bitsize(long),party); }
+long long revealOblivLLong(__obliv_c__lLong src,int party)
+  { return (long long)__obliv_c__revealOblivBits(src.bits,bitsize(long long)
                                                  ,party); }
 

@@ -22,12 +22,14 @@ typedef void (*protocol_run)(void*);
 
 #define bitsize(type) (8*sizeof(type))
 
-typedef OblivBit __obliv_c__bool[1];
-typedef OblivBit __obliv_c__char[bitsize(char)];
-typedef OblivBit __obliv_c__int[bitsize(int)];
-typedef OblivBit __obliv_c__short[bitsize(short)];
-typedef OblivBit __obliv_c__long[bitsize(long)];
-typedef OblivBit __obliv_c__lLong[bitsize(long long)];
+// Note: these structs are often freely casted to and from OblivBit* and void*
+//   Works great in C, but may fail if we add more fields here.
+typedef struct { OblivBit bits[1]; } __obliv_c__bool;
+typedef struct { OblivBit bits[bitsize(char)];  } __obliv_c__char;
+typedef struct { OblivBit bits[bitsize(int)];   } __obliv_c__int;
+typedef struct { OblivBit bits[bitsize(short)]; } __obliv_c__short;
+typedef struct { OblivBit bits[bitsize(long)];  } __obliv_c__long;
+typedef struct { OblivBit bits[bitsize(long long)]; } __obliv_c__lLong;
 
 static const __obliv_c__bool __obliv_c__trueCond = {{true,true}};
 
