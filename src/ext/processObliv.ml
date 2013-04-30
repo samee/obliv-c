@@ -268,8 +268,6 @@ let setComparison fname dest s1 s2 loc =
                  ;kinteger !kindOfSizeOf (oblivBitsSizeOf optype)],loc)
 
 let setLogicalOp fname dest s1 s2 loc = 
-  (*
-  let cbool = typeAddAttributes [constAttr] oblivBoolType in *)
   let cOblivBitPtr = TPtr(typeAddAttributes [constAttr] !oblivBitType,[]) in
   let fargTypes = ["dest",!oblivBitPtr,[]
                   ;"s1",cOblivBitPtr,[];"s2",cOblivBitPtr,[]
@@ -306,7 +304,7 @@ let condSetKnownInt c v k x loc =
 let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 
 (* Codegen, when conditions don't matter *)
-let codegenUncondInstr isFuncObliv (instr:instr) : instr = match instr with
+let codegenUncondInstr (instr:instr) : instr = match instr with
 | Set(v,BinOp(op,Lval e1,Lval e2,t),loc) when isOblivSimple t ->
     begin match op with
     | Lt -> setComparison "__obliv_c__setLessThan" v e1 e2 loc
@@ -329,51 +327,62 @@ let codegenUncondInstr isFuncObliv (instr:instr) : instr = match instr with
       setSignExtend
     else setZeroExtend
     *)
-| Call(lvo,(Lval(Var vi,NoOffset) as exp),args,loc) when isFuncObliv vi ->
+| Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
     Call(lvo,exp,mkAddrOf trueCond::args,loc)
 | _ -> instr
 
 
 (* Just copy doesn't cut it. Need a single function for op-and-assign *)
-let codegenInstr curCond (isFuncObliv:varinfo->bool) (instr:instr) : instr = 
+let codegenInstr curCond (instr:instr) : instr = 
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
-  if curCond == trueCond then codegenUncondInstr isFuncObliv instr
+  if curCond == trueCond then codegenUncondInstr instr
   else match instr with 
-  | Set(v,_,_) when simptemp v -> codegenUncondInstr isFuncObliv instr
+  | Set(v,_,_) when simptemp v -> codegenUncondInstr instr
   | Set(v,CastE(TInt(k,a),x),loc) when isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then
         instr (* TODO *)
       else condSetKnownInt curCond v k x loc
-  | Call(lvo,(Lval(Var vi,NoOffset) as exp),args,loc) when isFuncObliv vi ->
+  | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
       Call(lvo,exp,mkAddrOf curCond::args,loc)
   | _ -> instr
 
-class typeFixVisitor : cilVisitor = object
+class typeFixVisitor wasObliv : cilVisitor = object(self)
   inherit nopCilVisitor
-  method vtype t = match t with
+  method vtype t = ChangeDoChildrenPost (t, fun t -> match t with
   | TInt(k,a) when hasOblivAttr a -> 
       let a2 = dropOblivAttr a in
-      ChangeTo (setTypeAttrs (intTargetType k) a2)
+      setTypeAttrs (intTargetType k) a2
+  | TFun(tres,argso,vargs,a) when isOblivFunc t -> 
+      let entarget = visitCilType (self :> cilVisitor) constOblivBoolPtrType in
+      let args = ("__obliv_c__en",entarget,[]) :: argsToList argso in
+      let a' = dropOblivAttr a in
+      TFun(tres,Some args,vargs,a')
+  | _ -> t
+  )
+
+  method vglob g = match g with
+  | GFun(f,loc) when wasObliv f.svar ->
+      ignore(makeFormalVar f ~where:"^" "__obliv_c__en" constOblivBoolPtrType);
+      DoChildren
   | _ -> DoChildren
 end
 
 (* TODO codegenVisitor, codegenInstr, condOps *)
-class codegenVisitor (curFunc : fundec) 
-  (curCond : lval) (isFuncObliv : varinfo->bool) : cilVisitor = object
+class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
   inherit nopCilVisitor
 
   method vstmt s = match s.skind with
   | Instr ilist -> 
       ChangeTo (mkStmt (Instr (List.map 
-        (codegenInstr curCond isFuncObliv) ilist)))
+        (codegenInstr curCond) ilist)))
   | If(c,tb,fb,loc) when isOblivBlock tb ->
       let cv = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
       let ct = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
       let cf = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
       let visitSubBlock cond blk = 
-        visitCilBlock (new codegenVisitor curFunc cond isFuncObliv) blk in
-      let cs = mkStmt (Instr (List.map (codegenUncondInstr isFuncObliv)
+        visitCilBlock (new codegenVisitor curFunc cond) blk in
+      let cs = mkStmt (Instr (List.map codegenUncondInstr
         [ Set (cv,c,loc)
         ; Set (ct,BinOp(LAnd,Lval cv
                             ,Lval curCond,oblivBoolType),loc)
@@ -392,29 +401,18 @@ class codegenVisitor (curFunc : fundec)
     else DoChildren
 end
 
-let genFunc isObliv g = match g with
-| GFun(f,loc) -> 
-    begin match f.svar.vtype with
-    | TFun(tres,_,_,a) when hasOblivAttr a ->
-        f.svar.vtype <- typeRemoveAttributes ["obliv"] f.svar.vtype;
-        let en = makeFormalVar f ~where:"^" "__obliv_c__en"
-                               constOblivBoolPtrType in
-        let cv = new codegenVisitor f (mkMem (Lval(var en)) NoOffset) isObliv in
-        GFun(visitCilFunction cv f,loc)
-    | _ -> let cv = new codegenVisitor f trueCond isObliv in
-           GFun(visitCilFunction cv f,loc)
-    end
-| GVarDecl(vi,loc) ->
-    if vi.vstorage = Extern then match vi.vtype with
-    | TFun(tres,args,va,a) when hasOblivAttr a ->
-        let en = "__obliv_c__en",constOblivBoolPtrType,[] in
-        let args' = Some (en :: argsToList args) in
-        vi.vtype <- typeRemoveAttributes ["obliv"] (TFun(tres,args',va,a));
-        GVarDecl(vi,loc)
-    | _ -> g
-    else g
+let genFunc g = match g with
+| GFun(f,loc) ->
+    (* Using ~insert:false here. This makes it easier to uniformly treat
+     * direct and pointer function calls. They are later added as formals in
+     * typeFixVisitor *)
+    let makeFormal f' 
+      = mkMem (Lval(var(makeLocalVar f' ~insert:false "__obliv_c__en"
+                          constOblivBoolPtrType))) NoOffset in
+    let c = if isOblivFunc f.svar.vtype then makeFormal f else trueCond in
+    let cv = new codegenVisitor f c in
+    GFun(visitCilFunction cv f,loc)
 | _ -> g
-;;
 
 (* If this gets too slow, merge it with codegen *)
 class rmSimplifyVisitor = object
@@ -431,25 +429,17 @@ let feature : featureDescr =
     fd_extraopt = [];
     fd_doit = 
     (function (f: file) -> 
-      (*
-      let showFunc g = match g with
-      | GFun(fn,loc) -> 
-          ignore (Pretty.printf "%s '%a' '%a'\n" fn.svar.vname
-                  d_attrlist (typeAttrs fn.svar.vtype)
-                  d_attrlist fn.svar.vattr)
-      | _ -> ()
-      in
-      iterGlobals f showFunc;
-      *)
       let tcVisitor = new typeCheckVisitor in
       visitCilFileSameGlobals (tcVisitor :> cilVisitor) f;
       let isObliv = tcVisitor#isFuncObliv in
       SimplifyTagged.feature.fd_doit f; (* Note: this can screw up type equality
                                                  checks *)
-      mapGlobals f (genFunc isObliv);
+      (* types are often visited before the functions, so it is often easier
+       * to transform functions and types in separate phases *)
+      mapGlobals f genFunc;
       (* might merge these two *)
       visitCilFileSameGlobals (new rmSimplifyVisitor) f;
-      visitCilFileSameGlobals (new typeFixVisitor) f
+      visitCilFileSameGlobals (new typeFixVisitor isObliv) f
     );
     fd_post_check = true;
   } 
