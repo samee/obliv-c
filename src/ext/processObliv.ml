@@ -306,7 +306,7 @@ let condSetKnownInt c v k x loc =
 let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 
 (* Codegen, when conditions don't matter *)
-let codegenUncondInstr (instr:instr) : instr = match instr with
+let codegenUncondInstr isFuncObliv (instr:instr) : instr = match instr with
 | Set(v,BinOp(op,Lval e1,Lval e2,t),loc) when isOblivSimple t ->
     begin match op with
     | Lt -> setComparison "__obliv_c__setLessThan" v e1 e2 loc
@@ -329,20 +329,24 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
       setSignExtend
     else setZeroExtend
     *)
+| Call(lvo,(Lval(Var vi,NoOffset) as exp),args,loc) when isFuncObliv vi ->
+    Call(lvo,exp,mkAddrOf trueCond::args,loc)
 | _ -> instr
 
 
 (* Just copy doesn't cut it. Need a single function for op-and-assign *)
-let codegenInstr curCond (instr:instr) : instr = 
+let codegenInstr curCond (isFuncObliv:varinfo->bool) (instr:instr) : instr = 
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
-  if curCond == trueCond then codegenUncondInstr instr
+  if curCond == trueCond then codegenUncondInstr isFuncObliv instr
   else match instr with 
-  | Set(v,_,_) when simptemp v -> codegenUncondInstr instr
+  | Set(v,_,_) when simptemp v -> codegenUncondInstr isFuncObliv instr
   | Set(v,CastE(TInt(k,a),x),loc) when isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then
         instr (* TODO *)
       else condSetKnownInt curCond v k x loc
+  | Call(lvo,(Lval(Var vi,NoOffset) as exp),args,loc) when isFuncObliv vi ->
+      Call(lvo,exp,mkAddrOf curCond::args,loc)
   | _ -> instr
 
 class typeFixVisitor : cilVisitor = object
@@ -361,14 +365,15 @@ class codegenVisitor (curFunc : fundec)
 
   method vstmt s = match s.skind with
   | Instr ilist -> 
-      ChangeTo (mkStmt (Instr (List.map (codegenInstr curCond) ilist)))
+      ChangeTo (mkStmt (Instr (List.map 
+        (codegenInstr curCond isFuncObliv) ilist)))
   | If(c,tb,fb,loc) when isOblivBlock tb ->
       let cv = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
       let ct = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
       let cf = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
       let visitSubBlock cond blk = 
         visitCilBlock (new codegenVisitor curFunc cond isFuncObliv) blk in
-      let cs = mkStmt (Instr (List.map (codegenInstr trueCond)
+      let cs = mkStmt (Instr (List.map (codegenUncondInstr isFuncObliv)
         [ Set (cv,c,loc)
         ; Set (ct,BinOp(LAnd,Lval cv
                             ,Lval curCond,oblivBoolType),loc)
