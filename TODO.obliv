@@ -1,4 +1,4 @@
-Find out who uses src/frontc/cprint (pretty printing is done in ocamlutils/pretty).
+Integrate test suite into make test, make it all a separate target that builds only binary.
 
 Cast to obliv on return needs to go through known() functions
 
@@ -16,5 +16,3 @@ floating point and enum types
 check obliv array length (variable) in decl
 special case: disallow/warn obliv variables in printf
 warn if 'obliv if' has non-obliv condition
-
-Calling obliv functions through a pointer doesn't work yet. Right now, what happens is that function types change the moment function prototypes change. Might have to change this: either change function prototypes later in a separate phase after changing all calls, or use existing phases to change all function parameters in prototypes and calls in codegen, and change types in typeFixing phase. But this means that functions will have inconsistent definitions in the meantime ... may or may not be a problem. Typefixing includes adding cond param and dropping obliv attribute.
