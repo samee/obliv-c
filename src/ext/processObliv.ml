@@ -5,7 +5,6 @@ open Cil
 module E = Errormsg
 module H = Hashtbl
 
-let typeEqual = SimplifyTagged.typeEqual
 let constAttr = Attr("const",[])
 
 (* Initialized during type-checking *)
@@ -255,6 +254,7 @@ let voidFunc name argTypes =
   let ftype = TFun(TVoid [], Some argTypes,false,[]) in
   Lval(Var(makeGlobalVar name ftype),NoOffset)
 
+let xoBitsSizeOf t = kinteger !kindOfSizeOf (oblivBitsSizeOf t)
 
 let setComparison fname dest s1 s2 loc = 
   let optype = typeOfLval s1 in
@@ -278,6 +278,17 @@ let setLogicalOp fname dest s1 s2 loc =
                  ;CastE(cOblivBitPtr,AddrOf s1)
                  ;CastE(cOblivBitPtr,AddrOf s2)],loc)
 
+let setIntExtend fname dv dk sv sk loc = 
+  let fargTypes = ["dest",TPtr(TVoid [],[]),[]
+                  ;"dsize",!typeOfSizeOf,[]
+                  ;"src",TPtr(TVoid [constAttr], []),[]
+                  ;"ssize",!typeOfSizeOf,[]
+  ] in
+  let func = voidFunc fname fargTypes in
+  Call(None,func,[ mkAddrOf dv; xoBitsSizeOf (TInt(dk,[]))
+                 ; mkAddrOf sv; xoBitsSizeOf (TInt(sk,[]))
+                 ],loc)
+
 let setKnownInt v k x loc = 
   let fargTypes = ["dest",TPtr(typeOfLval v,[]),[]
                   ;"bitcount",!typeOfSizeOf,[]
@@ -287,8 +298,6 @@ let setKnownInt v k x loc =
   Call(None,func,[ AddrOf v; kinteger !kindOfSizeOf (oblivBitsSizeOf (typeOf x))
                  ; CastE(widestType,CastE(TInt(k,[]),x))
                  ],loc)
-
-let xoBitsSizeOf t = kinteger !kindOfSizeOf (oblivBitsSizeOf t)
 
 let condSetKnownInt c v k x loc = 
   let fargTypes = ["cond",TPtr(oblivBoolType,[]),[]
@@ -313,20 +322,17 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
     | LAnd -> setLogicalOp "__obliv_c__setBitAnd" v e1 e2 loc
     | _ -> instr
     end
-| Set(v,CastE(TInt(k,a) as dt,x),loc) when isOblivSimple dt -> 
-    if not (isOblivSimple (typeOf x)) then
+| Set(v,CastE(TInt(k,a) as dt,x),loc) 
+    when isOblivSimple dt && not (isOblivSimple (typeOf x)) ->
       setKnownInt v k x loc
-    else instr
-      (* TODO
-    (* (* Sign/zero extend already truncates in the library *)
-    else if source is wider then
-      truncate
-      *)
-    (* Think harder about extending laws *)
-    else if dest is signed then
-      setSignExtend
-    else setZeroExtend
-    *)
+| Set(dv,CastE(TInt(dk,da),Lval sv),loc) when hasOblivAttr da ->
+    begin match typeOfLval sv with
+    | TInt(sk,sa) when hasOblivAttr sa ->
+        if isSigned sk then
+          setIntExtend "__obliv_c__setSignExtend" dv dk sv sk loc
+        else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
+    | _ -> instr
+    end
 | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
     Call(lvo,exp,mkAddrOf trueCond::args,loc)
 | _ -> instr
