@@ -84,6 +84,12 @@ void __obliv_c__setBitwiseNotInPlace (void* dest,size_t size);
 // carryIn and/or carryOut can be NULL, in which case they are ignored
 // dest and carryOut must be different objects. dest may alias with either
 //   op1, op2, or both. carryIn may alias carryOut.
+void __obliv_c__setPlainAdd (void* vdest
+                            ,const void* vop1 ,const void* vop2
+                            ,size_t size);
+void __obliv_c__setPlainSub (void* vdest
+                            ,const void* vop1 ,const void* vop2
+                            ,size_t size);
 void __obliv_c__setBitsAdd (void* dest,void* carryOut
                            ,const void* op1,const void* op2
                            ,const void* carryIn
@@ -105,6 +111,9 @@ void __obliv_c__setLessThanUnit (OblivBit* ltOut
 void __obliv_c__setLessThan (void* dest
                             ,const void* op1,const void* op2
                             ,size_t size);
+void __obliv_c__setLessOrEqual (void* dest
+                               ,const void* op1,const void* op2
+                               ,size_t size);
 void __obliv_c__setEqualTo (void* dest
                            ,const void* op1,const void* op2
                            ,size_t size);

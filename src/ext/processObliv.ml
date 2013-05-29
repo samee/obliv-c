@@ -270,13 +270,20 @@ let setComparison fname dest s1 s2 loc =
 let setLogicalOp fname dest s1 s2 loc = 
   let cOblivBitPtr = TPtr(typeAddAttributes [constAttr] !oblivBitType,[]) in
   let fargTypes = ["dest",!oblivBitPtr,[]
-                  ;"s1",cOblivBitPtr,[];"s2",cOblivBitPtr,[]
-                  ;"bitcount",!typeOfSizeOf,[]
+                  ;"s1",cOblivBitPtr,[]; "s2",cOblivBitPtr,[]
                   ] in
   let func = voidFunc fname fargTypes in
   Call(None,func,[CastE(!oblivBitPtr,AddrOf dest)
                  ;CastE(cOblivBitPtr,AddrOf s1)
                  ;CastE(cOblivBitPtr,AddrOf s2)],loc)
+
+let setBitwiseOp fname dest s1 s2 loc =
+  setComparison fname dest s1 s2 loc
+  (* The only difference is return value type, which is not a problem 
+   * as long as we are casting everything to and from void* *)
+
+(* Same comments as in setBitwiseOp *)
+let setArith fname dest s1 s2 loc = setBitwiseOp fname dest s1 s2 loc
 
 let setIntExtend fname dv dk sv sk loc = 
   let fargTypes = ["dest",TPtr(TVoid [],[]),[]
@@ -316,10 +323,19 @@ let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 let codegenUncondInstr (instr:instr) : instr = match instr with
 | Set(v,BinOp(op,Lval e1,Lval e2,t),loc) when isOblivSimple t ->
     begin match op with
+    | PlusA -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
+    | MinusA -> setArith "__obliv_c__setPlainSub" v e1 e2 loc
     | Lt -> setComparison "__obliv_c__setLessThan" v e1 e2 loc
+    | Gt -> setComparison "__obliv_c__setLessThan" v e2 e1 loc
+    | Le -> setComparison "__obliv_c__setLessOrEqual" v e1 e2 loc
+    | Ge -> setComparison "__obliv_c__setLessOrEqual" v e2 e1 loc
     | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
     | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
+    | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAnd" v e1 e2 loc
+    | BXor -> setBitwiseOp "__obliv_c__setBitwiseXor" v e1 e2 loc
+    | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOr" v e1 e2 loc
     | LAnd -> setLogicalOp "__obliv_c__setBitAnd" v e1 e2 loc
+    | LOr  -> setLogicalOp "__obliv_c__setBitOr"  v e1 e2 loc
     | _ -> instr
     end
 | Set(v,CastE(TInt(k,a) as dt,x),loc) 

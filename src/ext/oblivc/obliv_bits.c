@@ -213,6 +213,11 @@ void __obliv_c__setBitsAdd (void* vdest,void* carryOut
   }
 }
 
+void __obliv_c__setPlainAdd (void* vdest
+                            ,const void* vop1 ,const void* vop2
+                            ,size_t size)
+  { __obliv_c__setBitsAdd (vdest,NULL,vop1,vop2,NULL,size); }
+
 void __obliv_c__setBitsSub (void* vdest, void* borrowOut
                            ,const void* vop1,const void* vop2
                            ,const void* borrowIn,size_t size)
@@ -244,6 +249,11 @@ void __obliv_c__setBitsSub (void* vdest, void* borrowOut
     __obliv_c__setBitXor(dest,&bxa,&borrow);
   }
 }
+
+void __obliv_c__setPlainSub (void* vdest
+                            ,const void* vop1 ,const void* vop2
+                            ,size_t size)
+  { __obliv_c__setBitsSub (vdest,NULL,vop1,vop2,NULL,size); }
 
 void __obliv_c__setSignExtend (void* vdest, size_t dsize
                               ,const void* vsrc, size_t ssize)
@@ -305,6 +315,14 @@ void __obliv_c__setLessThan (void* vdest
   const OblivBit *op1 = vop1, *op2 =  vop2;
   __obliv_c__assignBitKnown(dest,0);
   __obliv_c__setLessThanUnit(dest,op1,op2,size,dest);
+}
+
+void __obliv_c__setLessOrEqual (void* vdest
+                               ,const void* vop1, const void* vop2
+                               ,size_t size)
+{
+  __obliv_c__setLessThan(vdest,vop2,vop1,size);
+  __obliv_c__flipBit(vdest);
 }
 
 void __obliv_c__setEqualTo (void* vdest
