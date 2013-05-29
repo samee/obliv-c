@@ -5,6 +5,13 @@ open Cil
 module E = Errormsg
 module H = Hashtbl
 
+let mapcat f l = 
+  let rec aux acc l = match l with
+  | [] -> acc
+  | x::xs -> aux (List.rev_append (f x) acc) xs
+  in
+  List.rev (aux [] l)
+
 let constAttr = Attr("const",[])
 
 (* Initialized during type-checking *)
@@ -355,53 +362,32 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
 
 
 (* Just copy doesn't cut it. Need a single function for op-and-assign *)
-let codegenInstr curCond (instr:instr) : instr = 
+let codegenInstr curCond tmpVar (instr:instr) : instr list = 
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
-  if curCond == trueCond then codegenUncondInstr instr
+  if curCond == trueCond then [codegenUncondInstr instr]
   else match instr with 
-  | Set(v,_,_) when simptemp v -> codegenUncondInstr instr
+  | Set(v,_,_) when simptemp v -> [codegenUncondInstr instr]
   | Set(v,CastE(TInt(k,a),x),loc) when isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then
-        instr (* TODO *)
-      else condSetKnownInt curCond v k x loc
+        [instr] (* TODO *)
+      else [condSetKnownInt curCond v k x loc]
   | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
-      Call(lvo,exp,mkAddrOf curCond::args,loc)
-  | _ -> instr
-
-class typeFixVisitor wasObliv : cilVisitor = object(self)
-  inherit nopCilVisitor
-  method vtype t = ChangeDoChildrenPost (t, fun t -> match t with
-  | TInt(k,a) when hasOblivAttr a -> 
-      let a2 = dropOblivAttr a in
-      setTypeAttrs (intTargetType k) a2
-  | TFun(tres,argso,vargs,a) when isOblivFunc t -> 
-      let entarget = visitCilType (self :> cilVisitor) constOblivBoolPtrType in
-      let args = ("__obliv_c__en",entarget,[]) :: argsToList argso in
-      let a' = dropOblivAttr a in
-      TFun(tres,Some args,vargs,a')
-  | _ -> t
-  )
-
-  method vglob g = match g with
-  | GFun(f,loc) when wasObliv f.svar ->
-      ignore(makeFormalVar f ~where:"^" "__obliv_c__en" constOblivBoolPtrType);
-      DoChildren
-  | _ -> DoChildren
-end
+      [Call(lvo,exp,mkAddrOf curCond::args,loc)]
+  | _ -> [instr]
 
 (* TODO codegenVisitor, codegenInstr, condOps *)
 class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
   inherit nopCilVisitor
 
-  method vstmt s = match s.skind with
+  method vstmt s = let tmpVar t = SimplifyTagged.makeSimplifyTemp curFunc t in
+    match s.skind with
   | Instr ilist -> 
-      ChangeTo (mkStmt (Instr (List.map 
-        (codegenInstr curCond) ilist)))
+      ChangeTo (mkStmt (Instr (mapcat (codegenInstr curCond tmpVar) ilist)))
   | If(c,tb,fb,loc) when isOblivBlock tb ->
-      let cv = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
-      let ct = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
-      let cf = var (SimplifyTagged.makeSimplifyTemp curFunc oblivBoolType) in
+      let cv = var (tmpVar oblivBoolType) in
+      let ct = var (tmpVar oblivBoolType) in
+      let cf = var (tmpVar oblivBoolType) in
       let visitSubBlock cond blk = 
         visitCilBlock (new codegenVisitor curFunc cond) blk in
       let cs = mkStmt (Instr (List.map codegenUncondInstr
@@ -441,6 +427,27 @@ class rmSimplifyVisitor = object
   inherit nopCilVisitor
   method vattr at = match at with 
   | Attr(s,[]) when s = SimplifyTagged.simplifyTempTok -> ChangeTo []
+  | _ -> DoChildren
+end
+
+class typeFixVisitor wasObliv : cilVisitor = object(self)
+  inherit nopCilVisitor
+  method vtype t = ChangeDoChildrenPost (t, fun t -> match t with
+  | TInt(k,a) when hasOblivAttr a -> 
+      let a2 = dropOblivAttr a in
+      setTypeAttrs (intTargetType k) a2
+  | TFun(tres,argso,vargs,a) when isOblivFunc t -> 
+      let entarget = visitCilType (self :> cilVisitor) constOblivBoolPtrType in
+      let args = ("__obliv_c__en",entarget,[]) :: argsToList argso in
+      let a' = dropOblivAttr a in
+      TFun(tres,Some args,vargs,a')
+  | _ -> t
+  )
+
+  method vglob g = match g with
+  | GFun(f,loc) when wasObliv f.svar ->
+      ignore(makeFormalVar f ~where:"^" "__obliv_c__en" constOblivBoolPtrType);
+      DoChildren
   | _ -> DoChildren
 end
 
