@@ -272,7 +272,7 @@ let setComparison fname dest s1 s2 loc =
                   ] in
   let func = voidFunc fname fargTypes in
   Call(None,func,[AddrOf dest; AddrOf s1; AddrOf s2
-                 ;kinteger !kindOfSizeOf (oblivBitsSizeOf optype)],loc)
+                 ;xoBitsSizeOf optype],loc)
 
 let setLogicalOp fname dest s1 s2 loc = 
   let cOblivBitPtr = TPtr(typeAddAttributes [constAttr] !oblivBitType,[]) in
@@ -309,7 +309,7 @@ let setKnownInt v k x loc =
                   ;"value",widestType,[]
                   ] in
   let func = voidFunc "__obliv_c__setSignedKnown" fargTypes in
-  Call(None,func,[ AddrOf v; kinteger !kindOfSizeOf (oblivBitsSizeOf (typeOf x))
+  Call(None,func,[ AddrOf v; xoBitsSizeOf (typeOf x)
                  ; CastE(widestType,CastE(TInt(k,[]),x))
                  ],loc)
 
@@ -323,6 +323,20 @@ let condSetKnownInt c v k x loc =
   Call(None,func,[ mkAddrOf c; mkAddrOf v; xoBitsSizeOf (typeOf x)
                  ; CastE(widestType,CastE(TInt(k,[]),x))
                  ],loc)
+
+let setIfThenElse dest c ts fs loc = 
+  let fargTypes = ["dest",TPtr(TVoid [],[]),[]
+                  ;"tsrc",TPtr(TVoid [constAttr],[]),[]
+                  ;"fsrc",TPtr(TVoid [constAttr],[]),[]
+                  ;"size",!typeOfSizeOf,[]
+                  ;"cond",TPtr(TVoid [constAttr],[]),[]
+  ] in
+  let func = voidFunc "__obliv_c__ifThenElse" fargTypes in
+  let args = [ mkAddrOf dest; mkAddrOf ts; mkAddrOf fs
+             ; xoBitsSizeOf (typeOfLval dest)
+             ; mkAddrOf c ] in
+  Call(None,func,args,loc)
+
 
 let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 
@@ -360,14 +374,21 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
     Call(lvo,exp,mkAddrOf trueCond::args,loc)
 | _ -> instr
 
-
-(* Just copy doesn't cut it. Need a single function for op-and-assign *)
-let codegenInstr curCond tmpVar (instr:instr) : instr list = 
+let rec codegenInstr curCond tmpVar (instr:instr) : instr list = 
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
   if curCond == trueCond then [codegenUncondInstr instr]
   else match instr with 
   | Set(v,_,_) when simptemp v -> [codegenUncondInstr instr]
+  | Set(v,Lval(v2),loc) when isOblivSimple (typeOfLval v) -> 
+      if isOblivSimple (typeOfLval v2) then
+        [setIfThenElse v curCond v2 v loc]
+      else [instr] (* TODO *)
+  (* TODO special-case if-facoring for arithmetic operators *)
+  | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> 
+      let nv = var (tmpVar t) in
+      let ilist = [Set(nv,x,loc); Set(v,Lval nv,loc)] in
+      mapcat (codegenInstr curCond tmpVar) ilist
   | Set(v,CastE(TInt(k,a),x),loc) when isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then
         [instr] (* TODO *)
