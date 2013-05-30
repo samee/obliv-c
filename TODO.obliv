@@ -16,3 +16,5 @@ floating point and enum types
 check obliv array length (variable) in decl
 special case: disallow/warn obliv variables in printf
 warn if 'obliv if' has non-obliv condition
+
+Multiplication/Division/mod
