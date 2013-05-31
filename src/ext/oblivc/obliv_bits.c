@@ -307,21 +307,42 @@ void __obliv_c__setLessThanUnit (OblivBit* ltOut
     op1++; op2++;
   }
 }
-void __obliv_c__setLessThan (void* vdest
-                            ,const void* vop1,const void* vop2
-                            ,size_t size)
+
+// assumes size >= 1
+void __obliv_c__setLessThanSigned (void* vdest
+                                  ,const void* vop1,const void* vop2
+                                  ,size_t size)
 {
   OblivBit *dest=vdest;
-  const OblivBit *op1 = vop1, *op2 =  vop2;
+  const OblivBit *op1 = vop1, *op2 = vop2;
+  __obliv_c__assignBitKnown(dest,0);
+  __obliv_c__setLessThanUnit(dest,op1,op2,size-1,dest);
+  __obliv_c__setLessThanUnit(dest,op2+size-1,op1+size-1,1,dest);
+}
+
+void __obliv_c__setLessThanOrEqualSigned (void* vdest
+                                         ,const void* vop1, const void* vop2
+                                         ,size_t size)
+{
+  __obliv_c__setLessThanSigned(vdest,vop2,vop1,size);
+  __obliv_c__flipBit(vdest);
+}
+
+void __obliv_c__setLessThanUnsigned (void* vdest
+                                    ,const void* vop1,const void* vop2
+                                    ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1 = vop1, *op2 = vop2;
   __obliv_c__assignBitKnown(dest,0);
   __obliv_c__setLessThanUnit(dest,op1,op2,size,dest);
 }
 
-void __obliv_c__setLessOrEqual (void* vdest
-                               ,const void* vop1, const void* vop2
-                               ,size_t size)
+void __obliv_c__setLessOrEqualUnsigned (void* vdest
+                                       ,const void* vop1, const void* vop2
+                                       ,size_t size)
 {
-  __obliv_c__setLessThan(vdest,vop2,vop1,size);
+  __obliv_c__setLessThanUnsigned(vdest,vop2,vop1,size);
   __obliv_c__flipBit(vdest);
 }
 
@@ -334,6 +355,7 @@ void __obliv_c__setEqualTo (void* vdest
   __obliv_c__setNotEqual(dest,op1,op2,size);
   __obliv_c__flipBit(dest);
 }
+
 void __obliv_c__setNotEqual (void* vdest
                             ,const void* vop1,const void* vop2
                             ,size_t size)

@@ -108,12 +108,18 @@ void __obliv_c__ifThenElse (void* dest, const void* tsrc
 void __obliv_c__setLessThanUnit (OblivBit* ltOut
                                 ,const OblivBit* op1, const OblivBit* op2
                                 ,size_t size, const OblivBit* ltIn);
-void __obliv_c__setLessThan (void* dest
-                            ,const void* op1,const void* op2
-                            ,size_t size);
-void __obliv_c__setLessOrEqual (void* dest
-                               ,const void* op1,const void* op2
-                               ,size_t size);
+void __obliv_c__setLessThanUnsigned (void* dest
+                                    ,const void* op1,const void* op2
+                                    ,size_t size);
+void __obliv_c__setLessOrEqualUnsigned (void* dest
+                                       ,const void* op1,const void* op2
+                                       ,size_t size);
+void __obliv_c__setLessThanSigned (void* dest
+                                  ,const void* op1,const void* op2
+                                  ,size_t size);
+void __obliv_c__setLessOrEqualSigned (void* dest
+                                     ,const void* op1,const void* op2
+                                     ,size_t size);
 void __obliv_c__setEqualTo (void* dest
                            ,const void* op1,const void* op2
                            ,size_t size);
