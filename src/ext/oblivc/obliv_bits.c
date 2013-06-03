@@ -29,6 +29,8 @@ bool __obliv_c__bitIsKnown(const OblivBit* bit,bool* v)
   return bit->known;
 }
 
+int tobool(int x) { return x?1:0; }
+
 // TODO all sorts of identical parameter optimizations
 // Implementation note: remember that all these pointers may alias each other
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
@@ -68,7 +70,8 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
     if(v) __obliv_c__flipBit(dest);
   }
   else
-  { dest->val = (a->val != b->val);
+  {
+    dest->val = (tobool(a->val) != tobool(b->val));
     dest->known = false;
     currentProto.xorCount++;
   }
@@ -116,7 +119,8 @@ inline widest_t __obliv_c__revealOblivBits
   (const OblivBit* dest,size_t size,int party)
 { widest_t rv=0;
   if(party!=0 && party!=currentProto.thisParty) return false;
-  while(size-->0) rv=(rv<<1)+(dest++)->val;
+  dest+=size;
+  while(size-->0) rv=(rv<<1)+tobool((--dest)->val);
   return rv;
 }
 
@@ -202,7 +206,7 @@ void __obliv_c__setBitsAdd (void* vdest,void* carryOut
   { __obliv_c__setBitXor(&axc,op1,&carry);
     __obliv_c__setBitXor(&bxc,op2,&carry);
     __obliv_c__setBitXor(dest,op1,&bxc);
-    __obliv_c__setBitAnd(&t,&axc,&axc);
+    __obliv_c__setBitAnd(&t,&axc,&bxc);
     __obliv_c__setBitXor(&carry,&carry,&t);
     ++dest; ++op1; ++op2;
   }
@@ -280,12 +284,13 @@ void __obliv_c__ifThenElse (void* vdest, const void* vtsrc
                            ,const void* vfsrc, size_t size
                            ,const void* vcond)
 {
-  OblivBit x,a;
+  // copying out vcond because it could be aliased by vdest
+  OblivBit x,a,c=*(const OblivBit*)vcond;
   OblivBit *dest=vdest;
   const OblivBit *tsrc=vtsrc, *fsrc=vfsrc;
   while(size-->0)
   { __obliv_c__setBitXor(&x,tsrc,fsrc);
-    __obliv_c__setBitAnd(&a,vcond,&x);
+    __obliv_c__setBitAnd(&a,&c,&x);
     __obliv_c__setBitXor(dest,&a,fsrc);
     ++dest; ++fsrc; ++tsrc;
   }
