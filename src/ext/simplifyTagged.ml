@@ -140,8 +140,8 @@ let rec makeThreeAddress
     (e: exp) : taExp = 
   match e with 
   (* Might have to put these two lines (and others) inside constFold *)
-  | SizeOf t when isOblivSimple t -> targetSizeOf t
-  | SizeOfE x when isOblivSimple (typeOf x) -> targetSizeOf (typeOf x)
+  | SizeOf t when isOblivSimpleOrArray t -> targetSizeOf t
+  | SizeOfE x when isOblivSimpleOrArray (typeOf x) -> targetSizeOf (typeOf x)
   | SizeOf _ | SizeOfE _ | AlignOf _ |  AlignOfE _ | SizeOfStr _ -> 
       constFold true e
   | Const _ -> e

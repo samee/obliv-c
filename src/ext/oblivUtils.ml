@@ -36,6 +36,11 @@ let isOblivSimple t = match t with
 | TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
 | _ -> false
 
+let rec isOblivSimpleOrArray t = match t with
+| TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
+| TArray(t,_,_) -> isOblivSimpleOrArray t
+| _ -> false
+
 let isNonOblivSimple t = match t with
 | TInt(_,a) | TFloat(_,a) -> not (hasOblivAttr a)
 | _ -> false
