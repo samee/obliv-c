@@ -6307,6 +6307,12 @@ and isRipObliv (blk: A.block) : string option =
     | _ -> None
   ) blk.A.battrs
 
+and revConvLoc (l: location) : A.cabsloc =
+  { A.lineno = l.line; A.byteno = l.byte
+  ; A.filename = l.file
+  ; A.ident = 0
+  }
+
   (* Now define the processors for body and statement *)
 and doBody (blk: A.block) : chunk = 
   enterScope ();
@@ -6315,13 +6321,13 @@ and doBody (blk: A.block) : chunk =
   let init,battrs = match isRipObliv blk with
   | None -> empty,blk.A.battrs
   | Some nm -> 
-      let l = !currentLoc in
+      let l = revConvLoc !currentLoc in
       (* Register a new variable *)
       let specifier = [SpecAttr ("obliv",[]); SpecType Tbool] in
       let initName = ((nm,A.JUSTBASE,[],l),NO_INIT) in
       let condef = A.DEFINITION (A.DECDEF((specifier,[initName]),l)) in
       (* Since CIL might change variable name, obtain the new name *)
-      let newvar = None in
+      let newvar = ref None in
       let init = withLocalVarListener (fun vi -> newvar := Some vi) (fun () ->
         empty @@ doStatement condef
       ) in
