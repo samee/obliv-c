@@ -1,4 +1,5 @@
 open Cil
+module E = Errormsg
 
 let mapcat f l = 
   let rec aux acc l = match l with
@@ -55,6 +56,22 @@ let rec isOblivBlock b =
            end
   | _ -> false
 
+(* Returns the name of the new local variable for condition if true *)
+let rec isRipOblivBlock (f:fundec) (b:block) : varinfo option = 
+  let x = filterAttributes "~obliv" b.battrs in
+  match x with
+  | [Attr(_,[AStr vname])] -> 
+      let t = addOblivType (TInt(IBool,[])) in
+      (* The variable was already inserted in cabs2cil, but we only saved its
+       * name, not a varinfo *)
+      Some (makeLocalVar f ~insert:false vname t)
+  | _::_ -> E.s (E.error "directly nested ~obliv blocks")
+  | [] -> match b.bstmts with
+          | [s] -> begin match s.skind with
+                   | Block b2 -> isRipOblivBlock f b2
+                   | _ -> None
+                   end
+          | _ -> None
 
 let oblivBitsSizeOf t = begin match t with
 | TInt(IBool,_) -> 1

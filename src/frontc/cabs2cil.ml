@@ -6331,6 +6331,7 @@ and doBody (blk: A.block) : chunk =
       let init = withLocalVarListener (fun vi -> newvar := Some vi) (fun () ->
         empty @@ doStatement condef
       ) in
+      (* Record that new variable name in CIL attributes *)
       let battrs = match !newvar with
       | Some vi -> List.map (function 
             | "~obliv",_ -> "~obliv",[A.CONSTANT (A.CONST_STRING vi.vname)]
