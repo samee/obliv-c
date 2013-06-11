@@ -5393,6 +5393,21 @@ and createGlobal (specs : (typ * storage * bool * A.attribute list))
                     n docAlphaTable)
 *)
 
+and announceLocalVar = ref (fun (_:varinfo) -> ())
+and appendLocalVarListener listener = 
+  let old = !announceLocalVar in
+  announceLocalVar := begin fun v ->
+    old v;
+    listener v
+  end
+and withLocalVarListener listener code = begin
+  let old = !announceLocalVar in
+  announceLocalVar := (fun v -> old v;listener v);
+  let res = code() in
+  announceLocalVar := old;
+  res
+end
+
 (* Must catch the Static local variables. Make them global *)
 and createLocal ((_, sto, _, _) as specs)
                 ((((n, ndt, a, cloc) : A.name), 
@@ -5481,6 +5496,7 @@ and createLocal ((_, sto, _, _) as specs)
         makeVarSizeVarInfo loc specs (n, ndt, a) in
 
       let vi = alphaConvertVarAndAddToEnv true vi in        (* Replace vi *)
+      (!announceLocalVar) vi; (* use this TODO *)
       let se1 = 
         if isvarsize then begin (* Variable-sized array *) 
           ignore (warn "Variable-sized local variable %s" vi.vname);
@@ -6280,30 +6296,69 @@ and assignInit (lv: lval)
         ~acc:acc
   end
 
+and firstSome f l = match l with
+| [] -> None
+| x::l' -> match f x with Some y -> Some y
+                        | None -> firstSome f l'
+  (* Check if this is a ~obliv(en) block *)
+and isRipObliv (blk: A.block) : string option = 
+  firstSome (function
+    | "~obliv",[VARIABLE nm] -> Some nm
+    | _ -> None
+  ) blk.A.battrs
+
+and revConvLoc (l: location) : A.cabsloc =
+  { A.lineno = l.line; A.byteno = l.byte
+  ; A.filename = l.file
+  ; A.ident = 0
+  }
+
   (* Now define the processors for body and statement *)
 and doBody (blk: A.block) : chunk = 
   enterScope ();
   (* Rename the labels and add them to the environment *)
   List.iter (fun l -> ignore (genNewLocalLabel l)) blk.blabels;
+  let init,battrs = match isRipObliv blk with
+  | None -> empty,blk.A.battrs
+  | Some nm -> 
+      let l = revConvLoc !currentLoc in
+      (* Register a new variable *)
+      let specifier = [SpecAttr ("obliv",[]); SpecType Tbool] in
+      let initName = ((nm,A.JUSTBASE,[],l),NO_INIT) in
+      let condef = A.DEFINITION (A.DECDEF((specifier,[initName]),l)) in
+      (* Since CIL might change variable name, obtain the new name *)
+      let newvar = ref None in
+      let init = withLocalVarListener (fun vi -> newvar := Some vi) (fun () ->
+        empty @@ doStatement condef
+      ) in
+      (* Record that new variable name in CIL attributes *)
+      let battrs = match !newvar with
+      | Some vi -> List.map (function 
+            | "~obliv",_ -> "~obliv",[A.CONSTANT (A.CONST_STRING vi.vname)]
+            | x -> x
+            ) blk.A.battrs
+      | None -> E.s (bug "~obliv missing although isRipObliv is true")
+      in
+      init, battrs
+  in
   (* See if we have some attributes *)
-  let battrs = doAttributes blk.A.battrs in
+  let battrs' = doAttributes battrs in
 
   let bodychunk = 
     afterConversion
       (List.fold_left   (* !!! @ evaluates its arguments backwards *)
          (fun prev s -> let res = doStatement s in 
                         prev @@ res)
-         empty
-         blk.A.bstmts)
+         init blk.A.bstmts)
   in
   exitScope ();
 
 
-  if battrs == [] then
+  if battrs' == [] then
     bodychunk
   else begin
     let b = c2block bodychunk in
-    b.battrs <- battrs;
+    b.battrs <- battrs';
     s2c (mkStmt (Block b))
   end
       

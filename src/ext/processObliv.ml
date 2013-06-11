@@ -381,11 +381,17 @@ class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
       ChangeTo (mkStmt (Block {battrs=[]; bstmts=[cs;ts;fs]}))
   | _ -> DoChildren
 
-  method vblock b = if isOblivBlock b
-    then ChangeDoChildrenPost 
-          ( { b with battrs = dropAttribute "obliv" b.battrs }
-          , fun x -> x)
-    else DoChildren
+  method vblock b = 
+    if isOblivBlock b then 
+      ChangeDoChildrenPost ( { b with battrs = dropAttribute "obliv" b.battrs }
+                           , fun x -> x)
+    else match isRipOblivBlock curFunc b with
+    | Some vi -> 
+        let asg = mkStmt (Instr [Set (var vi,Lval curCond,!currentLoc)]) in
+        let b' = { bstmts = asg :: b.bstmts
+                 ; battrs = dropAttribute "~obliv" b.battrs } in 
+        ChangeTo (visitCilBlock (new codegenVisitor curFunc trueCond) b')
+    | None -> DoChildren
 end
 
 let genFunc g = match g with

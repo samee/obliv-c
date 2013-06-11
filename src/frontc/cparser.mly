@@ -240,6 +240,7 @@ let transformOffsetOf (speclist, dtype) member =
   resultExpr
 
 
+(* Used by obliv if *)
 let oblivState (s:statement): statement = 
   BLOCK ({ blabels = []; battrs = [("obliv",[])]; bstmts = [s] }
          , get_statementloc s)
@@ -869,6 +870,11 @@ statement:
 |   comma_expression SEMICOLON
 	        	{COMPUTATION (smooth_expression (fst $1), (*handleLoc*)(snd $1))}
 |   block               {BLOCK (fst3 $1, (*handleLoc*)(snd3 $1))}
+|   TILDE OBLIV LPAREN IDENT RPAREN statement
+                        {BLOCK ({ blabels = []
+                                ; battrs = [("~obliv",[VARIABLE (fst $4)])]
+                                ; bstmts = [$6] }
+                               ,snd $4)}
 |   IF paren_comma_expression statement                    %prec IF
                 	{IF (smooth_expression (fst $2), $3, NOP $1, $1)}
 |   IF paren_comma_expression statement ELSE statement
