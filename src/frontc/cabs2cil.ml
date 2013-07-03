@@ -835,13 +835,14 @@ module BlockChunk =
         in
         compactStmts (toLast c.stmts)
 
+    let hasAttr att (l:A.attribute list) : bool = List.exists ((=) att) l
 
     let c2block (c: chunk) : block = 
       let slist = pushPostIns c in
       let res = { battrs = []; bstmts = slist } in
       match slist with
-      | [{skind = Block ({battrs = [Attr("obliv",[])]; bstmts=sl2} as b)}] 
-          -> b
+      | [{skind = Block ({battrs = battrs; bstmts=sl2} as b)}] 
+          when hasAttribute "obliv" battrs -> b
       | _ -> res
 
     (* Add an instruction at the end. Never refer to this instruction again 
@@ -5735,9 +5736,11 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
             transparentUnionArgs := [];
 
             (* Fix the NAME and the STORAGE *)
+            let meObliv = ref false in
             let _ = 
               let bt,sto,inl,attrs = doSpecList n specs in
               !currentFunctionFDEC.svar.vinline <- inl;
+              meObliv := hasAttr ("obliv",[]) attrs;
               
               let ftyp, funattr = 
                 doType (AttrName false) bt (A.PARENTYPE(attrs, dt, a)) in
@@ -5889,7 +5892,9 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
 
             (********** Now do the BODY *************)
             let _ = 
+              if !meObliv then incr currentOblivDepth;
               let stmts = doBody body in
+              if !meObliv then decr currentOblivDepth;
               (* Finish everything *)
               exitScope ();
 
@@ -6382,7 +6387,12 @@ and doStatement (s : A.statement) : chunk =
 
     | A.BLOCK (b, loc) -> 
         currentLoc := convLoc loc;
-        doBody b
+        if hasAttr ("obliv",[]) b.A.battrs then begin
+          incr currentOblivDepth;
+          let c = doBody b in
+          decr currentOblivDepth;
+          c
+        end else doBody b
 
     | A.SEQUENCE (s1, s2, loc) ->
         (doStatement s1) @@ (doStatement s2)

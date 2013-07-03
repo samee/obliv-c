@@ -4823,6 +4823,9 @@ let newVID () =
   incr nextGlobalVID;
   t
 
+let currentOblivDepth = ref 0
+let vidOblivLevel = Hashtbl.create 10
+
    (* Make a varinfo. Used mostly as a helper function below  *)
 let makeVarinfo global name ?init typ =
   (* Strip const from type for locals *)
@@ -4841,6 +4844,7 @@ let makeVarinfo global name ?init typ =
       vdescr = nil;
       vdescrpure = true;
     } in
+  Hashtbl.add vidOblivLevel vi.vid !currentOblivDepth;
   vi
       
 let copyVarinfo (vi: varinfo) (newname: string) : varinfo = 

@@ -1523,6 +1523,8 @@ val typeSigAttrs: typsig -> attributes
 (*********************************************************)
 (**  {b Lvalues} *)
 
+val currentOblivDepth : int ref
+
 (** Make a varinfo. Use this (rarely) to make a raw varinfo. Use other 
  * functions to make locals ({!Cil.makeLocalVar} or {!Cil.makeFormalVar} or 
  * {!Cil.makeTempVar}) and globals ({!Cil.makeGlobalVar}). Note that this 
