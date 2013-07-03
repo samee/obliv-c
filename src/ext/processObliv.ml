@@ -103,6 +103,8 @@ let invalidOblivConvert t1 t2 = isOblivSimple t1 && isNonOblivSimple t2
 let conversionError loc =
   E.s (E.error "%s:%i:cannot convert obliv type to non-obliv" loc.file loc.line)
 
+let isImplicitCastResult t = hasAttribute "implicitCast" (typeAttrs t)
+
 class typeCheckVisitor = object
   inherit nopCilVisitor
 
@@ -417,7 +419,8 @@ end
 
 class typeFixVisitor wasObliv : cilVisitor = object(self)
   inherit nopCilVisitor
-  method vtype t = ChangeDoChildrenPost (t, fun t -> match t with
+  method vtype t = let t' = typeRemoveAttributes ["implicitCast"] t in
+    ChangeDoChildrenPost (t', fun t -> match t with
   | TInt(k,a) when hasOblivAttr a -> 
       let a2 = dropOblivAttr a in
       setTypeAttrs (intTargetType k) a2
