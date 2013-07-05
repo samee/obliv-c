@@ -56,8 +56,13 @@ let rec isOblivBlock b =
            end
   | _ -> false
 
+let rec isRipOblivBlock (b:block) : bool =
+  if hasAttribute "~obliv" b.battrs then true
+  else match b.bstmts with [{skind = Block b2}] -> isRipOblivBlock b2
+                         | _ -> false
+
 (* Returns the name of the new local variable for condition if true *)
-let rec isRipOblivBlock (f:fundec) (b:block) : varinfo option = 
+let rec ripOblivEnVar (f:fundec) (b:block) : varinfo option = 
   let x = filterAttributes "~obliv" b.battrs in
   match x with
   | [Attr(_,[AStr vname])] -> 
@@ -68,7 +73,7 @@ let rec isRipOblivBlock (f:fundec) (b:block) : varinfo option =
   | _::_ -> E.s (E.error "directly nested ~obliv blocks")
   | [] -> match b.bstmts with
           | [s] -> begin match s.skind with
-                   | Block b2 -> isRipOblivBlock f b2
+                   | Block b2 -> ripOblivEnVar f b2
                    | _ -> None
                    end
           | _ -> None

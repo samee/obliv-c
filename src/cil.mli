@@ -1523,7 +1523,13 @@ val typeSigAttrs: typsig -> attributes
 (*********************************************************)
 (**  {b Lvalues} *)
 
+(* Accessed only from Cabs2cil and Cil *)
 val currentOblivDepth : int ref
+
+(* The declared obliv level of each variable. Globals start at level 0.
+ * Formal parameters of obliv functions are at level 1, while level 0 for others
+ *)
+val vidOblivDepth : (int,int) Hashtbl.t
 
 (** Make a varinfo. Use this (rarely) to make a raw varinfo. Use other 
  * functions to make locals ({!Cil.makeLocalVar} or {!Cil.makeFormalVar} or 

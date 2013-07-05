@@ -156,6 +156,7 @@ let rec print_specifiers (specs: spec_elem list) =
     | SpecCV cv -> 
         printu (match cv with
         | CV_CONST -> "const"
+        | CV_DCONST -> "dconst"
         | CV_VOLATILE -> "volatile"
         | CV_RESTRICT -> "restrict")
     | SpecAttr al -> print_attribute al; space ()

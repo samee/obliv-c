@@ -100,7 +100,7 @@ end
  * So isOblivSimple can assume stupid types do not exist. *)
 let invalidOblivConvert t1 t2 = isOblivSimple t1 && isNonOblivSimple t2
 
-let conversionError loc =
+let oblivConversionError loc =
   E.s (E.error "%s:%i:cannot convert obliv type to non-obliv" loc.file loc.line)
 
 let isImplicitCastResult t = hasAttribute "implicitCast" (typeAttrs t)
@@ -108,13 +108,36 @@ let isImplicitCastResult t = hasAttribute "implicitCast" (typeAttrs t)
 class typeCheckVisitor = object
   inherit nopCilVisitor
 
+  val currentOblivDepth = ref 0
+  val currentRootDepth  = ref 0
   val funcOblivness = Hashtbl.create 100
+
   method isFuncObliv vinfo = 
     if vinfo.vglob && isFunctionType vinfo.vtype 
       then try Hashtbl.find funcOblivness vinfo.vname
            with Not_found -> false
       else raise (Invalid_argument 
         "typeCheckVisitor#isFuncObliv expects a global function")
+
+  (* Adds a 'dconst' qualification to type if necessary *)
+  method effectiveType vinfo =
+    if !currentOblivDepth = !currentRootDepth then vinfo.vtype
+    else 
+      let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
+      if decldepth < !currentOblivDepth then
+        typeAddAttributes [Attr("__dconst__",[])] vinfo.vtype
+      else vinfo.vtype
+
+  (* Counting up on obliv-if and ~obliv blocks  *)
+  method vblock b = 
+    if isOblivBlock b then
+      ChangeDoChildrenPost ((incr currentOblivDepth; b) 
+                           ,(fun b -> decr currentOblivDepth; b))
+    else if isRipOblivBlock b then
+      let c = !currentRootDepth in
+      ChangeDoChildrenPost ((currentRootDepth := !currentOblivDepth; b)
+                           ,(fun b -> currentRootDepth:=c; b))
+    else DoChildren
 
   method vtype vtype = match checkOblivType vtype with
     | None -> DoChildren
@@ -126,7 +149,7 @@ class typeCheckVisitor = object
     fun instr -> match instr with
       | Set (lv,exp,loc) -> 
           if invalidOblivConvert (typeOf exp) (typeOfLval lv) then
-            conversionError loc
+            oblivConversionError loc
           else instr
       | Call (lvopt,f,args,loc) ->
           begin match typeOf f with
@@ -137,14 +160,14 @@ class typeCheckVisitor = object
               | [],_ -> E.s (E.error "%s:%i:too few arguments to function"
                               loc.file loc.line)
               | a::al, (_,b,_)::bl -> 
-                  if invalidOblivConvert (typeOf a) b then conversionError loc
+                  if invalidOblivConvert (typeOf a) b then oblivConversionError loc
                   else matchArgs al bl
               in
               matchArgs args targs;
               match lvopt with 
               | Some lv -> 
                   if invalidOblivConvert tr (typeOfLval lv) then
-                    conversionError loc
+                    oblivConversionError loc
                   else instr
               | None -> instr
             end
@@ -187,6 +210,15 @@ class typeCheckVisitor = object
                      else exp
   | _ -> exp
   )
+
+  (* incr/decr currentOblivDepth on obliv functions *)
+  method vfunc fundec = 
+    let vi = fundec.svar in
+    let o = isFunctionType vi.vtype && hasOblivAttr (typeAttrs vi.vtype) in
+    if o then 
+      ChangeDoChildrenPost ((incr currentOblivDepth; fundec)
+                           ,fun f -> (decr currentOblivDepth; f))
+    else DoChildren
 
   method vglob v = begin match v with 
   | GCompTag(ci,loc) when ci.cname = "OblivBit" ->  
@@ -387,7 +419,7 @@ class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
     if isOblivBlock b then 
       ChangeDoChildrenPost ( { b with battrs = dropAttribute "obliv" b.battrs }
                            , fun x -> x)
-    else match isRipOblivBlock curFunc b with
+    else match ripOblivEnVar curFunc b with
     | Some vi -> 
         let asg = mkStmt (Instr [Set (var vi,Lval curCond,!currentLoc)]) in
         let b' = { bstmts = asg :: b.bstmts
@@ -419,7 +451,7 @@ end
 
 class typeFixVisitor wasObliv : cilVisitor = object(self)
   inherit nopCilVisitor
-  method vtype t = let t' = typeRemoveAttributes ["implicitCast"] t in
+  method vtype t = let t' = typeRemoveAttributes ["implicitCast";"dconst"] t in
     ChangeDoChildrenPost (t', fun t -> match t with
   | TInt(k,a) when hasOblivAttr a -> 
       let a2 = dropOblivAttr a in

@@ -2541,6 +2541,7 @@ and convertCVtoAttr (src: A.cvspec list) : A.attribute list =
   match src with
   | [] -> []
   | CV_CONST    :: tl -> ("const",[])    :: (convertCVtoAttr tl)
+  | CV_DCONST   :: tl -> ("dconst",[])   :: (convertCVtoAttr tl)
   | CV_VOLATILE :: tl -> ("volatile",[]) :: (convertCVtoAttr tl)
   | CV_RESTRICT :: tl -> ("restrict",[]) :: (convertCVtoAttr tl)
 
@@ -5892,7 +5893,12 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
 
             (********** Now do the BODY *************)
             let _ = 
-              if !meObliv then incr currentOblivDepth;
+              if !meObliv then begin 
+                incr currentOblivDepth;
+                let levelOne vinfo 
+                  = Hashtbl.replace vidOblivDepth vinfo.vid 1 in
+                List.iter levelOne !currentFunctionFDEC.sformals
+              end;
               let stmts = doBody body in
               if !meObliv then decr currentOblivDepth;
               (* Finish everything *)
