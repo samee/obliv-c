@@ -125,7 +125,7 @@ class typeCheckVisitor = object
     else 
       let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
       if decldepth < !currentOblivDepth then
-        typeAddAttributes [Attr("__dconst__",[])] vinfo.vtype
+        typeAddAttributes [Attr("dconst",[])] vinfo.vtype
       else vinfo.vtype
 
   (* Counting up on obliv-if and ~obliv blocks  *)

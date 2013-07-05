@@ -268,6 +268,11 @@ let options : (string * Arg.spec * string) list =
     (" Do not insert implicit casts" ^
        is_default (not !Cil.insertImplicitCasts));
 
+    "--markImplicitCasts",
+    Arg.Set Cabs2cil.markImplicitCasts,
+    (" Mark explicised implicit casts with a special attribute " 
+        ^ is_default !Cabs2cil.markImplicitCasts);
+
     "--forceRLArgEval",
     Arg.Set Cabs2cil.forceRLArgEval,
     (" Forces right to left evaluation of function arguments" ^
