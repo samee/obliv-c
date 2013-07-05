@@ -54,6 +54,8 @@ open Cilint
 open Trace
 
 
+let markImplicitCasts = ref false
+
 let mydebugfunction () = 
   E.s (error "mydebugfunction")
 
@@ -98,8 +100,10 @@ let typeForInsertedVar: (Cil.typ -> Cil.typ) ref = ref (fun t -> t)
 
 (** Like [typeForInsertedVar], but for casts.  
   * Casts in the source code are exempt from this hook. *)
-let typeForInsertedCast: (Cil.typ -> Cil.typ) ref = (* ref (fun t -> t) *)
-  ref (typeAddAttributes [Attr("implicitCast",[])])
+let typeForInsertedCast: (Cil.typ -> Cil.typ) ref =
+  ref (fun t ->
+    if !markImplicitCasts then typeAddAttributes [Attr("implicitCast",[])] t
+    else t)
 
 (** A hook into the code that remaps argument names in the appropriate
   * attributes. *)

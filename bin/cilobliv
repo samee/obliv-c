@@ -7,6 +7,6 @@ shift
 TMP=`mktemp --suffix='.c'`
 sed "1 i#include<obliv_bits.h>\\n#line 1 \"$SRC\"" $SRC > $TMP
 gcc -D_GNUCC -E -DCIL=1 $TMP -o ${SRC%.c}.i $@
-$DIR/../obj/x86_LINUX/cilly.asm.exe --out ${SRC%.c}.cil.c ${SRC%.c}.i --doprocessObliv --keepunused
+$DIR/../obj/x86_LINUX/cilly.asm.exe --out ${SRC%.c}.cil.c ${SRC%.c}.i --doprocessObliv --keepunused --markImplicitCasts
 gcc -D_GNUCC -E ${SRC%.c}.cil.c -o ${SRC%.c}.cil.i $@
 rm $TMP

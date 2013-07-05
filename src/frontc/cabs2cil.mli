@@ -35,6 +35,9 @@
  *
  *)
 
+(** Controls if implicit casts should be specially marked *)
+val markImplicitCasts : bool ref
+
 (** The main entry point *)
 val convFile: Cabs.file -> Cil.file
 
