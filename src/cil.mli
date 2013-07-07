@@ -1595,6 +1595,10 @@ val removeOffsetLval: lval -> lval * offset
  * then the original [lval] did not have an offset. *)
 val removeOffset:   offset -> offset * offset
 
+(** By default this just returns varinfo.vtype. But we sometimes hook in
+ *  since vtype does not have the correct dconst qualification in obliv-c *)
+val typeOfVinfo : (varinfo -> typ) ref
+
 (** Compute the type of an lvalue *)
 val typeOfLval: lval -> typ
 

@@ -1,6 +1,8 @@
 open Cil
 module E = Errormsg
 
+let compose f g x = f (g x)
+
 let mapcat f l = 
   let rec aux acc l = match l with
   | [] -> acc

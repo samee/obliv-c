@@ -100,12 +100,41 @@ end
  * So isOblivSimple can assume stupid types do not exist. *)
 let invalidOblivConvert t1 t2 = isOblivSimple t1 && isNonOblivSimple t2
 
+let dconstConversionError loc =
+  E.s (E.error "%s:%i:cannot convert a dconst pointer to a non-dconst one"
+      loc.file loc.line)
+
 let oblivConversionError loc =
   E.s (E.error "%s:%i:cannot convert obliv type to non-obliv" loc.file loc.line)
 
 let isImplicitCastResult t = hasAttribute "implicitCast" (typeAttrs t)
 
-class typeCheckVisitor = object
+(* Remember that obliv overrides dconst *)
+let isDconstQualified t = let a = typeAttrs t in
+                          hasAttribute "dconst" a && not (hasOblivAttr a)
+
+let isDconstPtr e = match e with
+| TPtr(t,_) -> isDconstQualified t
+| _ -> false
+
+let isNonDconstPtr e = match e with
+| TPtr(t,_) -> not (isDconstQualified t)
+| _ -> false
+
+let invalidDconstPtrConvert t1 t2 = isDconstPtr t1 && isNonDconstPtr t2
+
+(* Used for ChangeDoChildrenPost *)
+type 't visitorResponse = 't -> ('t * ('t -> 't)) ;;
+
+let chainVisitorResponse 
+  (a : 't visitorResponse) (b : 't visitorResponse) : 't visitorResponse =
+    begin fun x -> 
+      let (x1,post1) = a x in
+      let (x2,post2) = b x1 in
+      (x2, compose post1 post2)
+    end
+
+class typeCheckVisitor = object(self)
   inherit nopCilVisitor
 
   val currentOblivDepth = ref 0
@@ -120,7 +149,7 @@ class typeCheckVisitor = object
         "typeCheckVisitor#isFuncObliv expects a global function")
 
   (* Adds a 'dconst' qualification to type if necessary *)
-  method effectiveType vinfo =
+  method effectiveVarType vinfo =
     if !currentOblivDepth = !currentRootDepth then vinfo.vtype
     else 
       let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
@@ -148,7 +177,12 @@ class typeCheckVisitor = object
   method vinst instr = ChangeDoChildrenPost ([instr], List.map (
     fun instr -> match instr with
       | Set (lv,exp,loc) -> 
-          if invalidOblivConvert (typeOf exp) (typeOfLval lv) then
+          if isDconstQualified (typeOfLval lv) then
+            E.s (E.error "%s:%i:cannot assign to dconst qualified lvalue"
+                         loc.file loc.line)
+          else if invalidDconstPtrConvert (typeOf exp) (typeOfLval lv) then
+            dconstConversionError loc
+          else if invalidOblivConvert (typeOf exp) (typeOfLval lv) then
             oblivConversionError loc
           else instr
       | Call (lvopt,f,args,loc) ->
@@ -160,7 +194,10 @@ class typeCheckVisitor = object
               | [],_ -> E.s (E.error "%s:%i:too few arguments to function"
                               loc.file loc.line)
               | a::al, (_,b,_)::bl -> 
-                  if invalidOblivConvert (typeOf a) b then oblivConversionError loc
+                  if invalidOblivConvert (typeOf a) b then 
+                    oblivConversionError loc
+                  else if invalidDconstPtrConvert (typeOf a) b then
+                    dconstConversionError loc
                   else matchArgs al bl
               in
               matchArgs args targs;
@@ -189,7 +226,8 @@ class typeCheckVisitor = object
     | _ -> s
   )
 
-  method vexpr e = ChangeDoChildrenPost (e, fun exp -> match exp with
+  (* obliv-related typechecking *)
+  method vexprObliv e = (e, fun exp -> match exp with
   | UnOp (op,e,t) -> if isOblivSimple (typeOf e) then
                        let tr = addOblivType t in UnOp(op,e,tr)
                      else exp
@@ -205,11 +243,34 @@ class typeCheckVisitor = object
         BinOp(op,e1,e2,tr)
       else exp
   | CastE (t,e) when t = typeOf e -> e
-  | CastE (t,e) -> if isOblivSimple (typeOf e) && not (isOblivSimple t) 
-                     then mkCast e (addOblivType t)
-                     else exp
   | _ -> exp
   )
+
+  (* dconst-related typechecking *)
+  method vexprDconst e = (e, fun exp -> match exp with
+  (* Lval types do not have to change dconst since we hooked in from
+   * featureDescr. This may be a problem since we can never accurately
+   * obtain dconst qualifications of Lval() expressions outside of
+   * typeCheckVisitor, since we need to know what "level" the expression
+   * appears in. Hopefully, we won't have to know dconst after typechecking
+   * is done. *)
+  | BinOp(op,e1,e2,t) ->
+      let t = match op with (* Propagate dconst qualifiers *)
+              | PlusPI | IndexPI | MinusPI -> typeOf e1
+              | _ -> t
+      in BinOp(op,e1,e2,t)
+  | CastE (t,e2) when isImplicitCastResult t && isDconstPtr (typeOf e2) ->
+      begin match t with 
+      | TPtr(t2,a) -> 
+          let t' = TPtr(typeAddAttributes [Attr("dconst",[])] t2,a) in
+          CastE (t',e2)
+      | _ -> e
+      end
+  | _ -> exp
+  )
+  method vexpr e 
+    = let (e',post) = chainVisitorResponse self#vexprDconst self#vexprObliv e in
+      ChangeDoChildrenPost (e',post)
 
   (* incr/decr currentOblivDepth on obliv functions *)
   method vfunc fundec = 
@@ -381,7 +442,6 @@ let rec codegenInstr curCond tmpVar (instr:instr) : instr list =
       if isOblivSimple (typeOfLval v2) then
         [setIfThenElse v curCond v2 v loc]
       else setUsingTmp v (Lval v2) loc
-  (* TODO special-case if-facoring for arithmetic operators *)
   | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> setUsingTmp v x loc
   | Set(v,(CastE(TInt(k,a),x) as xf),loc) when isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then setUsingTmp v xf loc
@@ -390,7 +450,6 @@ let rec codegenInstr curCond tmpVar (instr:instr) : instr list =
       [Call(lvo,exp,mkAddrOf curCond::args,loc)]
   | _ -> [instr]
 
-(* TODO codegenVisitor, codegenInstr, condOps *)
 class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
   inherit nopCilVisitor
 
@@ -480,7 +539,10 @@ let feature : featureDescr =
     fd_doit = 
     (function (f: file) -> 
       let tcVisitor = new typeCheckVisitor in
+      let oldtov = !typeOfVinfo in
+      typeOfVinfo := tcVisitor#effectiveVarType;
       visitCilFileSameGlobals (tcVisitor :> cilVisitor) f;
+      typeOfVinfo := oldtov;
       let isObliv = tcVisitor#isFuncObliv in
       SimplifyTagged.feature.fd_doit f; (* Note: this can screw up type equality
                                                  checks *)

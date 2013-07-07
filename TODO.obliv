@@ -8,7 +8,7 @@ Not sure what the parser currently does in the following line, but I need the 'o
   obliv int x[5];
 Also check this on typedefs
 
-Right now this turns both to const: extern const int x; int x = 5; Should be 
+Right now CIL turns both to const: extern const int x; int x = 5; Should be 
 illegal. Need to hack CIL attribute parsing for this. Same problem with obliv
 instead of const.
 
@@ -16,5 +16,7 @@ floating point and enum types
 check obliv array length (variable) in decl
 special case: disallow/warn obliv variables in printf
 warn if 'obliv if' has non-obliv condition
+
+Optimization: factoring out muxes for simple if-else assignments
 
 Multiplication/Division/mod

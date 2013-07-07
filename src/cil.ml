@@ -1910,11 +1910,16 @@ and typeOfInit (i: init) : typ =
     SingleInit e -> typeOf e
   | CompoundInit (t, _) -> t
 
+and typeOfVinfo = ref (fun vi -> vi.vtype)
+
 and typeOfLval = function
-    Var vi, off -> typeOffset vi.vtype off
+    Var vi, off -> typeOffset (!typeOfVinfo vi) off
   | Mem addr, off -> begin
       match unrollType (typeOf addr) with
-        TPtr (t, _) -> typeOffset t off
+        TPtr (t, a) -> 
+          if hasAttribute "dconst" a then
+            typeOffset (typeAddAttributes [Attr("dconst",[])] t) off
+          else typeOffset t off
       | _ -> E.s (bug "typeOfLval: Mem on a non-pointer (%a)" !pd_exp addr)
   end
 
