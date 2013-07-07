@@ -369,21 +369,22 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
 let rec codegenInstr curCond tmpVar (instr:instr) : instr list = 
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
+  let setUsingTmp v x loc = 
+    let nv = var (tmpVar (typeOfLval v)) in
+    let ilist = [Set(nv,x,loc); Set(v,Lval nv,loc)] in
+    mapcat (codegenInstr curCond tmpVar) ilist
+  in
   if curCond == trueCond then [codegenUncondInstr instr]
   else match instr with 
   | Set(v,_,_) when simptemp v -> [codegenUncondInstr instr]
   | Set(v,Lval(v2),loc) when isOblivSimple (typeOfLval v) -> 
       if isOblivSimple (typeOfLval v2) then
         [setIfThenElse v curCond v2 v loc]
-      else [instr] (* TODO *)
+      else setUsingTmp v (Lval v2) loc
   (* TODO special-case if-facoring for arithmetic operators *)
-  | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> 
-      let nv = var (tmpVar t) in
-      let ilist = [Set(nv,x,loc); Set(v,Lval nv,loc)] in
-      mapcat (codegenInstr curCond tmpVar) ilist
-  | Set(v,CastE(TInt(k,a),x),loc) when isOblivSimple (typeOfLval v) ->
-      if isOblivSimple (typeOf x) then
-        [instr] (* TODO *)
+  | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> setUsingTmp v x loc
+  | Set(v,(CastE(TInt(k,a),x) as xf),loc) when isOblivSimple (typeOfLval v) ->
+      if isOblivSimple (typeOf x) then setUsingTmp v xf loc
       else [condSetKnownInt curCond v k x loc]
   | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
       [Call(lvo,exp,mkAddrOf curCond::args,loc)]
