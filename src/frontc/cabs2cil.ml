@@ -2545,7 +2545,7 @@ and convertCVtoAttr (src: A.cvspec list) : A.attribute list =
   match src with
   | [] -> []
   | CV_CONST    :: tl -> ("const",[])    :: (convertCVtoAttr tl)
-  | CV_DCONST   :: tl -> ("dconst",[])   :: (convertCVtoAttr tl)
+  | CV_FROZEN   :: tl -> ("frozen",[])   :: (convertCVtoAttr tl)
   | CV_VOLATILE :: tl -> ("volatile",[]) :: (convertCVtoAttr tl)
   | CV_RESTRICT :: tl -> ("restrict",[]) :: (convertCVtoAttr tl)
 

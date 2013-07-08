@@ -264,7 +264,7 @@ let oblivState (s:statement): statement =
 %token<Cabs.cabsloc> ENUM STRUCT TYPEDEF UNION
 %token<Cabs.cabsloc> SIGNED UNSIGNED LONG SHORT
 %token<Cabs.cabsloc> OBLIV
-%token<Cabs.cabsloc> VOLATILE EXTERN STATIC CONST RESTRICT AUTO REGISTER DCONST
+%token<Cabs.cabsloc> VOLATILE EXTERN STATIC CONST RESTRICT AUTO REGISTER FROZEN
 %token<Cabs.cabsloc> THREAD
 
 %token<Cabs.cabsloc> SIZEOF ALIGNOF
@@ -331,7 +331,7 @@ let oblivState (s:statement): statement =
 %left	INF SUP INF_EQ SUP_EQ
 %left	INF_INF SUP_SUP
 %left	PLUS MINUS
-%left	STAR SLASH PERCENT CONST RESTRICT VOLATILE DCONST
+%left	STAR SLASH PERCENT CONST RESTRICT VOLATILE FROZEN
 %right	EXCLAM TILDE PLUS_PLUS MINUS_MINUS CAST RPAREN ADDROF SIZEOF ALIGNOF
 %left 	LBRACKET
 %left	DOT ARROW LPAREN LBRACE
@@ -1294,7 +1294,7 @@ function_def_start:  /* (* ISO 6.9.1 *) */
 /* const/volatile as type specifier elements */
 cvspec:
     CONST                               { SpecCV(CV_CONST), $1 }
-|   DCONST                              { SpecCV(CV_DCONST), $1 }
+|   FROZEN                              { SpecCV(CV_FROZEN), $1 }
 |   VOLATILE                            { SpecCV(CV_VOLATILE), $1 }
 |   RESTRICT                            { SpecCV(CV_RESTRICT), $1 }
 ;
@@ -1340,7 +1340,7 @@ attribute_nocv_list:
 attribute:
     attribute_nocv                      { $1 }
 |   CONST                               { ("const", []), $1 }
-|   DCONST                              { ("dconst", []), $1 }
+|   FROZEN                              { ("frozen", []), $1 }
 |   RESTRICT                            { ("restrict",[]), $1 }
 |   VOLATILE                            { ("volatile",[]), $1 }
 ;

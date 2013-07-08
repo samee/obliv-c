@@ -100,8 +100,8 @@ end
  * So isOblivSimple can assume stupid types do not exist. *)
 let invalidOblivConvert t1 t2 = isOblivSimple t1 && isNonOblivSimple t2
 
-let dconstConversionError loc =
-  E.s (E.error "%s:%i:cannot convert a dconst pointer to a non-dconst one"
+let frozenConversionError loc =
+  E.s (E.error "%s:%i:cannot convert a frozen pointer to a non-frozen one"
       loc.file loc.line)
 
 let oblivConversionError loc =
@@ -109,19 +109,19 @@ let oblivConversionError loc =
 
 let isImplicitCastResult t = hasAttribute "implicitCast" (typeAttrs t)
 
-(* Remember that obliv overrides dconst *)
-let isDconstQualified t = let a = typeAttrs t in
-                          hasAttribute "dconst" a && not (hasOblivAttr a)
+(* Remember that obliv overrides frozen *)
+let isFrozenQualified t = let a = typeAttrs t in
+                          hasAttribute "frozen" a && not (hasOblivAttr a)
 
-let isDconstPtr e = match e with
-| TPtr(t,_) -> isDconstQualified t
+let isFrozenPtr e = match e with
+| TPtr(t,_) -> isFrozenQualified t
 | _ -> false
 
-let isNonDconstPtr e = match e with
-| TPtr(t,_) -> not (isDconstQualified t)
+let isNonFrozenPtr e = match e with
+| TPtr(t,_) -> not (isFrozenQualified t)
 | _ -> false
 
-let invalidDconstPtrConvert t1 t2 = isDconstPtr t1 && isNonDconstPtr t2
+let invalidFrozenPtrConvert t1 t2 = isFrozenPtr t1 && isNonFrozenPtr t2
 
 (* Used for ChangeDoChildrenPost *)
 type 't visitorResponse = 't -> ('t * ('t -> 't)) ;;
@@ -148,13 +148,13 @@ class typeCheckVisitor = object(self)
       else raise (Invalid_argument 
         "typeCheckVisitor#isFuncObliv expects a global function")
 
-  (* Adds a 'dconst' qualification to type if necessary *)
+  (* Adds a 'frozen' qualification to type if necessary *)
   method effectiveVarType vinfo =
     if !currentOblivDepth = !currentRootDepth then vinfo.vtype
     else 
       let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
       if decldepth < !currentOblivDepth then
-        typeAddAttributes [Attr("dconst",[])] vinfo.vtype
+        typeAddAttributes [Attr("frozen",[])] vinfo.vtype
       else vinfo.vtype
 
   (* Counting up on obliv-if and ~obliv blocks  *)
@@ -177,11 +177,11 @@ class typeCheckVisitor = object(self)
   method vinst instr = ChangeDoChildrenPost ([instr], List.map (
     fun instr -> match instr with
       | Set (lv,exp,loc) -> 
-          if isDconstQualified (typeOfLval lv) then
-            E.s (E.error "%s:%i:cannot assign to dconst qualified lvalue"
+          if isFrozenQualified (typeOfLval lv) then
+            E.s (E.error "%s:%i:cannot assign to frozen qualified lvalue"
                          loc.file loc.line)
-          else if invalidDconstPtrConvert (typeOf exp) (typeOfLval lv) then
-            dconstConversionError loc
+          else if invalidFrozenPtrConvert (typeOf exp) (typeOfLval lv) then
+            frozenConversionError loc
           else if invalidOblivConvert (typeOf exp) (typeOfLval lv) then
             oblivConversionError loc
           else instr
@@ -196,8 +196,8 @@ class typeCheckVisitor = object(self)
               | a::al, (_,b,_)::bl -> 
                   if invalidOblivConvert (typeOf a) b then 
                     oblivConversionError loc
-                  else if invalidDconstPtrConvert (typeOf a) b then
-                    dconstConversionError loc
+                  else if invalidFrozenPtrConvert (typeOf a) b then
+                    frozenConversionError loc
                   else matchArgs al bl
               in
               matchArgs args targs;
@@ -246,30 +246,30 @@ class typeCheckVisitor = object(self)
   | _ -> exp
   )
 
-  (* dconst-related typechecking *)
-  method vexprDconst e = (e, fun exp -> match exp with
-  (* Lval types do not have to change dconst since we hooked in from
+  (* frozen-related typechecking *)
+  method vexprFrozen e = (e, fun exp -> match exp with
+  (* Lval types do not have to change frozen since we hooked in from
    * featureDescr. This may be a problem since we can never accurately
-   * obtain dconst qualifications of Lval() expressions outside of
+   * obtain frozen qualifications of Lval() expressions outside of
    * typeCheckVisitor, since we need to know what "level" the expression
-   * appears in. Hopefully, we won't have to know dconst after typechecking
+   * appears in. Hopefully, we won't have to know frozen after typechecking
    * is done. *)
   | BinOp(op,e1,e2,t) ->
-      let t = match op with (* Propagate dconst qualifiers *)
+      let t = match op with (* Propagate frozen qualifiers *)
               | PlusPI | IndexPI | MinusPI -> typeOf e1
               | _ -> t
       in BinOp(op,e1,e2,t)
-  | CastE (t,e2) when isImplicitCastResult t && isDconstPtr (typeOf e2) ->
+  | CastE (t,e2) when isImplicitCastResult t && isFrozenPtr (typeOf e2) ->
       begin match t with 
       | TPtr(t2,a) -> 
-          let t' = TPtr(typeAddAttributes [Attr("dconst",[])] t2,a) in
+          let t' = TPtr(typeAddAttributes [Attr("frozen",[])] t2,a) in
           CastE (t',e2)
       | _ -> e
       end
   | _ -> exp
   )
   method vexpr e 
-    = let (e',post) = chainVisitorResponse self#vexprDconst self#vexprObliv e in
+    = let (e',post) = chainVisitorResponse self#vexprFrozen self#vexprObliv e in
       ChangeDoChildrenPost (e',post)
 
   (* incr/decr currentOblivDepth on obliv functions *)
@@ -511,7 +511,7 @@ end
 
 class typeFixVisitor wasObliv : cilVisitor = object(self)
   inherit nopCilVisitor
-  method vtype t = let t' = typeRemoveAttributes ["implicitCast";"dconst"] t in
+  method vtype t = let t' = typeRemoveAttributes ["implicitCast";"frozen"] t in
     ChangeDoChildrenPost (t', fun t -> match t with
   | TInt(k,a) when hasOblivAttr a -> 
       let a2 = dropOblivAttr a in

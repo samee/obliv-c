@@ -1917,8 +1917,8 @@ and typeOfLval = function
   | Mem addr, off -> begin
       match unrollType (typeOf addr) with
         TPtr (t, a) -> 
-          if hasAttribute "dconst" a then
-            typeOffset (typeAddAttributes [Attr("dconst",[])] t) off
+          if hasAttribute "frozen" a then
+            typeOffset (typeAddAttributes [Attr("frozen",[])] t) off
           else typeOffset t off
       | _ -> E.s (bug "typeOfLval: Mem on a non-pointer (%a)" !pd_exp addr)
   end
