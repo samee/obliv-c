@@ -8,7 +8,7 @@
 //   because its size need to be known before the user can declare these
 //   as local variables.
 
-typedef struct {
+typedef struct ProtocolDesc {
   // private fields, do not use directly
   int sock;
   int yaoCount,xorCount;

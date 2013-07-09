@@ -4,17 +4,20 @@
 #include<stdbool.h>
 // This file gets included in every C intermediate file generated from obliv-C
 
-// TODO make parameter orders more consistent: dest, src, size, cond etc.
-
 // import common types
 #include<obliv_types.h>
 
 typedef long long widest_t;
 typedef struct OblivBit {
   // private fields, do not use directly
-  bool val;
   bool known;
-  // would later have garbled keys, invert state etc.
+  union {
+    bool knownValue;
+    // a struct for each protocol we support goes here
+    struct {
+      // garbled keys, invert state etc.      
+    };
+  };
 } OblivBit;
 
 // Type of the 'main' function being compiled in obliv-c

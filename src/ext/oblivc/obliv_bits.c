@@ -1,5 +1,4 @@
 #include <obliv_bits.h>
-#include <stdio.h> // XXX
 
 // Q: What's with all these casts to and from void* ?
 // A: Code generation becomes easier without the need for extraneous casts.
@@ -19,13 +18,13 @@ void execOblivProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 }
 
 void __obliv_c__assignBitKnown(OblivBit* dest, bool value)
-  { dest->val = value; dest->known=true; }
+  { dest->knownValue = value; dest->known=true; }
 
 void __obliv_c__copyBit(OblivBit* dest,const OblivBit* src)
   { if(dest!=src) *dest=*src; }
 
 bool __obliv_c__bitIsKnown(const OblivBit* bit,bool* v)
-{ if(bit->known) *v=bit->val;
+{ if(bit->known) *v=bit->knownValue;
   return bit->known;
 }
 
@@ -37,11 +36,11 @@ void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   if(a->known || b->known)
   { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
-    if(a->val) __obliv_c__copyBit(dest,b);
+    if(a->knownValue) __obliv_c__copyBit(dest,b);
     else __obliv_c__assignBitKnown(dest,false);
   }
   else
-  { dest->val = (a->val && b->val);
+  { dest->knownValue= (a->knownValue&& b->knownValue);
     dest->known = false;
     currentProto.yaoCount++;
   }
@@ -51,11 +50,11 @@ void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   if(a->known || b->known)
   { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
-    if(!a->val) __obliv_c__copyBit(dest,b);
+    if(!a->knownValue) __obliv_c__copyBit(dest,b);
     else __obliv_c__assignBitKnown(dest,true);
   }
   else
-  { dest->val = (a->val || b->val);
+  { dest->knownValue= (a->knownValue|| b->knownValue);
     dest->known = false;
     currentProto.yaoCount++;
   }
@@ -65,28 +64,28 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
   bool v;
   if(a->known || b->known)
   { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
-    v = a->val;
+    v = a->knownValue;
     __obliv_c__copyBit(dest,b);
     if(v) __obliv_c__flipBit(dest);
   }
   else
   {
-    dest->val = (tobool(a->val) != tobool(b->val));
+    dest->knownValue= (tobool(a->knownValue) != tobool(b->knownValue));
     dest->known = false;
     currentProto.xorCount++;
   }
 }
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
 {
-  dest->val = !a->val;
+  dest->knownValue= !a->knownValue;
   dest->known = a->known;
 }
-void __obliv_c__flipBit(OblivBit* dest) { dest->val = !dest->val; }
+void __obliv_c__flipBit(OblivBit* dest) { dest->knownValue= !dest->knownValue; }
 
 void __obliv_c__feedOblivBool(OblivBit* dest,int party,bool a)
 { /* if(party!=currentProto.thisParty) return; */
   dest->known=false;
-  dest->val=a;
+  dest->knownValue=a;
 }
 void __obliv_c__feedOblivBits(OblivBit* dest, int party
                              ,const bool* src,size_t size)
@@ -113,14 +112,14 @@ inline void __obliv_c__feedOblivInputs(OblivInputs* spec,size_t count,int party)
 
 inline bool __obliv_c__revealOblivBool(const OblivBit* dest,int party)
 { if(party!=0 && party!=currentProto.thisParty) return false;
-  else return dest->val;
+  else return dest->knownValue;
 }
 inline widest_t __obliv_c__revealOblivBits
   (const OblivBit* dest,size_t size,int party)
 { widest_t rv=0;
   if(party!=0 && party!=currentProto.thisParty) return false;
   dest+=size;
-  while(size-->0) rv=(rv<<1)+tobool((--dest)->val);
+  while(size-->0) rv=(rv<<1)+tobool((--dest)->knownValue);
   return rv;
 }
 
