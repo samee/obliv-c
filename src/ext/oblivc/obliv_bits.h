@@ -7,7 +7,6 @@
 // import common types
 #include<obliv_types.h>
 
-typedef long long widest_t;
 typedef struct OblivBit {
   // private fields, do not use directly
   bool known;
@@ -35,10 +34,6 @@ typedef struct { OblivBit bits[bitsize(long)];  } __obliv_c__long;
 typedef struct { OblivBit bits[bitsize(long long)]; } __obliv_c__lLong;
 
 static const __obliv_c__bool __obliv_c__trueCond = {{true,true}};
-
-// TODO protocol initialization functions
-void setCurrentParty(ProtocolDesc* pd, int party);
-void execOblivProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 
 // None of the __obliv_c__* functions are meant to be used directly
 //   in a normal C program, but rather through an obliv-c program.
