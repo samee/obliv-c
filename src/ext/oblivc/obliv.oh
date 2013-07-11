@@ -17,4 +17,10 @@ short revealOblivShort(obliv short src,int party);
 long revealOblivLong(obliv long src,int party);
 long long revealOblivLLong(obliv long long src,int party);
 
+bool broadcastBool(int source,bool v);
+char broadcastChar(int source,char v);
+int broadcastInt(int source,int v);
+short broadcastShort(int source,short v);
+long broadcastLong(int source,long v);
+long long broadcastLLong(int source,long long v);
 #endif

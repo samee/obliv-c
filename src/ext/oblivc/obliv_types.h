@@ -1,6 +1,8 @@
 #ifndef OBLIV_TYPES_H
 #define OBLIV_TYPES_H
 
+#include<stddef.h>
+
 typedef long long widest_t;
 
 // These are the troublesome types that need to be included both in
@@ -36,8 +38,8 @@ struct ProtocolDesc {
 };
 
 typedef struct ProtocolTransport {
-  int (*send)(ProtocolDesc*,const char*,int);
-  int (*recv)(ProtocolDesc*,      char*,int);
+  int (*send)(ProtocolDesc*,int,const void*,size_t);
+  int (*recv)(ProtocolDesc*,int,      void*,size_t);
   void (*cleanup)(ProtocolDesc*);
 } ProtocolTransport;
 

@@ -1,3 +1,4 @@
+// TODO I need to fix some int sizes
 #include <obliv_bits.h>
 #include <stdio.h>      // for protoUseStdio()
 
@@ -9,20 +10,40 @@
 static ProtocolDesc currentProto;
 
 // --------------------------- Transports -----------------------------------
-static int stdioSend(ProtocolDesc* pd,const char* s,int n)
-  { return fwrite(s,1,n,stdout); }
+// Convenience functions
+static int recv(ProtocolDesc* pd,int s,void* p,size_t n)
+  { return pd->trans->recv(pd,s,p,n); }
+static int send(ProtocolDesc* pd,int d,void* p,size_t n)
+  { return pd->trans->send(pd,d,p,n); }
 
-// flush on recv?
-static int stdioRecv(ProtocolDesc* pd,char* s,int n)
-  { return fread(s,1,n,stdin); }
+struct stdioTransport
+{ ProtocolTransport cb;
+  bool needFlush;
+};
+
+// Ignores 'dest' parameter. So you can't send to yourself
+static bool* stdioFlushFlag(ProtocolDesc* pd)
+  { return &((struct stdioTransport*)pd->trans)->needFlush; }
+
+static int stdioSend(ProtocolDesc* pd,int dest,const void* s,size_t n)
+{ *stdioFlushFlag(pd)=true;
+  return fwrite(s,1,n,stdout); 
+}
+
+static int stdioRecv(ProtocolDesc* pd,int src,void* s,size_t n)
+{ 
+  bool *p = stdioFlushFlag(pd);
+  if(*p) { fflush(stdout); *p=false; }
+  return fread(s,1,n,stdin); 
+}
 
 static void stdioCleanup(ProtocolDesc* pd) {}
 
-static ProtocolTransport stdioTransport 
-  = { stdioSend, stdioRecv, stdioCleanup };
+static struct stdioTransport stdioTransport 
+  = {{ stdioSend, stdioRecv, stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
-  { pd->trans = &stdioTransport; }
+  { pd->trans = &stdioTransport.cb; }
 
 void cleanupProtocol(ProtocolDesc* pd)
   { pd->trans->cleanup(pd); }
@@ -111,9 +132,15 @@ void __obliv_c__flipBit(OblivBit* dest)
   { currentProto.flipBit(&currentProto,dest); }
 
 void __obliv_c__feedOblivBool(OblivBit* dest,int party,bool a)
-{ /* if(party!=currentProto.thisParty) return; */
+{ 
+  int curparty = __obliv_c__currentParty();
+  
   dest->known=false;
-  dest->knownValue=a;
+  if(party==1) { if(curparty==1) dest->knownValue=a; }
+  else if(party==2 && curparty == 1) 
+    recv(&currentProto,1,&dest->knownValue,sizeof(bool));
+  else if(party==2 && curparty == 2) send(&currentProto,1,&a,sizeof(bool));
+  else fprintf(stderr,"Error: This is a 2 party protocol\n");
 }
 void __obliv_c__feedOblivBits(OblivBit* dest, int party
                              ,const bool* src,size_t size)
@@ -128,8 +155,7 @@ inline void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
 inline void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
     OblivInputs* spec,size_t count,int party)
 { while(count--)
-  { bool bits[sizeof(widest_t)];
-    int i;
+  { int i;
     widest_t v = spec->src;
     for(i=0;i<spec->size;++i) 
     { __obliv_c__feedOblivBool(spec->dest+i,party,v&1);
@@ -146,11 +172,26 @@ inline bool __obliv_c__revealOblivBool(const OblivBit* dest,int party)
 inline widest_t dbgProtoRevealOblivBits
   (ProtocolDesc* pd,const OblivBit* dest,size_t size,int party)
 { widest_t rv=0;
-  if(party!=0 && party!=currentProto.thisParty) return false;
-  dest+=size;
-  while(size-->0) rv=(rv<<1)+tobool((--dest)->knownValue);
-  return rv;
+  if(currentProto.thisParty==1)
+  { dest+=size;
+    while(size-->0) rv = (rv<<1)+tobool((--dest)->knownValue);
+    if(party==0 || party==2) send(pd,2,&rv,sizeof(rv));
+    if(party==2) return 0;
+    else return rv;
+  }else // assuming thisParty==2
+  { if(party==0 || party==2) { recv(pd,1,&rv,sizeof(rv)); return rv; }
+    else return 0;
+  }
 }
+
+static void broadcastBits(int source,void* p,size_t n)
+{
+  int i;
+  if(currentProto.thisParty!=source) recv(&currentProto,source,p,n);
+  else for(i=1;i<=currentProto.partyCount;++i) if(i!=source)
+      send(&currentProto,i,p,n);
+}
+
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   pd->feedOblivInputs = dbgProtoFeedOblivInputs;
@@ -160,6 +201,7 @@ void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pd->setBitXor = dbgProtoSetBitXor;
   pd->setBitNot = dbgProtoSetBitNot;
   pd->flipBit   = dbgProtoFlipBit;
+  pd->partyCount= 2;
   currentProto = *pd;
   currentProto.yaoCount = currentProto.xorCount = 0;
   start(arg);
@@ -469,3 +511,21 @@ long long revealOblivLLong(__obliv_c__lLong src,int party)
   { return (long long)__obliv_c__revealOblivBits(src.bits,bitsize(long long)
                                                  ,party); }
 
+// TODO fix data width
+bool broadcastBool(int source,bool v)
+{
+  char t = v;
+  broadcastBits(source,&t,1);
+  return t;
+}
+#define broadcastFun(t,tname)           \
+  t broadcast##tname(int source, t v)   \
+  { broadcastBits(source,&v,sizeof(v)); \
+    return v;                           \
+  }
+broadcastFun(char,Char)
+broadcastFun(int,Int)
+broadcastFun(short,Short)
+broadcastFun(long,Long)
+broadcastFun(long long,LLong)
+#undef broadcastFun
