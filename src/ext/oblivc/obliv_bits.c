@@ -512,14 +512,14 @@ long long revealOblivLLong(__obliv_c__lLong src,int party)
                                                  ,party); }
 
 // TODO fix data width
-bool broadcastBool(int source,bool v)
+bool ocBroadcastBool(int source,bool v)
 {
   char t = v;
   broadcastBits(source,&t,1);
   return t;
 }
 #define broadcastFun(t,tname)           \
-  t broadcast##tname(int source, t v)   \
+  t ocBroadcast##tname(int source, t v)   \
   { broadcastBits(source,&v,sizeof(v)); \
     return v;                           \
   }
