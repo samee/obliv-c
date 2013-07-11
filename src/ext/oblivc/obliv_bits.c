@@ -69,48 +69,24 @@ static int tobool(int x) { return x?1:0; }
 void dbgProtoSetBitAnd(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
-  if(a->known || b->known)
-  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
-    if(a->knownValue) __obliv_c__copyBit(dest,b);
-    else __obliv_c__assignBitKnown(dest,false);
-  }
-  else
-  { dest->knownValue= (a->knownValue&& b->knownValue);
-    dest->known = false;
-    currentProto.yaoCount++;
-  }
+  dest->knownValue= (a->knownValue&& b->knownValue);
+  dest->known = false;
+  currentProto.yaoCount++;
 }
 
 void dbgProtoSetBitOr(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
-  if(a->known || b->known)
-  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
-    if(!a->knownValue) __obliv_c__copyBit(dest,b);
-    else __obliv_c__assignBitKnown(dest,true);
-  }
-  else
-  { dest->knownValue= (a->knownValue|| b->knownValue);
-    dest->known = false;
-    currentProto.yaoCount++;
-  }
+  dest->knownValue= (a->knownValue|| b->knownValue);
+  dest->known = false;
+  currentProto.yaoCount++;
 }
 void dbgProtoSetBitXor(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
-  bool v;
-  if(a->known || b->known)
-  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
-    v = a->knownValue;
-    __obliv_c__copyBit(dest,b);
-    if(v) __obliv_c__flipBit(dest);
-  }
-  else
-  {
-    dest->knownValue= (tobool(a->knownValue) != tobool(b->knownValue));
-    dest->known = false;
-    currentProto.xorCount++;
-  }
+  dest->knownValue= (tobool(a->knownValue) != tobool(b->knownValue));
+  dest->known = false;
+  currentProto.xorCount++;
 }
 void dbgProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
 {
@@ -121,11 +97,31 @@ void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
   { dest->knownValue = !dest->knownValue; }
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
-  { currentProto.setBitAnd(&currentProto,dest,a,b); }
+{
+  if(a->known || b->known)
+  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
+    if(a->knownValue) __obliv_c__copyBit(dest,b);
+    else __obliv_c__assignBitKnown(dest,false);
+  }else currentProto.setBitAnd(&currentProto,dest,a,b);
+}
 void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
-  { currentProto.setBitOr(&currentProto,dest,a,b); }
+{
+  if(a->known || b->known)
+  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
+    if(!a->knownValue) __obliv_c__copyBit(dest,b);
+    else __obliv_c__assignBitKnown(dest,true);
+  }else currentProto.setBitOr(&currentProto,dest,a,b);
+}
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
-  { currentProto.setBitXor(&currentProto,dest,a,b); }
+{
+  bool v;
+  if(a->known || b->known)
+  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
+    v = a->knownValue;
+    __obliv_c__copyBit(dest,b);
+    if(v) __obliv_c__flipBit(dest);
+  }else currentProto.setBitXor(&currentProto,dest,a,b); 
+}
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
   { currentProto.setBitNot(&currentProto,dest,a); }
 void __obliv_c__flipBit(OblivBit* dest) 
