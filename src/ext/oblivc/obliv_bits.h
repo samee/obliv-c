@@ -8,14 +8,16 @@
 #include<obliv_types.h>
 
 typedef struct OblivBit {
-  // private fields, do not use directly
   bool known;
   union {
-    bool knownValue;
     // a struct for each protocol we support goes here
+    bool knownValue;
     struct {
-      // garbled keys, invert state etc.      
-    };
+      // generator: w is label for 0 value if inverted == false, 1 otherwise
+      // evaluator: w is current label
+      yao_key_t w;
+      bool inverted; // inverted: generator use only
+    } yao;
   };
 } OblivBit;
 

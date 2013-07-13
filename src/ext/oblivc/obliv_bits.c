@@ -1,6 +1,9 @@
 // TODO I need to fix some int sizes
 #include <obliv_bits.h>
+#include <inttypes.h>
 #include <stdio.h>      // for protoUseStdio()
+#include <string.h>
+#include <gcrypt.h>
 
 // Q: What's with all these casts to and from void* ?
 // A: Code generation becomes easier without the need for extraneous casts.
@@ -11,9 +14,9 @@ static ProtocolDesc currentProto;
 
 // --------------------------- Transports -----------------------------------
 // Convenience functions
-static int recv(ProtocolDesc* pd,int s,void* p,size_t n)
+static int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
   { return pd->trans->recv(pd,s,p,n); }
-static int send(ProtocolDesc* pd,int d,void* p,size_t n)
+static int osend(ProtocolDesc* pd,int d,void* p,size_t n)
   { return pd->trans->send(pd,d,p,n); }
 
 struct stdioTransport
@@ -21,7 +24,7 @@ struct stdioTransport
   bool needFlush;
 };
 
-// Ignores 'dest' parameter. So you can't send to yourself
+// Ignores 'dest' parameter. So you can't osend to yourself
 static bool* stdioFlushFlag(ProtocolDesc* pd)
   { return &((struct stdioTransport*)pd->trans)->needFlush; }
 
@@ -71,7 +74,7 @@ void dbgProtoSetBitAnd(ProtocolDesc* pd,
 {
   dest->knownValue= (a->knownValue&& b->knownValue);
   dest->known = false;
-  currentProto.yaoCount++;
+  currentProto.debug.mulCount++;
 }
 
 void dbgProtoSetBitOr(ProtocolDesc* pd,
@@ -79,14 +82,14 @@ void dbgProtoSetBitOr(ProtocolDesc* pd,
 {
   dest->knownValue= (a->knownValue|| b->knownValue);
   dest->known = false;
-  currentProto.yaoCount++;
+  currentProto.debug.mulCount++;
 }
 void dbgProtoSetBitXor(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   dest->knownValue= (tobool(a->knownValue) != tobool(b->knownValue));
   dest->known = false;
-  currentProto.xorCount++;
+  currentProto.debug.xorCount++;
 }
 void dbgProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
 {
@@ -95,6 +98,246 @@ void dbgProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
 }
 void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest) 
   { dest->knownValue = !dest->knownValue; }
+
+//-------------------- Yao Protocol (honest but curious) -------------
+
+// Assume: generator is party 1, evaluator is party 2
+
+static void yaoKeyDebug(const yao_key_t k)
+{ int i;
+  fprintf(stderr,"%d: ",currentProto.thisParty);
+  for(i=YAO_KEY_BYTES-1;i>=0;--i) fprintf(stderr,"%02x ",0xff&k[i]);
+  fprintf(stderr,"\n");
+}
+void yaoKeyCopy(yao_key_t d, const yao_key_t s) { memcpy(d,s,YAO_KEY_BYTES); }
+void yaoKeyZero(yao_key_t d) { memset(d,0,YAO_KEY_BYTES); }
+bool yaoKeyLsb(const yao_key_t k) { return k[0]&1; }
+void yaoKeyXor(yao_key_t d, const yao_key_t s)
+{ int i;
+  for(i=0;i<YAO_KEY_BYTES;++i) d[i]^=s[i];
+}
+// XXX do I need i when it is already encoded in lsb(a)||lsb(b)
+void yaoSetHashMask(yao_key_t d,const yao_key_t a,const yao_key_t b,
+    uint64_t k,int i)
+{
+  char buf[2*YAO_KEY_BYTES+8], dest[20];  // dest length == DIGEST length
+  k=((k<<2)|i);
+  memcpy(buf,a,YAO_KEY_BYTES);
+  memcpy(buf+YAO_KEY_BYTES,b,YAO_KEY_BYTES);
+  memcpy(buf+2*YAO_KEY_BYTES,&k,8);
+  gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
+  memcpy(d,dest,YAO_KEY_BYTES);
+}
+void yaoKeyNewPair(ProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
+{
+  unsigned* ic = &pd->yao.icount;
+  char buf[YAO_KEY_BYTES+sizeof(*ic)], dest[20];
+  memcpy(buf,pd->yao.I,YAO_KEY_BYTES);
+  memcpy(buf+YAO_KEY_BYTES,ic,sizeof(*ic));
+  (*ic)++;
+  gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
+  memcpy(w0,dest,YAO_KEY_BYTES);
+  yaoKeyCopy(w1,w0);
+  yaoKeyXor(w1,pd->yao.R);
+}
+
+void yaoSetBitAnd(ProtocolDesc* pd,OblivBit* r,
+                  const OblivBit* a,const OblivBit* b)
+  { pd->yao.nonFreeGate(pd,r,0x8,a,b); }
+void yaoSetBitOr(ProtocolDesc* pd,OblivBit* r,
+                 const OblivBit* a,const OblivBit* b)
+  { pd->yao.nonFreeGate(pd,r,0xE,a,b); }
+void yaoSetBitXor(ProtocolDesc* pd,OblivBit* r,
+                 const OblivBit* a,const OblivBit* b)
+{
+  OblivBit t;
+  yaoKeyCopy(t.yao.w,a->yao.w);
+  yaoKeyXor (t.yao.w,b->yao.w);
+  t.yao.inverted = (a->yao.inverted!=b->yao.inverted); // no-op for evaluator
+  t.known = false;
+  *r = t;
+}
+void yaoFlipBit(ProtocolDesc* pd,OblivBit* r)
+  { r->yao.inverted = !r->yao.inverted; }
+void yaoSetBitNot(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
+  { *r = *a; yaoFlipBit(pd,r); }
+
+// Java-style iterator over bits in OblivInput array, assumes all sizes > 0
+typedef struct { int i,j; OblivInputs* oi; size_t n; } OIBitSrc;
+static bool hasBit (OIBitSrc* s) { return s->i<s->n; }
+static bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1<<s->j); }
+static OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
+static void nextBit(OIBitSrc* s) 
+  { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
+
+void yaoGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
+{ 
+  yao_key_t w0,w1;
+  OIBitSrc it = {0,0,oi,n};
+  if(src==1) for(;hasBit(&it);nextBit(&it))
+  { OblivBit* o = curDestBit(&it);
+    yaoKeyNewPair(pd,w0,w1);
+    if(curBit(&it)) osend(pd,2,w1,YAO_KEY_BYTES);
+    else osend(pd,2,w0,YAO_KEY_BYTES);
+    o->yao.inverted = o->known = false;
+    yaoKeyCopy(o->yao.w,w0);
+  }else for(;hasBit(&it);nextBit(&it))
+  { // TODO Oblivious transfer send
+    OblivBit* o = curDestBit(&it);
+    yaoKeyNewPair(pd,w0,w1);
+    osend(pd,2,w0,YAO_KEY_BYTES);
+    osend(pd,2,w1,YAO_KEY_BYTES);
+    o->yao.inverted = o->known = false;
+    yaoKeyCopy(o->yao.w,w0);
+  }
+}
+void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
+{ OIBitSrc it = {0,0,oi,n};
+  if(src==1) for(;hasBit(&it);nextBit(&it))
+  { OblivBit* o = curDestBit(&it);
+    orecv(pd,1,o->yao.w,YAO_KEY_BYTES);
+    o->known = false;
+    pd->yao.icount++;
+  }else for(;hasBit(&it);nextBit(&it))
+  { OblivBit* o = curDestBit(&it);
+    // TODO Oblivious transfer recv
+    yao_key_t w0,w1;
+    orecv(pd,1,w0,YAO_KEY_BYTES);
+    orecv(pd,1,w1,YAO_KEY_BYTES);
+    o->known = false;
+    if(curBit(&it)) yaoKeyCopy(o->yao.w,w1);
+    else yaoKeyCopy(o->yao.w,w0);
+    pd->yao.icount++;
+  }
+}
+
+widest_t yaoGenrRevealOblivBits(ProtocolDesc* pd,
+    const OblivBit* o,size_t n,int party)
+{
+  int i,bc=(n+7)/8;
+  widest_t rv=0, flipflags=0;
+  for(i=0;i<n;++i)
+    flipflags |= ((yaoKeyLsb(o[i].yao.w) != o[i].yao.inverted)?1LL<<i:0);
+  // Assuming little endian
+  if(party != 1) osend(pd,2,&flipflags,bc);
+  if(party != 2) { orecv(pd,2,&rv,bc); rv^=flipflags; }
+  pd->yao.ocount+=n;
+  return rv;
+}
+widest_t yaoEvalRevealOblivBits(ProtocolDesc* pd,
+    const OblivBit* o,size_t n,int party)
+{
+  int i,bc=(n+7)/8;
+  widest_t rv=0, flipflags=0;
+  for(i=0;i<n;++i) flipflags |= (yaoKeyLsb(o[i].yao.w)?1LL<<i:0);
+  // Assuming little endian
+  if(party != 1) { orecv(pd,1,&rv,bc); rv^=flipflags; }
+  if(party != 2) osend(pd,1,&flipflags,bc);
+  pd->yao.ocount+=n;
+  return rv;
+}
+
+// TODO
+//   Make this function compile standalone: write yaoUtils   (  DONE  )
+//   Write init functions (init R, I)
+//   Non-obliv transfers, hook in, test protocol
+//   Debug
+//   Freefy xors
+//   Oblivious transfers
+// Encodes a 2-input truth table for f(a,b) = ((ttable&(1<<(2*a+b)))!=0)
+void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
+    const OblivBit* a, const OblivBit* b)
+{ uint64_t k = pd->yao.gcount;
+  int im=0,i;
+  yao_key_t wa,wb,wc,wt;
+  yao_key_t wdebug;
+  const char* R = pd->yao.R;
+
+  // adjust truth table according to invert fields (faster with im^=...) TODO
+  if(a->yao.inverted) ttable = (((ttable&3)<<2)|((ttable>>2)&3));
+  if(b->yao.inverted) ttable = (((ttable&5)<<1)|((ttable>>1)&5));
+
+  // Doing garbled-row-reduction: wc is set to first mask
+  yaoKeyCopy(wa,a->yao.w);
+  yaoKeyCopy(wb,b->yao.w);
+  if(yaoKeyLsb(wa)) { im^=2; yaoKeyXor(wa,R); }
+  if(yaoKeyLsb(wb)) { im^=1; yaoKeyXor(wb,R); }
+
+  // Create labels for new wire in wc
+  yaoSetHashMask(wc,wa,wb,k,0);
+  if(ttable&(1<<im)) yaoKeyXor(wc,R);
+
+  for(i=1;i<4;++i) // skip 0, because GRR
+  { yaoKeyXor(wb,R);
+    if(i==2) yaoKeyXor(wa,R);
+    yaoSetHashMask(wt,wa,wb,k,i);
+    yaoKeyXor(wt,wc);
+    if(ttable&(1<<(i^im))) yaoKeyXor(wt,R);
+    osend(pd,2,wt,YAO_KEY_BYTES);
+  }
+
+  // r may alias a and b, so modify at the end
+  yaoKeyCopy(r->yao.w,wc);
+  r->known = r->yao.inverted = false;
+  pd->yao.gcount++;
+}
+void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
+  const OblivBit* a, const OblivBit* b)
+{
+  int i=0,j;
+  yao_key_t w,t;
+  yaoKeyZero(t);
+  if(yaoKeyLsb(a->yao.w)) i^=2;
+  if(yaoKeyLsb(b->yao.w)) i^=1;
+  // I wonder: can the generator do timing attacks here?
+  if(i==0) yaoKeyCopy(w,t);
+  for(j=1;j<4;++j)
+  { orecv(pd,1,t,sizeof(yao_key_t));
+    if(i==j) yaoKeyCopy(w,t);
+  }
+  yaoSetHashMask(t,a->yao.w,b->yao.w,pd->yao.gcount++,i);
+  yaoKeyXor(w,t);
+  // r may alias a and b, so modify at the end
+  yaoKeyCopy(r->yao.w,w);
+  r->known = false;
+}
+
+void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+{
+  int me = pd->thisParty;
+  int tailind,tailpos;
+  pd->partyCount = 2;
+  pd->yao.nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
+  pd->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
+  pd->revealOblivBits = (me==1?yaoGenrRevealOblivBits:yaoEvalRevealOblivBits);
+  pd->setBitAnd = yaoSetBitAnd;
+  pd->setBitOr  = yaoSetBitOr;
+  pd->setBitXor = yaoSetBitXor;
+  pd->setBitNot = yaoSetBitNot;
+  pd->flipBit   = yaoFlipBit;
+  pd->yao.gcount = pd->yao.icount = pd->yao.ocount = 0;
+
+  if(!gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P)) 
+  { gcry_check_version(NULL);
+    gcry_control(GCRYCTL_DISABLE_SECMEM,0);
+    gcry_control(GCRYCTL_INITIALIZATION_FINISHED,0);
+  }
+
+  if(me==1)
+  {
+    gcry_randomize(pd->yao.R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    gcry_randomize(pd->yao.I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    pd->yao.R[0] |= 1;   // flipper bit
+
+    tailind=YAO_KEY_BYTES-1;
+    tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
+    pd->yao.R[tailind] &= (1<<tailpos)-1;
+    pd->yao.I[tailind] &= (1<<tailpos)-1;
+  }
+
+  currentProto = *pd;
+  start(arg);
+}
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
@@ -127,55 +370,59 @@ void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
 void __obliv_c__flipBit(OblivBit* dest) 
   { currentProto.flipBit(&currentProto,dest); }
 
-void __obliv_c__feedOblivBool(OblivBit* dest,int party,bool a)
+static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
 { 
   int curparty = __obliv_c__currentParty();
   
   dest->known=false;
   if(party==1) { if(curparty==1) dest->knownValue=a; }
   else if(party==2 && curparty == 1) 
-    recv(&currentProto,1,&dest->knownValue,sizeof(bool));
-  else if(party==2 && curparty == 2) send(&currentProto,1,&a,sizeof(bool));
+    orecv(&currentProto,1,&dest->knownValue,sizeof(bool));
+  else if(party==2 && curparty == 2) osend(&currentProto,1,&a,sizeof(bool));
   else fprintf(stderr,"Error: This is a 2 party protocol\n");
 }
+  /*
 void __obliv_c__feedOblivBits(OblivBit* dest, int party
                              ,const bool* src,size_t size)
   { while(size--) __obliv_c__feedOblivBool(dest++,party,*(src++)); }
+*/
 
-inline void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
+void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
                                      ,widest_t v,size_t size)
 { spec->dest=dest;
   spec->src=v;
   spec->size=size;
 }
-inline void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
+void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
     OblivInputs* spec,size_t count,int party)
 { while(count--)
   { int i;
     widest_t v = spec->src;
     for(i=0;i<spec->size;++i) 
-    { __obliv_c__feedOblivBool(spec->dest+i,party,v&1);
+    { dbgFeedOblivBool(spec->dest+i,party,v&1);
       v>>=1;
     }
     spec++;
   }
 }
 
-inline bool __obliv_c__revealOblivBool(const OblivBit* dest,int party)
+/*
+bool __obliv_c__revealOblivBool(const OblivBit* dest,int party)
 { if(party!=0 && party!=currentProto.thisParty) return false;
   else return dest->knownValue;
 }
-inline widest_t dbgProtoRevealOblivBits
+*/
+widest_t dbgProtoRevealOblivBits
   (ProtocolDesc* pd,const OblivBit* dest,size_t size,int party)
 { widest_t rv=0;
   if(currentProto.thisParty==1)
   { dest+=size;
     while(size-->0) rv = (rv<<1)+tobool((--dest)->knownValue);
-    if(party==0 || party==2) send(pd,2,&rv,sizeof(rv));
+    if(party==0 || party==2) osend(pd,2,&rv,sizeof(rv));
     if(party==2) return 0;
     else return rv;
   }else // assuming thisParty==2
-  { if(party==0 || party==2) { recv(pd,1,&rv,sizeof(rv)); return rv; }
+  { if(party==0 || party==2) { orecv(pd,1,&rv,sizeof(rv)); return rv; }
     else return 0;
   }
 }
@@ -183,9 +430,9 @@ inline widest_t dbgProtoRevealOblivBits
 static void broadcastBits(int source,void* p,size_t n)
 {
   int i;
-  if(currentProto.thisParty!=source) recv(&currentProto,source,p,n);
+  if(currentProto.thisParty!=source) orecv(&currentProto,source,p,n);
   else for(i=1;i<=currentProto.partyCount;++i) if(i!=source)
-      send(&currentProto,i,p,n);
+      osend(&currentProto,i,p,n);
 }
 
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
@@ -199,13 +446,13 @@ void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pd->flipBit   = dbgProtoFlipBit;
   pd->partyCount= 2;
   currentProto = *pd;
-  currentProto.yaoCount = currentProto.xorCount = 0;
+  currentProto.debug.mulCount = currentProto.debug.xorCount = 0;
   start(arg);
 }
 
-inline widest_t __obliv_c__revealOblivBits(const OblivBit* dest, size_t size,
+widest_t __obliv_c__revealOblivBits(const OblivBit* dest, size_t size,
     int party)
-  { return dbgProtoRevealOblivBits(&currentProto,dest,size,party); }
+  { return currentProto.revealOblivBits(&currentProto,dest,size,party); }
 
 int __obliv_c__currentParty() { return currentProto.thisParty; }
 
@@ -476,18 +723,18 @@ void __obliv_c__condSub(const void* vc,void* vdest
 // ---- Translated versions of obliv.oh functions ----------------------
 
 // TODO remove __obliv_c prefix and make these functions static/internal
-void setupOblivBool(OblivInputs* spec, OblivBit* dest, bool v)
-  { __obliv_c__setupOblivBits(spec,dest,v,1); }
-void setupOblivChar(OblivInputs* spec, OblivBit* dest, char v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-void setupOblivInt(OblivInputs* spec, OblivBit* dest, int v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-void setupOblivShort(OblivInputs* spec, OblivBit* dest, short v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-void setupOblivLong(OblivInputs* spec, OblivBit* dest, long v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
-void setupOblivLLong(OblivInputs* spec, OblivBit* dest, long long v)
-  { __obliv_c__setupOblivBits(spec,dest,v,bitsize(v)); }
+void setupOblivBool(OblivInputs* spec, __obliv_c__bool* dest, bool v)
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,1); }
+void setupOblivChar(OblivInputs* spec, __obliv_c__char* dest, char v)
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+void setupOblivInt(OblivInputs* spec, __obliv_c__int* dest, int v)
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+void setupOblivShort(OblivInputs* spec, __obliv_c__short* dest, short v)
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+void setupOblivLong(OblivInputs* spec, __obliv_c__long* dest, long v)
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+void setupOblivLLong(OblivInputs* spec, __obliv_c__lLong* dest, long long v)
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
   { currentProto.feedOblivInputs(&currentProto,spec,count,party); }

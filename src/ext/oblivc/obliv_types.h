@@ -2,6 +2,8 @@
 #define OBLIV_TYPES_H
 
 #include<stddef.h>
+#include<stdint.h>  // uint64_t
+#include<gcrypt.h>
 
 typedef long long widest_t;
 
@@ -19,13 +21,24 @@ typedef struct OblivBit OblivBit;
 //   Add a new entry in OblivBit union
 //   Assign proper hooks to these callbacks in ProtocolDesc
 
+// One extra bit for truth-table permutation
+#define YAO_KEY_BITS 81
+#define YAO_KEY_BYTES ((YAO_KEY_BITS+7)/8)
+typedef char yao_key_t[YAO_KEY_BYTES];
+
 struct ProtocolDesc {
-  // private fields, do not use directly
-  int sock;
-  int yaoCount,xorCount;
   int partyCount, thisParty;
-  // Other state for OT, random keys etc.
   struct ProtocolTransport* trans;
+  union // a struct for each protocol-specific info
+  { struct 
+    { yao_key_t R,I; // LSB of R needs to be 1
+      uint64_t gcount;
+      unsigned icount, ocount;
+      void (*nonFreeGate)(ProtocolDesc*,OblivBit*,char,
+          const OblivBit*,const OblivBit*);
+    } yao;
+    struct { unsigned mulCount,xorCount; } debug;
+  };
 
   void (*feedOblivInputs)(ProtocolDesc*,OblivInputs*,size_t,int);
   widest_t (*revealOblivBits)(ProtocolDesc*,const OblivBit*,size_t,int);
@@ -34,7 +47,7 @@ struct ProtocolDesc {
   void (*setBitOr )(ProtocolDesc*,OblivBit*,const OblivBit*,const OblivBit*);
   void (*setBitXor)(ProtocolDesc*,OblivBit*,const OblivBit*,const OblivBit*);
   void (*setBitNot)(ProtocolDesc*,OblivBit*,const OblivBit*);
-  void (*flipBit  )(ProtocolDesc*,OblivBit*); // Avoids a struct copy
+  void (*flipBit  )(ProtocolDesc*,OblivBit*); // Sometimes avoids a struct copy
 };
 
 typedef struct ProtocolTransport {
@@ -44,7 +57,6 @@ typedef struct ProtocolTransport {
 } ProtocolTransport;
 
 struct OblivInputs {
-  // private fields, do not use directly
   unsigned long long src;
   struct OblivBit* dest;
   size_t size;
