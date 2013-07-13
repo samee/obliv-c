@@ -109,6 +109,15 @@ static void yaoKeyDebug(const yao_key_t k)
   for(i=YAO_KEY_BYTES-1;i>=0;--i) fprintf(stderr,"%02x ",0xff&k[i]);
   fprintf(stderr,"\n");
 }
+static void debugOblivBit(const OblivBit* o)
+{
+  if(o->known) fprintf(stderr,"Known value %d\n",(int)o->knownValue);
+  else 
+  { fprintf(stderr,"inv %d, ",(int)o->yao.inverted);
+    yaoKeyDebug(o->yao.w);
+  }
+}
+
 void yaoKeyCopy(yao_key_t d, const yao_key_t s) { memcpy(d,s,YAO_KEY_BYTES); }
 void yaoKeyZero(yao_key_t d) { memset(d,0,YAO_KEY_BYTES); }
 bool yaoKeyLsb(const yao_key_t k) { return k[0]&1; }
@@ -216,11 +225,13 @@ widest_t yaoGenrRevealOblivBits(ProtocolDesc* pd,
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
-  for(i=0;i<n;++i)
+  for(i=0;i<n;++i) if(!o[i].known)
     flipflags |= ((yaoKeyLsb(o[i].yao.w) != o[i].yao.inverted)?1LL<<i:0);
   // Assuming little endian
   if(party != 1) osend(pd,2,&flipflags,bc);
   if(party != 2) { orecv(pd,2,&rv,bc); rv^=flipflags; }
+  for(i=0;i<n;++i) if(o[i].known && o[i].knownValue)
+    rv |= (1LL<<i);
   pd->yao.ocount+=n;
   return rv;
 }
@@ -229,10 +240,13 @@ widest_t yaoEvalRevealOblivBits(ProtocolDesc* pd,
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
-  for(i=0;i<n;++i) flipflags |= (yaoKeyLsb(o[i].yao.w)?1LL<<i:0);
+  for(i=0;i<n;++i) if(!o[i].known)
+    flipflags |= (yaoKeyLsb(o[i].yao.w)?1LL<<i:0);
   // Assuming little endian
   if(party != 1) { orecv(pd,1,&rv,bc); rv^=flipflags; }
   if(party != 2) osend(pd,1,&flipflags,bc);
+  for(i=0;i<n;++i) if(o[i].known && o[i].knownValue)
+    rv |= (1LL<<i);
   pd->yao.ocount+=n;
   return rv;
 }
@@ -366,9 +380,13 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
   }else currentProto.setBitXor(&currentProto,dest,a,b); 
 }
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
-  { currentProto.setBitNot(&currentProto,dest,a); }
+{ if(dest->known) { *dest=*a; dest->knownValue=!dest->knownValue; }
+  else currentProto.setBitNot(&currentProto,dest,a); 
+}
 void __obliv_c__flipBit(OblivBit* dest) 
-  { currentProto.flipBit(&currentProto,dest); }
+{ if(dest->known) dest->knownValue = !dest->knownValue;
+  else currentProto.flipBit(&currentProto,dest); 
+}
 
 static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
 { 
@@ -610,6 +628,7 @@ void __obliv_c__setZeroExtend (void* vdest, size_t dsize
   dest+=ssize;
   while(dsize-->0) __obliv_c__assignBitKnown(dest++,0);
 }
+
 void __obliv_c__ifThenElse (void* vdest, const void* vtsrc
                            ,const void* vfsrc, size_t size
                            ,const void* vcond)
