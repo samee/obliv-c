@@ -96,7 +96,7 @@ void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
 
 //-------------------- Yao Protocol (honest but curious) -------------
 
-#define OT_BATCH_SIZE 1
+#define OT_BATCH_SIZE 7
 
 void gcryDefaultLibInit(void)
 {
@@ -247,6 +247,7 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
       { npotRecv1Of2Once(pd->yao.recver,buf,mask,OT_BATCH_SIZE,YAO_KEY_BYTES);
         for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
         bp=0;
+        mask=0;
       }
     }
     if(bp>0)
