@@ -36,6 +36,7 @@ struct ProtocolDesc {
       unsigned icount, ocount;
       void (*nonFreeGate)(ProtocolDesc*,OblivBit*,char,
           const OblivBit*,const OblivBit*);
+      union { struct NpotSender* sender; struct NpotRecver* recver; };
     } yao;
     struct { unsigned mulCount,xorCount; } debug;
   };

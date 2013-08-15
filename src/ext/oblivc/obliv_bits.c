@@ -1,4 +1,5 @@
 // TODO I need to fix some int sizes
+#include <obliv_common.h>
 #include <obliv_bits.h>
 #include <inttypes.h>
 #include <stdio.h>      // for protoUseStdio()
@@ -13,12 +14,6 @@
 static ProtocolDesc currentProto;
 
 // --------------------------- Transports -----------------------------------
-// Convenience functions
-static int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
-  { return pd->trans->recv(pd,s,p,n); }
-static int osend(ProtocolDesc* pd,int d,void* p,size_t n)
-  { return pd->trans->send(pd,d,p,n); }
-
 struct stdioTransport
 { ProtocolTransport cb;
   bool needFlush;
@@ -101,6 +96,20 @@ void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
 
 //-------------------- Yao Protocol (honest but curious) -------------
 
+#define OT_BATCH_SIZE 1
+
+void gcryDefaultLibInit(void)
+{
+  if(!gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P))
+  { if(!gcry_check_version(NULL))
+    { fprintf(stderr,"libgcrypt init failed\n");
+      exit(1);
+    }
+    gcry_control (GCRYCTL_DISABLE_SECMEM, 0);
+    gcry_control (GCRYCTL_INITIALIZATION_FINISHED, 0);
+  }
+}
+
 // Assume: generator is party 1, evaluator is party 2
 
 static void yaoKeyDebug(const yao_key_t k)
@@ -178,6 +187,11 @@ static bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1<<s->j); }
 static OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
 static void nextBit(OIBitSrc* s) 
   { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
+static int bitCount(OIBitSrc* s) 
+{ int res=0,i;
+  for(i=0;i<s->n;++i) res+=s->oi[i].size;
+  return res;
+}
 
 void yaoGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
 { 
@@ -190,14 +204,26 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
     else osend(pd,2,w0,YAO_KEY_BYTES);
     o->yao.inverted = o->known = false;
     yaoKeyCopy(o->yao.w,w0);
-  }else for(;hasBit(&it);nextBit(&it))
-  { // TODO Oblivious transfer send
-    OblivBit* o = curDestBit(&it);
-    yaoKeyNewPair(pd,w0,w1);
-    osend(pd,2,w0,YAO_KEY_BYTES);
-    osend(pd,2,w1,YAO_KEY_BYTES);
-    o->yao.inverted = o->known = false;
-    yaoKeyCopy(o->yao.w,w0);
+    pd->yao.icount++;
+  }else 
+  {
+    char buf0[OT_BATCH_SIZE*YAO_KEY_BYTES], buf1[OT_BATCH_SIZE*YAO_KEY_BYTES];
+    int bp=0;
+    for(;hasBit(&it);nextBit(&it))
+    { 
+      OblivBit* o = curDestBit(&it);
+      yaoKeyNewPair(pd,w0,w1);
+      yaoKeyCopy(buf0+bp*YAO_KEY_BYTES,w0);
+      yaoKeyCopy(buf1+bp*YAO_KEY_BYTES,w1);
+      o->yao.inverted = o->known = false;
+      yaoKeyCopy(o->yao.w,w0);
+      pd->yao.icount++;
+      if(++bp>=OT_BATCH_SIZE)
+      { npotSend1Of2Once(pd->yao.sender,buf0,buf1,OT_BATCH_SIZE,YAO_KEY_BYTES);
+        bp=0;
+      }
+    }
+    if(bp>0) npotSend1Of2Once(pd->yao.sender,buf0,buf1,bp,YAO_KEY_BYTES);
   }
 }
 void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
@@ -207,16 +233,26 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
     orecv(pd,1,o->yao.w,YAO_KEY_BYTES);
     o->known = false;
     pd->yao.icount++;
-  }else for(;hasBit(&it);nextBit(&it))
-  { OblivBit* o = curDestBit(&it);
-    // TODO Oblivious transfer recv
-    yao_key_t w0,w1;
-    orecv(pd,1,w0,YAO_KEY_BYTES);
-    orecv(pd,1,w1,YAO_KEY_BYTES);
-    o->known = false;
-    if(curBit(&it)) yaoKeyCopy(o->yao.w,w1);
-    else yaoKeyCopy(o->yao.w,w0);
-    pd->yao.icount++;
+  }else 
+  { char buf[OT_BATCH_SIZE*YAO_KEY_BYTES], *dest[OT_BATCH_SIZE];
+    int mask=0;
+    int bp=0,i;
+    for(;hasBit(&it);nextBit(&it))
+    { OblivBit* o = curDestBit(&it);
+      dest[bp]=o->yao.w;
+      mask|=(curBit(&it)?1<<bp:0);
+      o->known = false; // Known to me, but not to both parties
+      pd->yao.icount++;
+      if(++bp>=OT_BATCH_SIZE)
+      { npotRecv1Of2Once(pd->yao.recver,buf,mask,OT_BATCH_SIZE,YAO_KEY_BYTES);
+        for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
+        bp=0;
+      }
+    }
+    if(bp>0)
+    { npotRecv1Of2Once(pd->yao.recver,buf,mask,bp,YAO_KEY_BYTES);
+      for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
+    }
   }
 }
 
@@ -331,11 +367,7 @@ void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pd->flipBit   = yaoFlipBit;
   pd->yao.gcount = pd->yao.icount = pd->yao.ocount = 0;
 
-  if(!gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P)) 
-  { gcry_check_version(NULL);
-    gcry_control(GCRYCTL_DISABLE_SECMEM,0);
-    gcry_control(GCRYCTL_INITIALIZATION_FINISHED,0);
-  }
+  dhRandomInit();
 
   if(me==1)
   {
@@ -347,10 +379,14 @@ void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
     pd->yao.R[tailind] &= (1<<tailpos)-1;
     pd->yao.I[tailind] &= (1<<tailpos)-1;
-  }
+    pd->yao.sender = npotSenderNew(1<<OT_BATCH_SIZE,pd,me);
+  }else pd->yao.recver = npotRecverNew(1<<OT_BATCH_SIZE,pd,me);
 
   currentProto = *pd;
   start(arg);
+
+  if(me==1) npotSenderRelease(pd->yao.sender);
+  else npotRecverRelease(pd->yao.recver);
 }
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
