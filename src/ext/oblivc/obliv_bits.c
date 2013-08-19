@@ -288,13 +288,6 @@ widest_t yaoEvalRevealOblivBits(ProtocolDesc* pd,
   return rv;
 }
 
-// TODO
-//   Make this function compile standalone: write yaoUtils   (  DONE  )
-//   Write init functions (init R, I)
-//   Non-obliv transfers, hook in, test protocol
-//   Debug
-//   Freefy xors
-//   Oblivious transfers
 // Encodes a 2-input truth table for f(a,b) = ((ttable&(1<<(2*a+b)))!=0)
 void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
     const OblivBit* a, const OblivBit* b)
@@ -332,6 +325,7 @@ void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   r->known = r->yao.inverted = false;
   pd->yao.gcount++;
 }
+
 void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
   const OblivBit* a, const OblivBit* b)
 {
@@ -352,6 +346,8 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   yaoKeyCopy(r->yao.w,w);
   r->known = false;
 }
+
+unsigned yaoGateCount() { return currentProto.yao.gcount; }
 
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
