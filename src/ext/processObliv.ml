@@ -243,6 +243,13 @@ class typeCheckVisitor = object(self)
         BinOp(op,e1,e2,tr)
       else exp
   | CastE (t,e) when t = typeOf e -> e
+  | CastE (t,e) when isImplicitCastResult t ->
+      let st = typeOf e in
+      if isOblivSimple st && not (isOblivSimple t) then
+        E.s (E.error "%a: Cannot convert obliv type '%a' to non-obliv '%a'"
+          d_loc !currentLoc d_type st 
+            d_type (typeRemoveAttributes ["implicitCast"] t))
+      else CastE(t,e)
   | _ -> exp
   )
 
@@ -473,6 +480,14 @@ class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
       let ts = mkStmt (Block (visitSubBlock ct tb)) in
       let fs = mkStmt (Block (visitSubBlock cf fb)) in
       ChangeTo (mkStmt (Block {battrs=[]; bstmts=[cs;ts;fs]}))
+  (* Filter out the trivial cases *)
+  | Return(None,_) | Return(Some(Lval _),_) -> DoChildren
+  (* and then the unsimplified return *)
+  | Return(Some x,l) when isOblivSimple (typeOf x) -> 
+      let rv = var (tmpVar (typeOf x)) in
+      let set = mkStmt (Instr [codegenUncondInstr (Set (rv,x,l))]) in
+      let ret = mkStmt (Return (Some (Lval rv),l)) in
+      ChangeTo (mkStmt (Block {battrs=[]; bstmts=[set;ret]}))
   | _ -> DoChildren
 
   method vblock b = 
