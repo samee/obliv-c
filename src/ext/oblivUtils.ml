@@ -35,7 +35,7 @@ let isOblivFunc t = match t with
 | TFun(_,_,_,a) -> hasOblivAttr a
 | _ -> false
 
-let isOblivSimple t = match t with
+let isOblivSimple t = match unrollType t with
 | TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
 | _ -> false
 

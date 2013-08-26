@@ -423,6 +423,18 @@ let setIfThenElse dest c ts fs loc =
              ; mkAddrOf c ] in
   Call(None,func,args,loc)
 
+let zeroSet (dest:varinfo) loc = 
+  let fargTypes = ["s",TPtr(TVoid [],[]),[]
+                  ;"c",TInt(IInt,[]),[]
+                  ;"n",!typeOfSizeOf,[]
+  ] in
+  let voidptr = TPtr(TVoid [],[]) in
+  let ftype = TFun(voidptr, Some fargTypes,false,[]) in
+  let func = var(makeGlobalVar "memset" ftype) in
+  let args = [ mkCast (mkAddrOf (var dest)) voidptr
+             ; kinteger IInt 0; SizeOf(dest.vtype) ] in
+  Call(None,Lval(func),args,loc)
+
 
 let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 
@@ -460,6 +472,9 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
     Call(lvo,exp,mkAddrOf trueCond::args,loc)
 | _ -> instr
 
+let isTaggedTemp lv = hasAttribute SimplifyTagged.simplifyTempTok
+                        (typeAttrs (typeOfLval lv))
+
 (* Ok, I really should stop adding more parameters here 
  * curCond : generated instructions should only have an effect if this is true
  * tmpVar: creates a new temporary var in current function
@@ -467,8 +482,6 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
  *              some outer scope
  * instr: the instruction to be compiled *)
 let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list = 
-  let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
-                      (typeAttrs (typeOfLval lv)) in
   let setUsingTmp v x loc = 
     let nv = var (tmpVar (typeOfLval v)) in
     let ilist = [Set(nv,x,loc); Set(v,Lval nv,loc)] in
@@ -476,7 +489,7 @@ let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list =
   in
   if curCond == trueCond then [codegenUncondInstr instr]
   else match instr with 
-  | Set(v,_,_) when simptemp v -> [codegenUncondInstr instr]
+  | Set(v,_,_) when isTaggedTemp v -> [codegenUncondInstr instr]
   | Set((Var(v),NoOffset),_,_) when isDeepVar v -> 
       [codegenUncondInstr instr]
   | Set(v,Lval(v2),loc) when isOblivSimple (typeOfLval v) -> 
@@ -491,13 +504,31 @@ let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list =
       [Call(lvo,exp,mkAddrOf curCond::args,loc)]
   | _ -> [instr]
 
+
+(* Traverses the whole function to check this *)
+let hasOblivBlocks f = begin
+  let vis = object
+    inherit nopCilVisitor
+    val foundObliv = ref false
+    method vblock b = begin
+      if isOblivBlock b then foundObliv:=true;
+      if !foundObliv then SkipChildren else DoChildren
+    end
+    method found = !foundObliv
+  end in
+  ignore (visitCilFunction (vis :> cilVisitor) f);
+  vis#found
+end
+
 class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval) 
-  : cilVisitor = object
+  : cilVisitor = object(self)
   inherit nopCilVisitor
 
   method vstmt s = 
     let tmpVar t = SimplifyTagged.makeSimplifyTemp curFunc t in
-    let isDeepVar v = dt#curDepth() = dt#varDepth v in
+    let isDeepVar v = 
+      printf "%s %d %d\n" v.vname (dt#curDepth()) (dt#varDepth v);
+      dt#curDepth() = dt#varDepth v in
     match s.skind with
     | Instr ilist -> 
         let nestedGen = codegenInstr curCond tmpVar isDeepVar in
@@ -540,7 +571,16 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
         ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b')
     | None -> DoChildren
   end
-  method vfunc = dt#defaultVFunc
+  method vfunc = dt#wrapVFunc begin fun f ->
+    if isOblivFunc f.svar.vtype || hasOblivBlocks f then begin
+      (* This really needs to be done only for obliv types
+       * But I am too lazy to traverse through structs *)
+      let nontemp = List.filter (fun v -> not (isTaggedTemp (var v)))
+                                f.slocals in
+      self#queueInstr (List.map (fun v -> zeroSet v !currentLoc) nontemp);
+    end;
+    DoChildren
+  end
 end
 
 let genFunc g = match g with
