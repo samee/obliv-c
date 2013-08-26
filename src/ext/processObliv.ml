@@ -150,7 +150,7 @@ class depthTracker = object(self)
   method varDepth vinfo =
     (* This 'if' clause shouldn't be necessary, but some temporaries
      * (possibly created from cabs2cil) cause Not_found without it *)
-    if !currentOblivDepth = !currentRootDepth then 0
+    if !currentOblivDepth = !currentRootDepth then self#curDepth()
     else
       let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
       max 0 (decldepth - !currentRootDepth)
@@ -181,7 +181,7 @@ end
 
 class typeCheckVisitor = object(self)
   inherit nopCilVisitor
-  inherit depthTracker as dt
+  val dt = new depthTracker
 
   val funcOblivness = Hashtbl.create 100
 
@@ -460,17 +460,25 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
     Call(lvo,exp,mkAddrOf trueCond::args,loc)
 | _ -> instr
 
-let rec codegenInstr curCond tmpVar (instr:instr) : instr list = 
+(* Ok, I really should stop adding more parameters here 
+ * curCond : generated instructions should only have an effect if this is true
+ * tmpVar: creates a new temporary var in current function
+ * isDeepVar: checks if a given varinfo is declared at current block scope (vs.
+ *              some outer scope
+ * instr: the instruction to be compiled *)
+let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list = 
   let simptemp lv = hasAttribute SimplifyTagged.simplifyTempTok 
                       (typeAttrs (typeOfLval lv)) in
   let setUsingTmp v x loc = 
     let nv = var (tmpVar (typeOfLval v)) in
     let ilist = [Set(nv,x,loc); Set(v,Lval nv,loc)] in
-    mapcat (codegenInstr curCond tmpVar) ilist
+    mapcat (codegenInstr curCond tmpVar isDeepVar) ilist
   in
   if curCond == trueCond then [codegenUncondInstr instr]
   else match instr with 
   | Set(v,_,_) when simptemp v -> [codegenUncondInstr instr]
+  | Set((Var(v),NoOffset),_,_) when isDeepVar v -> 
+      [codegenUncondInstr instr]
   | Set(v,Lval(v2),loc) when isOblivSimple (typeOfLval v) -> 
       if isOblivSimple (typeOfLval v2) then
         [setIfThenElse v curCond v2 v loc]
@@ -483,40 +491,44 @@ let rec codegenInstr curCond tmpVar (instr:instr) : instr list =
       [Call(lvo,exp,mkAddrOf curCond::args,loc)]
   | _ -> [instr]
 
-class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
+class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval) 
+  : cilVisitor = object
   inherit nopCilVisitor
 
-  method vstmt s = let tmpVar t = SimplifyTagged.makeSimplifyTemp curFunc t in
+  method vstmt s = 
+    let tmpVar t = SimplifyTagged.makeSimplifyTemp curFunc t in
+    let isDeepVar v = dt#curDepth() = dt#varDepth v in
     match s.skind with
-  | Instr ilist -> 
-      ChangeTo (mkStmt (Instr (mapcat (codegenInstr curCond tmpVar) ilist)))
-  | If(c,tb,fb,loc) when isOblivBlock tb ->
-      let cv = var (tmpVar oblivBoolType) in
-      let ct = var (tmpVar oblivBoolType) in
-      let cf = var (tmpVar oblivBoolType) in
-      let visitSubBlock cond blk = 
-        visitCilBlock (new codegenVisitor curFunc cond) blk in
-      let cs = mkStmt (Instr (List.map codegenUncondInstr
-        [ Set (cv,c,loc)
-        ; Set (ct,BinOp(LAnd,Lval cv
-                            ,Lval curCond,oblivBoolType),loc)
-        ; Set (cf,BinOp(Ne  ,Lval ct
-                            ,Lval curCond,oblivBoolType),loc)
-        ])) in
-      let ts = mkStmt (Block (visitSubBlock ct tb)) in
-      let fs = mkStmt (Block (visitSubBlock cf fb)) in
-      ChangeTo (mkStmt (Block {battrs=[]; bstmts=[cs;ts;fs]}))
-  (* Filter out the trivial cases *)
-  | Return(None,_) | Return(Some(Lval _),_) -> DoChildren
-  (* and then the unsimplified return *)
-  | Return(Some x,l) when isOblivSimple (typeOf x) -> 
-      let rv = var (tmpVar (typeOf x)) in
-      let set = mkStmt (Instr [codegenUncondInstr (Set (rv,x,l))]) in
-      let ret = mkStmt (Return (Some (Lval rv),l)) in
-      ChangeTo (mkStmt (Block {battrs=[]; bstmts=[set;ret]}))
-  | _ -> DoChildren
+    | Instr ilist -> 
+        let nestedGen = codegenInstr curCond tmpVar isDeepVar in
+        ChangeTo (mkStmt (Instr (mapcat nestedGen ilist)))
+    | If(c,tb,fb,loc) when isOblivBlock tb ->
+        let cv = var (tmpVar oblivBoolType) in
+        let ct = var (tmpVar oblivBoolType) in
+        let cf = var (tmpVar oblivBoolType) in
+        let visitSubBlock cond blk = 
+          visitCilBlock (new codegenVisitor curFunc dt cond) blk in
+        let cs = mkStmt (Instr (List.map codegenUncondInstr
+          [ Set (cv,c,loc)
+          ; Set (ct,BinOp(LAnd,Lval cv
+                              ,Lval curCond,oblivBoolType),loc)
+          ; Set (cf,BinOp(Ne  ,Lval ct
+                              ,Lval curCond,oblivBoolType),loc)
+          ])) in
+        let ts = mkStmt (Block (visitSubBlock ct tb)) in
+        let fs = mkStmt (Block (visitSubBlock cf fb)) in
+        ChangeTo (mkStmt (Block {battrs=[]; bstmts=[cs;ts;fs]}))
+    (* Filter out the trivial cases *)
+    | Return(None,_) | Return(Some(Lval _),_) -> DoChildren
+    (* and then the unsimplified return *)
+    | Return(Some x,l) when isOblivSimple (typeOf x) -> 
+        let rv = var (tmpVar (typeOf x)) in
+        let set = mkStmt (Instr [codegenUncondInstr (Set (rv,x,l))]) in
+        let ret = mkStmt (Return (Some (Lval rv),l)) in
+        ChangeTo (mkStmt (Block {battrs=[]; bstmts=[set;ret]}))
+    | _ -> DoChildren
 
-  method vblock b = 
+  method vblock = dt#wrapVBlock begin fun b ->
     if isOblivBlock b then 
       ChangeDoChildrenPost ( { b with battrs = dropAttribute "obliv" b.battrs }
                            , fun x -> x)
@@ -525,8 +537,10 @@ class codegenVisitor (curFunc : fundec) (curCond : lval) : cilVisitor = object
         let asg = mkStmt (Instr [Set (var vi,Lval curCond,!currentLoc)]) in
         let b' = { bstmts = asg :: b.bstmts
                  ; battrs = dropAttribute "~obliv" b.battrs } in 
-        ChangeTo (visitCilBlock (new codegenVisitor curFunc trueCond) b')
+        ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b')
     | None -> DoChildren
+  end
+  method vfunc = dt#defaultVFunc
 end
 
 let genFunc g = match g with
@@ -537,8 +551,9 @@ let genFunc g = match g with
     let makeFormal f' 
       = mkMem (Lval(var(makeLocalVar f' ~insert:false "__obliv_c__en"
                           constOblivBoolPtrType))) NoOffset in
-    let c = if isOblivFunc f.svar.vtype then makeFormal f else trueCond in
-    let cv = new codegenVisitor f c in
+    let isofun = isOblivFunc f.svar.vtype in
+    let c = if isofun then makeFormal f else trueCond in
+    let cv = new codegenVisitor f (new depthTracker) c in
     GFun(visitCilFunction cv f,loc)
 | _ -> g
 
