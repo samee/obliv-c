@@ -134,11 +134,55 @@ let chainVisitorResponse
       (x2, compose post1 post2)
     end
 
-class typeCheckVisitor = object(self)
-  inherit nopCilVisitor
+let wrapPostProcessor
+  (x1:'t) (post1 : ('t->'t)) (vb : 't->'t visitAction) : 't visitAction =
+    match vb x1 with
+    | SkipChildren -> post1 x1; SkipChildren
+    | DoChildren   -> ChangeDoChildrenPost(x1,post1)
+    | ChangeTo x2  -> ChangeTo(post1 x2)
+    | ChangeDoChildrenPost(x2,post2) -> 
+        ChangeDoChildrenPost(x2, compose post1 post2)
 
+class depthTracker = object(self)
   val currentOblivDepth = ref 0
   val currentRootDepth  = ref 0
+  (* Should always satisfy varDepth v <= curDepth() for all v in scope *)
+  method varDepth vinfo =
+    (* This 'if' clause shouldn't be necessary, but some temporaries
+     * (possibly created from cabs2cil) cause Not_found without it *)
+    if !currentOblivDepth = !currentRootDepth then 0
+    else
+      let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
+      max 0 (decldepth - !currentRootDepth)
+  (* Should never be negative *)
+  method curDepth () = !currentOblivDepth - !currentRootDepth
+  method wrapVBlock childVisitor b = 
+    if isOblivBlock b then (
+      incr currentOblivDepth;
+      let undo x = decr currentOblivDepth; x in
+      wrapPostProcessor b undo childVisitor
+    )else if isRipOblivBlock b then
+      let c = !currentRootDepth in
+      let undo x = currentRootDepth := c; x in
+      currentRootDepth := !currentOblivDepth;
+      wrapPostProcessor b undo childVisitor
+    else childVisitor b
+  method defaultVBlock b = self#wrapVBlock (fun _ -> DoChildren) b
+  method wrapVFunc childVisitor fundec = 
+    let vi = fundec.svar in
+    let o = isFunctionType vi.vtype && hasOblivAttr (typeAttrs vi.vtype) in
+    if o then (
+      incr currentOblivDepth;
+      let undo x = decr currentOblivDepth; x in
+      wrapPostProcessor fundec undo childVisitor
+    )else childVisitor fundec
+  method defaultVFunc fundec = self#wrapVFunc (fun _ -> DoChildren) fundec
+end
+
+class typeCheckVisitor = object(self)
+  inherit nopCilVisitor
+  inherit depthTracker as dt
+
   val funcOblivness = Hashtbl.create 100
 
   method isFuncObliv vinfo = 
@@ -149,24 +193,12 @@ class typeCheckVisitor = object(self)
         "typeCheckVisitor#isFuncObliv expects a global function")
 
   (* Adds a 'frozen' qualification to type if necessary *)
-  method effectiveVarType vinfo =
-    if !currentOblivDepth = !currentRootDepth then vinfo.vtype
-    else 
-      let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
-      if decldepth < !currentOblivDepth then
-        typeAddAttributes [Attr("frozen",[])] vinfo.vtype
-      else vinfo.vtype
+  method effectiveVarType vinfo = 
+    if dt#curDepth() = dt#varDepth vinfo then vinfo.vtype
+    else typeAddAttributes [Attr("frozen",[])] vinfo.vtype
 
   (* Counting up on obliv-if and ~obliv blocks  *)
-  method vblock b = 
-    if isOblivBlock b then
-      ChangeDoChildrenPost ((incr currentOblivDepth; b) 
-                           ,(fun b -> decr currentOblivDepth; b))
-    else if isRipOblivBlock b then
-      let c = !currentRootDepth in
-      ChangeDoChildrenPost ((currentRootDepth := !currentOblivDepth; b)
-                           ,(fun b -> currentRootDepth:=c; b))
-    else DoChildren
+  method vblock = dt#defaultVBlock
 
   method vtype vtype = match checkOblivType vtype with
     | None -> DoChildren
@@ -280,13 +312,7 @@ class typeCheckVisitor = object(self)
       ChangeDoChildrenPost (e',post)
 
   (* incr/decr currentOblivDepth on obliv functions *)
-  method vfunc fundec = 
-    let vi = fundec.svar in
-    let o = isFunctionType vi.vtype && hasOblivAttr (typeAttrs vi.vtype) in
-    if o then 
-      ChangeDoChildrenPost ((incr currentOblivDepth; fundec)
-                           ,fun f -> (decr currentOblivDepth; f))
-    else DoChildren
+  method vfunc = dt#defaultVFunc
 
   method vglob v = begin match v with 
   | GCompTag(ci,loc) when ci.cname = "OblivBit" ->  
