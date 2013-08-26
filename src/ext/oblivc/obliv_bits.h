@@ -8,7 +8,9 @@
 #include<obliv_types.h>
 
 typedef struct OblivBit {
-  bool known;
+  bool unknown; // Will be default initialized with memset(0), 
+                //   so this field is 'unknown' rather than 'known'
+                //   so that the default 0 means 'known'
   union {
     // a struct for each protocol we support goes here
     bool knownValue;
@@ -35,7 +37,7 @@ typedef struct { OblivBit bits[bitsize(short)]; } __obliv_c__short;
 typedef struct { OblivBit bits[bitsize(long)];  } __obliv_c__long;
 typedef struct { OblivBit bits[bitsize(long long)]; } __obliv_c__lLong;
 
-static const __obliv_c__bool __obliv_c__trueCond = {{true,true}};
+static const __obliv_c__bool __obliv_c__trueCond = {{false,true}};
 
 // None of the __obliv_c__* functions are meant to be used directly
 //   in a normal C program, but rather through an obliv-c program.

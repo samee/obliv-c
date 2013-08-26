@@ -13,6 +13,8 @@
 // Right now, we do not support multiple protocols at the same time
 static ProtocolDesc currentProto;
 
+inline bool known(const OblivBit* o) { return !o->unknown; }
+
 // --------------------------- Transports -----------------------------------
 struct stdioTransport
 { ProtocolTransport cb;
@@ -50,14 +52,14 @@ void setCurrentParty(ProtocolDesc* pd, int party)
   { pd->thisParty=party; }
 
 void __obliv_c__assignBitKnown(OblivBit* dest, bool value)
-  { dest->knownValue = value; dest->known=true; }
+  { dest->knownValue = value; dest->unknown=false; }
 
 void __obliv_c__copyBit(OblivBit* dest,const OblivBit* src)
   { if(dest!=src) *dest=*src; }
 
 bool __obliv_c__bitIsKnown(const OblivBit* bit,bool* v)
-{ if(bit->known) *v=bit->knownValue;
-  return bit->known;
+{ if(known(bit)) *v=bit->knownValue;
+  return known(bit);
 }
 
 static int tobool(int x) { return x?1:0; }
@@ -68,7 +70,7 @@ void dbgProtoSetBitAnd(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   dest->knownValue= (a->knownValue&& b->knownValue);
-  dest->known = false;
+  dest->unknown = true;
   currentProto.debug.mulCount++;
 }
 
@@ -76,20 +78,20 @@ void dbgProtoSetBitOr(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   dest->knownValue= (a->knownValue|| b->knownValue);
-  dest->known = false;
+  dest->unknown = true;
   currentProto.debug.mulCount++;
 }
 void dbgProtoSetBitXor(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   dest->knownValue= (tobool(a->knownValue) != tobool(b->knownValue));
-  dest->known = false;
+  dest->unknown = true;
   currentProto.debug.xorCount++;
 }
 void dbgProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
 {
   dest->knownValue= !a->knownValue;
-  dest->known = a->known;
+  dest->unknown = a->unknown;
 }
 void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest) 
   { dest->knownValue = !dest->knownValue; }
@@ -120,7 +122,7 @@ static void yaoKeyDebug(const yao_key_t k)
 }
 static void debugOblivBit(const OblivBit* o)
 {
-  if(o->known) fprintf(stderr,"Known value %d\n",(int)o->knownValue);
+  if(known(o)) fprintf(stderr,"Known value %d\n",(int)o->knownValue);
   else 
   { fprintf(stderr,"inv %d, ",(int)o->yao.inverted);
     yaoKeyDebug(o->yao.w);
@@ -172,7 +174,7 @@ void yaoSetBitXor(ProtocolDesc* pd,OblivBit* r,
   yaoKeyCopy(t.yao.w,a->yao.w);
   yaoKeyXor (t.yao.w,b->yao.w);
   t.yao.inverted = (a->yao.inverted!=b->yao.inverted); // no-op for evaluator
-  t.known = false;
+  t.unknown = true;
   *r = t;
 }
 void yaoFlipBit(ProtocolDesc* pd,OblivBit* r)
@@ -202,7 +204,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
     yaoKeyNewPair(pd,w0,w1);
     if(curBit(&it)) osend(pd,2,w1,YAO_KEY_BYTES);
     else osend(pd,2,w0,YAO_KEY_BYTES);
-    o->yao.inverted = o->known = false;
+    o->yao.inverted = false; o->unknown = true;
     yaoKeyCopy(o->yao.w,w0);
     pd->yao.icount++;
   }else 
@@ -215,7 +217,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
       yaoKeyNewPair(pd,w0,w1);
       yaoKeyCopy(buf0+bp*YAO_KEY_BYTES,w0);
       yaoKeyCopy(buf1+bp*YAO_KEY_BYTES,w1);
-      o->yao.inverted = o->known = false;
+      o->yao.inverted = false; o->unknown = true;
       yaoKeyCopy(o->yao.w,w0);
       pd->yao.icount++;
       if(++bp>=OT_BATCH_SIZE)
@@ -231,7 +233,7 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
     orecv(pd,1,o->yao.w,YAO_KEY_BYTES);
-    o->known = false;
+    o->unknown = true;
     pd->yao.icount++;
   }else 
   { char buf[OT_BATCH_SIZE*YAO_KEY_BYTES], *dest[OT_BATCH_SIZE];
@@ -241,7 +243,7 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
     { OblivBit* o = curDestBit(&it);
       dest[bp]=o->yao.w;
       mask|=(curBit(&it)?1<<bp:0);
-      o->known = false; // Known to me, but not to both parties
+      o->unknown = true; // Known to me, but not to both parties
       pd->yao.icount++;
       if(++bp>=OT_BATCH_SIZE)
       { npotRecv1Of2Once(pd->yao.recver,buf,mask,OT_BATCH_SIZE,YAO_KEY_BYTES);
@@ -262,12 +264,12 @@ widest_t yaoGenrRevealOblivBits(ProtocolDesc* pd,
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
-  for(i=0;i<n;++i) if(!o[i].known)
+  for(i=0;i<n;++i) if(o[i].unknown)
     flipflags |= ((yaoKeyLsb(o[i].yao.w) != o[i].yao.inverted)?1LL<<i:0);
   // Assuming little endian
   if(party != 1) osend(pd,2,&flipflags,bc);
   if(party != 2) { orecv(pd,2,&rv,bc); rv^=flipflags; }
-  for(i=0;i<n;++i) if(o[i].known && o[i].knownValue)
+  for(i=0;i<n;++i) if(!o[i].unknown && o[i].knownValue)
     rv |= (1LL<<i);
   pd->yao.ocount+=n;
   return rv;
@@ -277,12 +279,12 @@ widest_t yaoEvalRevealOblivBits(ProtocolDesc* pd,
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
-  for(i=0;i<n;++i) if(!o[i].known)
+  for(i=0;i<n;++i) if(o[i].unknown)
     flipflags |= (yaoKeyLsb(o[i].yao.w)?1LL<<i:0);
   // Assuming little endian
   if(party != 1) { orecv(pd,1,&rv,bc); rv^=flipflags; }
   if(party != 2) osend(pd,1,&flipflags,bc);
-  for(i=0;i<n;++i) if(o[i].known && o[i].knownValue)
+  for(i=0;i<n;++i) if(!o[i].unknown && o[i].knownValue)
     rv |= (1LL<<i);
   pd->yao.ocount+=n;
   return rv;
@@ -322,7 +324,7 @@ void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
 
   // r may alias a and b, so modify at the end
   yaoKeyCopy(r->yao.w,wc);
-  r->known = r->yao.inverted = false;
+  r->unknown = true; r->yao.inverted = false;
   pd->yao.gcount++;
 }
 
@@ -344,7 +346,7 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   yaoKeyXor(w,t);
   // r may alias a and b, so modify at the end
   yaoKeyCopy(r->yao.w,w);
-  r->known = false;
+  r->unknown = true;
 }
 
 unsigned yaoGateCount() { return currentProto.yao.gcount; }
@@ -388,16 +390,16 @@ void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
-  if(a->known || b->known)
-  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
+  if(known(a) || known(b))
+  { if(!known(a)) { const OblivBit* t=a; a=b; b=t; }
     if(a->knownValue) __obliv_c__copyBit(dest,b);
     else __obliv_c__assignBitKnown(dest,false);
   }else currentProto.setBitAnd(&currentProto,dest,a,b);
 }
 void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
-  if(a->known || b->known)
-  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
+  if(known(a) || known(b))
+  { if(!known(a)) { const OblivBit* t=a; a=b; b=t; }
     if(!a->knownValue) __obliv_c__copyBit(dest,b);
     else __obliv_c__assignBitKnown(dest,true);
   }else currentProto.setBitOr(&currentProto,dest,a,b);
@@ -405,19 +407,19 @@ void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   bool v;
-  if(a->known || b->known)
-  { if(!a->known) { const OblivBit* t=a; a=b; b=t; }
+  if(known(a) || known(b))
+  { if(!known(a)) { const OblivBit* t=a; a=b; b=t; }
     v = a->knownValue;
     __obliv_c__copyBit(dest,b);
     if(v) __obliv_c__flipBit(dest);
   }else currentProto.setBitXor(&currentProto,dest,a,b); 
 }
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
-{ if(dest->known) { *dest=*a; dest->knownValue=!dest->knownValue; }
+{ if(known(dest)){ *dest=*a; dest->knownValue=!dest->knownValue; }
   else currentProto.setBitNot(&currentProto,dest,a); 
 }
 void __obliv_c__flipBit(OblivBit* dest) 
-{ if(dest->known) dest->knownValue = !dest->knownValue;
+{ if(known(dest)) dest->knownValue = !dest->knownValue;
   else currentProto.flipBit(&currentProto,dest); 
 }
 
@@ -425,7 +427,7 @@ static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
 { 
   int curparty = __obliv_c__currentParty();
   
-  dest->known=false;
+  dest->unknown=true;
   if(party==1) { if(curparty==1) dest->knownValue=a; }
   else if(party==2 && curparty == 1) 
     orecv(&currentProto,1,&dest->knownValue,sizeof(bool));
