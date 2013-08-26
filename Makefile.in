@@ -94,7 +94,7 @@ CILLY_FEATURES += @EXTRAFEATURES@
 CILLY_LIBRARY_MODULES = pretty inthash errormsg alpha trace stats util clist \
               cilutil escape longarray growArray\
               cabs cabshelper cabsvisit whitetrack cprint lexerhack machdep machdepenv cparser clexer  \
-              cilversion cilint cil cillower formatparse formatlex formatcil cabs2cil \
+              cilversion cilint cil cillower formatparse formatlex formatcil oblivUtils cabs2cil \
               patch frontc check mergecil \
               dataflow dominators bitmap ssa ciltools \
               usedef logcalls logwrites rmtmps \
@@ -105,7 +105,6 @@ CILLY_LIBRARY_MODULES = pretty inthash errormsg alpha trace stats util clist \
               cfg liveness reachingdefs deadcodeelim availexps \
               availexpslv predabst\
               testcil \
-              oblivUtils \
 	      $(CILLY_FEATURES) \
 	      ciloptions feature_config
 # ww: we don't want "main" in an external cil library (cil.cma),
