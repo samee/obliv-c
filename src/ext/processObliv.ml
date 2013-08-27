@@ -143,6 +143,11 @@ let wrapPostProcessor
     | ChangeDoChildrenPost(x2,post2) -> 
         ChangeDoChildrenPost(x2, compose post1 post2)
 
+(* Allows any cilVisitor to track the current 'obliv-depth'. To use this, simply
+ * wrap vblock and vfunc with the corresponding methods here. then #curDepth
+ * will give you the current depth, while varDepth will give you the current
+ * effective depth of the variable's declaration. See other visitors below for
+ * examples *)
 class depthTracker = object(self)
   val currentOblivDepth = ref 0
   val currentRootDepth  = ref 0
