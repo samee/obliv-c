@@ -5750,7 +5750,6 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
             let _ = 
               let bt,sto,inl,attrs = doSpecList n specs in
               !currentFunctionFDEC.svar.vinline <- inl;
-              meObliv := hasAttr ("obliv",[]) attrs;
               
               let ftyp, funattr = 
                 doType (AttrName false) bt (A.PARENTYPE(attrs, dt, a)) in
@@ -5879,6 +5878,7 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
               * as well *)
               !currentFunctionFDEC.svar.vtype <- ftype;
               !currentFunctionFDEC.sformals <- formals;
+              meObliv := OblivUtils.isOblivFunc ftype;
             in
             (* Now change the type of transparent union args back to what it 
              * was so that the body type checks. We must do it this late 

@@ -526,9 +526,7 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
 
   method vstmt s = 
     let tmpVar t = SimplifyTagged.makeSimplifyTemp curFunc t in
-    let isDeepVar v = 
-      printf "%s %d %d\n" v.vname (dt#curDepth()) (dt#varDepth v);
-      dt#curDepth() = dt#varDepth v in
+    let isDeepVar v = dt#curDepth() = dt#varDepth v in
     match s.skind with
     | Instr ilist -> 
         let nestedGen = codegenInstr curCond tmpVar isDeepVar in
