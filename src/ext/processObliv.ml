@@ -444,7 +444,7 @@ let zeroSet (dest:varinfo) loc =
 let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 
 (* Codegen, when conditions don't matter *)
-let codegenUncondInstr (instr:instr) : instr = match instr with
+let rec codegenUncondInstr (instr:instr) : instr = match instr with
 | Set(v,BinOp(op,Lval e1,Lval e2,t),loc) when isOblivSimple t ->
     begin match op with
     | PlusA -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
@@ -473,6 +473,8 @@ let codegenUncondInstr (instr:instr) : instr = match instr with
         else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
     | _ -> instr
     end
+| Set(v,CastE(t,x),loc) when isOblivSimple t ->
+    codegenUncondInstr (Set(v,CastE(unrollType t,x),loc))
 | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
     Call(lvo,exp,mkAddrOf trueCond::args,loc)
 | _ -> instr
@@ -610,18 +612,19 @@ end
 
 class typeFixVisitor wasObliv : cilVisitor = object(self)
   inherit nopCilVisitor
-  method vtype t = let t' = typeRemoveAttributes ["implicitCast";"frozen"] t in
+  method vtype t = 
+    let t' = typeRemoveAttributes ["implicitCast";"frozen"] t in
     ChangeDoChildrenPost (t', fun t -> match t with
-  | TInt(k,a) when hasOblivAttr a -> 
-      let a2 = dropOblivAttr a in
-      setTypeAttrs (intTargetType k) a2
-  | TFun(tres,argso,vargs,a) when isOblivFunc t -> 
-      let entarget = visitCilType (self :> cilVisitor) constOblivBoolPtrType in
-      let args = ("__obliv_c__en",entarget,[]) :: argsToList argso in
-      let a' = dropOblivAttr a in
-      TFun(tres,Some args,vargs,a')
-  | _ -> t
-  )
+    | TInt(k,a) when hasOblivAttr a -> 
+        let a2 = dropOblivAttr a in
+        setTypeAttrs (intTargetType k) a2
+    | TFun(tres,argso,vargs,a) when isOblivFunc t -> 
+        let entarget = visitCilType (self :> cilVisitor) constOblivBoolPtrType in
+        let args = ("__obliv_c__en",entarget,[]) :: argsToList argso in
+        let a' = dropOblivAttr a in
+        TFun(tres,Some args,vargs,a')
+    | _ -> t
+    )
 
   method vglob g = match g with
   | GFun(f,loc) when wasObliv f.svar ->
