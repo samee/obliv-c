@@ -29,22 +29,24 @@ let addOblivAttr a = if not (hasOblivAttr a)
                        else a
 let dropOblivAttr a = dropAttribute "obliv" a
 
-let addOblivType t = typeAddAttributes [Attr("obliv",[])] t
+let addOblivType t = if not (hasOblivAttr (typeAttrs t)) then
+                       typeAddAttributes [Attr("obliv",[])] t
+                     else t
 
-let isOblivFunc t = match t with
+let isOblivFunc t = match unrollType t with
 | TFun(_,_,_,a) -> hasOblivAttr a
 | _ -> false
 
-let isOblivSimple t = match t with
+let isOblivSimple t = match unrollType t with
 | TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
 | _ -> false
 
-let rec isOblivSimpleOrArray t = match t with
+let rec isOblivSimpleOrArray t = match unrollType t with
 | TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
 | TArray(t,_,_) -> isOblivSimpleOrArray t
 | _ -> false
 
-let isNonOblivSimple t = match t with
+let isNonOblivSimple t = match unrollType t with
 | TInt(_,a) | TFloat(_,a) -> not (hasOblivAttr a)
 | _ -> false
 

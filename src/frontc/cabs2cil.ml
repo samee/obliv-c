@@ -4619,6 +4619,11 @@ and doExp (asconst: bool)   (* This expression is used as a constant *)
      integer 0, intType)
   end
 
+and makeCastT_keepObliv e tsrc tdest = 
+  let tdest = if OblivUtils.isOblivSimple tsrc 
+                then OblivUtils.addOblivType tdest else tdest in
+  makeCastT e tsrc tdest
+
 (* bop is always the arithmetic version. Change it to the appropriate pointer 
  * version if necessary *)
 and doBinOp (bop: binop) (e1: exp) (t1: typ) (e2: exp) (t2: typ) : typ * exp =
@@ -4633,7 +4638,7 @@ and doBinOp (bop: binop) (e1: exp) (t1: typ) (e2: exp) (t2: typ) : typ * exp =
     (* Keep the operator since it is arithemtic *)
     intType, 
     optConstFoldBinOp false bop 
-      (makeCastT e1 t1 tres) (makeCastT e2 t2 tres) intType
+      (makeCastT_keepObliv e1 t1 tres) (makeCastT_keepObliv e2 t2 tres) intType
   in
   let doIntegralArithmetic () = 
     let tres = unrollType (arithmeticConversion t1 t2) in
@@ -4641,7 +4646,7 @@ and doBinOp (bop: binop) (e1: exp) (t1: typ) (e2: exp) (t2: typ) : typ * exp =
       TInt _ -> 
         tres,
         optConstFoldBinOp false bop 
-          (makeCastT e1 t1 tres) (makeCastT e2 t2 tres) tres
+          (makeCastT_keepObliv e1 t1 tres) (makeCastT_keepObliv e2 t2 tres) tres
     | _ -> E.s (error "%a operator on a non-integer type" d_binop bop)
   in
   let pointerComparison e1 t1 e2 t2 = 
@@ -5745,7 +5750,6 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
             let _ = 
               let bt,sto,inl,attrs = doSpecList n specs in
               !currentFunctionFDEC.svar.vinline <- inl;
-              meObliv := hasAttr ("obliv",[]) attrs;
               
               let ftyp, funattr = 
                 doType (AttrName false) bt (A.PARENTYPE(attrs, dt, a)) in
@@ -5874,6 +5878,7 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
               * as well *)
               !currentFunctionFDEC.svar.vtype <- ftype;
               !currentFunctionFDEC.sformals <- formals;
+              meObliv := OblivUtils.isOblivFunc ftype;
             in
             (* Now change the type of transparent union args back to what it 
              * was so that the body type checks. We must do it this late 
