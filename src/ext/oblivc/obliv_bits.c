@@ -1,6 +1,7 @@
 // TODO I need to fix some int sizes
 #include <obliv_common.h>
 #include <obliv_bits.h>
+#include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>      // for protoUseStdio()
 #include <string.h>
@@ -643,6 +644,88 @@ void __obliv_c__setPlainSub (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size)
   { __obliv_c__setBitsSub (vdest,NULL,vop1,vop2,NULL,size); }
+
+#define MAX_BITS (8*sizeof(widest_t))
+// dest = c?src:0;
+static void setZeroOrVal (OblivBit* dest
+    ,const OblivBit* src ,size_t size ,const OblivBit* c)
+{
+  int i;
+  for(i=0;i<size;++i) __obliv_c__setBitAnd(dest,src,c);
+}
+void __obliv_c__setMul (void* vdest
+                       ,const void* vop1 ,const void* vop2
+                       ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  OblivBit temp[MAX_BITS],sum[MAX_BITS];
+  int i;
+  assert(size<=MAX_BITS);
+  __obliv_c__setUnsignedKnown(sum,0,size);
+  for(i=0;i<size;++i)
+  { setZeroOrVal(temp,vop1+i,size-i,vop2+i);
+    __obliv_c__setPlainAdd(sum,sum,temp,size-i);
+  }
+  __obliv_c__copyBits(vdest,sum,size);
+}
+
+// All parameters have equal number of bits
+void __obliv_c__setDivModUnsigned (void* vquot, void* vrem
+                                  ,const void* vop1, const void* vop2
+                                  ,size_t n)
+{
+  const OblivBit *op1=vop1, *op2=vop2;
+  OblivBit overflow[MAX_BITS]; // overflow[i] = does it overflow on op2<<i
+  OblivBit temp[MAX_BITS],rem[MAX_BITS],quot[MAX_BITS],b;
+  int i;
+  assert(n<=MAX_BITS);
+  __obliv_c__copyBits(rem,op1,n);
+  __obliv_c__assignBitKnown(overflow,false);
+  for(i=1;i<n;++i) __obliv_c__setBitOr(overflow+i,overflow+i-1,op2+n-i);
+  for(i=n-1;i>=0;--i)
+  { __obliv_c__setBitsSub(temp,&b,rem,op2+i,NULL,n-i);
+    __obliv_c__setBitOr(&b,&b,overflow+i);
+    __obliv_c__ifThenElse(rem,rem,temp,n-i,&b);
+    __obliv_c__setBitNot(quot+i,&b);
+  }
+  if(vrem)  __obliv_c__copyBits(vrem,rem,n);
+  if(vquot) __obliv_c__copyBits(vquot,quot,n);
+}
+
+// get absolute value and sign
+static void setAbs (void* vdest, void* vsign, const void* vsrc, size_t n)
+{
+  int i;
+  const OblivBit *src = vsrc;
+  OblivBit *dest=vdest, c, t;
+  __obliv_c__copyBit(vsign,src+n-1); // this one's easy
+  __obliv_c__copyBit(&c,vsign);
+  for(i=0;i<n-1;++i)
+  { __obliv_c__setBitXor(dest+i,src+i,vsign); // flip, then
+    __obliv_c__setBitXor(&t,dest+i,&c);       // conditional increment
+    __obliv_c__setBitAnd(&c,&c,dest+i);
+    __obliv_c__copyBit(dest+i,&t);
+  }
+  __obliv_c__setBitXor(dest+n-1,src+n-1,vsign);
+  __obliv_c__setBitXor(dest+n-1,dest+n-1,&c);
+}
+
+// Code could have been combined with setAbs, but meh
+void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n)
+{
+  int i;
+  const OblivBit *src=vsrc;
+  OblivBit *dest=vdest, got1, got1_;
+  __obliv_c__copyBit(&got1,src);
+  __obliv_c__copyBit(dest,src);
+  for(i=1;i<n-1;++i)
+  { __obliv_c__setBitAnd(&got1_,&got1,src+i);
+    __obliv_c__setBitXor(dest+i,&got1,src+i);
+    __obliv_c__copyBit(&got1,&got1_);
+  }
+  __obliv_c__setBitXor(dest+i,src+i,&got1);
+}
 
 void __obliv_c__setSignExtend (void* vdest, size_t dsize
                               ,const void* vsrc, size_t ssize)

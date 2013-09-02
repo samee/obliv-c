@@ -94,6 +94,14 @@ void __obliv_c__setBitsAdd (void* dest,void* carryOut
                            ,const void* op1,const void* op2
                            ,const void* carryIn
                            ,size_t size);
+// Fun fact: product of n-bit numbers, when truncated to n-bits, is the 
+//   same whether the numbers are signed or unsigned
+void __obliv_c__setMul (void* vdest
+                       ,const void* vop1 ,const void* vop2
+                       ,size_t size);
+void __obliv_c__setDivModUnsigned (void* vquot, void* vrem
+                                  ,const void* vop1, const void* vop2
+                                  ,size_t size);
 // Similar restrictions as setBitsAdd
 void __obliv_c__setBitsSub (void* dest,void* borrowOut
                            ,const void* op1,const void* op2
