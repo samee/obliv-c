@@ -651,6 +651,35 @@ static void setZeroOrVal (OblivBit* dest
   int i;
   for(i=0;i<size;++i) __obliv_c__setBitAnd(dest,src,c);
 }
+void __obliv_c__condNeg (const void* vcond, void* vdest
+                        ,const void* vsrc, size_t n)
+{
+  int i;
+  OblivBit c,t, *dest = vdest;
+  const OblivBit *src = vsrc;
+  __obliv_c__copyBit(&c,vcond);
+  for(i=0;i<n-1;++i)
+  { __obliv_c__setBitXor(dest+i,src+i,vcond);  // flip first
+    __obliv_c__setBitXor(&t,dest+i,&c);        // then, conditional increment
+    __obliv_c__setBitAnd(&c,&c,dest+i);
+    __obliv_c__copyBit(dest+i,&t);
+  }
+  __obliv_c__setBitXor(dest+i,src+i,vcond);
+  __obliv_c__setBitXor(dest+i,dest+i,&c);
+}
+
+// get absolute value and sign
+static void setAbs (void* vdest, void* vsign, const void* vsrc, size_t n)
+{
+  __obliv_c__copyBit(vsign,((const OblivBit*)vsrc)+n-1);
+  __obliv_c__condNeg(vsign,vdest,vsrc,n);
+}
+
+void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n)
+{
+  __obliv_c__condNeg(&__obliv_c__trueCond,vdest,vsrc,n);
+}
+
 void __obliv_c__setMul (void* vdest
                        ,const void* vop1 ,const void* vop2
                        ,size_t size)
@@ -691,40 +720,19 @@ void __obliv_c__setDivModUnsigned (void* vquot, void* vrem
   if(vquot) __obliv_c__copyBits(vquot,quot,n);
 }
 
-// get absolute value and sign
-static void setAbs (void* vdest, void* vsign, const void* vsrc, size_t n)
+void __obliv_c__setDivModSigned (void* vquot, void* vrem
+                                ,const void* vop1, const void* vop2
+                                ,size_t n)
 {
-  int i;
-  const OblivBit *src = vsrc;
-  OblivBit *dest=vdest, c, t;
-  __obliv_c__copyBit(vsign,src+n-1); // this one's easy
-  __obliv_c__copyBit(&c,vsign);
-  for(i=0;i<n-1;++i)
-  { __obliv_c__setBitXor(dest+i,src+i,vsign); // flip, then
-    __obliv_c__setBitXor(&t,dest+i,&c);       // conditional increment
-    __obliv_c__setBitAnd(&c,&c,dest+i);
-    __obliv_c__copyBit(dest+i,&t);
-  }
-  __obliv_c__setBitXor(dest+n-1,src+n-1,vsign);
-  __obliv_c__setBitXor(dest+n-1,dest+n-1,&c);
+  OblivBit neg1,neg2;
+  OblivBit op1[MAX_BITS],op2[MAX_BITS];
+  setAbs(op1,&neg1,vop1,n);
+  setAbs(op2,&neg2,vop2,n);
+  __obliv_c__setDivModUnsigned(vquot,vrem,op1,op2,n);
+  __obliv_c__setBitXor(&neg2,&neg2,&neg1);
+  __obliv_c__condNeg(&neg1,vrem,vrem,n);
+  __obliv_c__condNeg(&neg2,vquot,vquot,n);
 }
-
-// Code could have been combined with setAbs, but meh
-void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n)
-{
-  int i;
-  const OblivBit *src=vsrc;
-  OblivBit *dest=vdest, got1, got1_;
-  __obliv_c__copyBit(&got1,src);
-  __obliv_c__copyBit(dest,src);
-  for(i=1;i<n-1;++i)
-  { __obliv_c__setBitAnd(&got1_,&got1,src+i);
-    __obliv_c__setBitXor(dest+i,&got1,src+i);
-    __obliv_c__copyBit(&got1,&got1_);
-  }
-  __obliv_c__setBitXor(dest+i,src+i,&got1);
-}
-
 void __obliv_c__setSignExtend (void* vdest, size_t dsize
                               ,const void* vsrc, size_t ssize)
 {
