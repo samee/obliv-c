@@ -649,7 +649,7 @@ static void setZeroOrVal (OblivBit* dest
     ,const OblivBit* src ,size_t size ,const OblivBit* c)
 {
   int i;
-  for(i=0;i<size;++i) __obliv_c__setBitAnd(dest,src,c);
+  for(i=0;i<size;++i) __obliv_c__setBitAnd(dest+i,src+i,c);
 }
 void __obliv_c__condNeg (const void* vcond, void* vdest
                         ,const void* vsrc, size_t n)
@@ -688,11 +688,12 @@ void __obliv_c__setMul (void* vdest
   const OblivBit *op1=vop1, *op2=vop2;
   OblivBit temp[MAX_BITS],sum[MAX_BITS];
   int i;
+  int j;
   assert(size<=MAX_BITS);
   __obliv_c__setUnsignedKnown(sum,0,size);
   for(i=0;i<size;++i)
-  { setZeroOrVal(temp,vop1+i,size-i,vop2+i);
-    __obliv_c__setPlainAdd(sum,sum,temp,size-i);
+  { setZeroOrVal(temp,op1,size-i,op2+i);
+    __obliv_c__setPlainAdd(sum+i,sum+i,temp,size-i);
   }
   __obliv_c__copyBits(vdest,sum,size);
 }
@@ -711,9 +712,10 @@ void __obliv_c__setDivModUnsigned (void* vquot, void* vrem
   __obliv_c__assignBitKnown(overflow,false);
   for(i=1;i<n;++i) __obliv_c__setBitOr(overflow+i,overflow+i-1,op2+n-i);
   for(i=n-1;i>=0;--i)
-  { __obliv_c__setBitsSub(temp,&b,rem,op2+i,NULL,n-i);
+  {
+    __obliv_c__setBitsSub(temp,&b,rem+i,op2,NULL,n-i);
     __obliv_c__setBitOr(&b,&b,overflow+i);
-    __obliv_c__ifThenElse(rem,rem,temp,n-i,&b);
+    __obliv_c__ifThenElse(rem+i,rem+i,temp,n-i,&b);
     __obliv_c__setBitNot(quot+i,&b);
   }
   if(vrem)  __obliv_c__copyBits(vrem,rem,n);
@@ -730,8 +732,32 @@ void __obliv_c__setDivModSigned (void* vquot, void* vrem
   setAbs(op2,&neg2,vop2,n);
   __obliv_c__setDivModUnsigned(vquot,vrem,op1,op2,n);
   __obliv_c__setBitXor(&neg2,&neg2,&neg1);
-  __obliv_c__condNeg(&neg1,vrem,vrem,n);
-  __obliv_c__condNeg(&neg2,vquot,vquot,n);
+  if(vrem)  __obliv_c__condNeg(&neg1,vrem,vrem,n);
+  if(vquot) __obliv_c__condNeg(&neg2,vquot,vquot,n);
+}
+void __obliv_c__setDivUnsigned (void* vdest
+                               ,const void* vop1 ,const void* vop2
+                               ,size_t n)
+{
+  __obliv_c__setDivModUnsigned(vdest,NULL,vop1,vop2,n);
+}
+void __obliv_c__setModUnsigned (void* vdest
+                               ,const void* vop1 ,const void* vop2
+                               ,size_t n)
+{
+  __obliv_c__setDivModUnsigned(NULL,vdest,vop1,vop2,n);
+}
+void __obliv_c__setDivSigned (void* vdest
+                             ,const void* vop1 ,const void* vop2
+                             ,size_t n)
+{
+  __obliv_c__setDivModSigned(vdest,NULL,vop1,vop2,n);
+}
+void __obliv_c__setModSigned (void* vdest
+                             ,const void* vop1 ,const void* vop2
+                             ,size_t n)
+{
+  __obliv_c__setDivModSigned(NULL,vdest,vop1,vop2,n);
 }
 void __obliv_c__setSignExtend (void* vdest, size_t dsize
                               ,const void* vsrc, size_t ssize)

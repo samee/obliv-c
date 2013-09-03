@@ -445,21 +445,37 @@ let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 
 (* Codegen, when conditions don't matter *)
 let rec codegenUncondInstr (instr:instr) : instr = match instr with
-| Set(v,BinOp(op,Lval e1,Lval e2,t),loc) when isOblivSimple t ->
-    begin match op with
-    | PlusA -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
-    | MinusA -> setArith "__obliv_c__setPlainSub" v e1 e2 loc
-    | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
-    | Gt -> setComparisonUS cmpLtFuncs v e2 e1 loc
-    | Le -> setComparisonUS cmpLeFuncs v e1 e2 loc
-    | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
-    | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
-    | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
-    | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAnd" v e1 e2 loc
-    | BXor -> setBitwiseOp "__obliv_c__setBitwiseXor" v e1 e2 loc
-    | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOr" v e1 e2 loc
-    | LAnd -> setLogicalOp "__obliv_c__setBitAnd" v e1 e2 loc
-    | LOr  -> setLogicalOp "__obliv_c__setBitOr"  v e1 e2 loc
+| Set(v,BinOp(op,Lval e1,Lval e2,t),loc) ->
+    begin match unrollType t with
+    | TInt(kind,a) when hasOblivAttr a ->
+        begin match op with
+        | PlusA -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
+        | MinusA -> setArith "__obliv_c__setPlainSub" v e1 e2 loc
+        | Mult   -> setArith "__obliv_c__setMul" v e1 e2 loc
+        | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
+        | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
+        | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAnd" v e1 e2 loc
+        | BXor -> setBitwiseOp "__obliv_c__setBitwiseXor" v e1 e2 loc
+        | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOr" v e1 e2 loc
+        | LAnd -> setLogicalOp "__obliv_c__setBitAnd" v e1 e2 loc
+        | LOr  -> setLogicalOp "__obliv_c__setBitOr"  v e1 e2 loc
+        | _ when isSigned kind ->
+            begin match op with
+            | Div -> setArith "__obliv_c__setDivSigned" v e1 e2 loc
+            | Mod -> setArith "__obliv_c__setModSigned" v e1 e2 loc
+            | _ -> instr
+            end
+        | _ -> 
+            begin match op with
+            | Div -> setArith "__obliv_c__setDivUnsigned" v e1 e2 loc
+            | Mod -> setArith "__obliv_c__setModUnsigned" v e1 e2 loc
+            | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
+            | Gt -> setComparisonUS cmpLtFuncs v e2 e1 loc
+            | Le -> setComparisonUS cmpLeFuncs v e1 e2 loc
+            | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
+            | _ -> instr
+            end
+        end
     | _ -> instr
     end
 | Set(v,CastE(TInt(k,a) as dt,x),loc) 
