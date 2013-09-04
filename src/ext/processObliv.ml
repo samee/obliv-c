@@ -335,6 +335,44 @@ class typeCheckVisitor = object(self)
   end
 end
 
+class controlCheckVisitor = object(self)
+  inherit nopCilVisitor
+  val breakOk = ref false
+  val contOk = ref false
+  val returnOk = ref true
+
+  method getRestorer() = 
+    let oldbreak,oldcont,oldret = !breakOk,!contOk,!returnOk in
+    (fun() -> breakOk:=oldbreak; contOk:=oldcont; returnOk:=oldret)
+
+  method vstmt s = let restore = self#getRestorer() in begin
+    match s.skind with
+    | If(c,tb,fb,loc) -> if isOblivBlock tb then
+          (breakOk:=false; contOk:=false; returnOk:=false)
+    | Loop _ -> breakOk:=true; contOk:=true
+    | Switch _ -> breakOk:=true
+    | TryFinally _ | TryExcept _ -> 
+        E.s (E.error "%a: Obliv-C does not support exceptions"
+          d_loc !currentLoc)
+    | Break loc -> if not !breakOk then
+                      E.s (E.error "%a: unexpected break" d_loc loc)
+    | Continue loc -> if not !contOk then
+                        E.s (E.error "%a: unexpected continue" d_loc loc)
+    | Return (_,loc) -> if not !returnOk then
+                          E.s (E.error "%a: unexpected return" d_loc loc)
+    | _ -> (); (* Yeah, I'm not handling Goto *)
+    ;
+    ChangeDoChildrenPost(s,fun s -> restore(); s)
+  end
+
+
+  method vglob v = begin match v with
+  | GFun ({svar=vi},loc) when isFunctionType vi.vtype ->
+      (breakOk:=true; contOk:=true; returnOk:=true; DoChildren)
+  | _ -> DoChildren
+  end
+end
+
 let voidFunc name argTypes =
   let ftype = TFun(TVoid [], Some argTypes,false,[]) in
   Lval(Var(makeGlobalVar name ftype),NoOffset)
@@ -662,6 +700,9 @@ let feature : featureDescr =
       visitCilFileSameGlobals (tcVisitor :> cilVisitor) f;
       typeOfVinfo := oldtov;
       let isObliv = tcVisitor#isFuncObliv in
+  
+      visitCilFileSameGlobals (new controlCheckVisitor :> cilVisitor) f;
+
       SimplifyTagged.feature.fd_doit f; (* Note: this can screw up type equality
                                                  checks *)
       (* types are often visited before the functions, so it is often easier
