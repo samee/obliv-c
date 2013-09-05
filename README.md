@@ -79,7 +79,7 @@ of the tests builds the documentation):
     cd test
     ./testcil --run
 
-Ressources
+Resources
 ----------
 
 * [Mailing list](https://lists.sourceforge.net/lists/listinfo/cil-users)

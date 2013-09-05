@@ -568,6 +568,32 @@ void __obliv_c__setBitwiseNotInPlace (void* vdest,size_t size)
   while(size-->0) __obliv_c__flipBit(dest++); 
 }
 
+void __obliv_c__setLShift (void* vdest, const void* vsrc, size_t n,
+    unsigned shiftAmt)
+{
+  int i;
+  OblivBit* dest=vdest;
+  const OblivBit* src=vsrc;
+  for(i=n-1;i>=shiftAmt;--i) __obliv_c__copyBit(dest+i,src+i-shiftAmt);
+  for(;i>=0;--i) __obliv_c__assignBitKnown(dest+i,false);
+}
+void __obliv_c__setRShift (void* vdest, const void* vsrc, size_t n,
+    unsigned shiftAmt,bool isSigned)
+{
+  int i;
+  OblivBit* dest=vdest;
+  const OblivBit* src=vsrc;
+  for(i=shiftAmt;i<n;++i) __obliv_c__copyBit(dest+i-shiftAmt,src+i);
+  (isSigned?__obliv_c__setSignExtend
+           :__obliv_c__setZeroExtend)(dest,n,dest,n-shiftAmt);
+}
+void __obliv_c__setRShiftSigned (void* vdest, const void* vsrc, size_t n,
+    unsigned shiftAmt)
+  { __obliv_c__setRShift(vdest,vsrc,n,shiftAmt,true); }
+void __obliv_c__setRShiftUnsigned (void* vdest, const void* vsrc, size_t n,
+    unsigned shiftAmt)
+  { __obliv_c__setRShift(vdest,vsrc,n,shiftAmt,false); }
+
 // carryIn and/or carryOut can be NULL, in which case they are ignored
 void __obliv_c__setBitsAdd (void* vdest,void* carryOut
                            ,const void* vop1,const void* vop2

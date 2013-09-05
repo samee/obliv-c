@@ -81,6 +81,14 @@ void __obliv_c__setBitwiseXor (void* dest
                               ,size_t size);
 void __obliv_c__setBitwiseNot (void* dest,const void* op,size_t size);
 void __obliv_c__setBitwiseNotInPlace (void* dest,size_t size);
+void __obliv_c__setLShift (void* vdest, const void* vsrc, size_t size,
+    unsigned shiftAmt);
+void __obliv_c__setRShiftSigned (void* vdest, const void* vsrc, size_t size,
+    unsigned shiftAmt);
+void __obliv_c__setRShiftUnsigned (void* vdest, const void* vsrc, size_t size,
+    unsigned shiftAmt);
+void __obliv_c__setRShift (void* vdest, const void* vsrc, size_t size,
+    unsigned shiftAmt,bool isSigned);
 
 // TODO reduced bit-width optimization. First, write a version that allows
 //   user to do this manually in obliv-c. Then, promote ints to it automatically

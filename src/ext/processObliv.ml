@@ -251,7 +251,6 @@ class typeCheckVisitor = object(self)
       | _ -> instr
       ))
 
-  (* TODO check if break/continue goes through obliv if *)
   method vstmt s = ChangeDoChildrenPost (s, fun s -> match s.skind with
     | If(e,tb,fb,l) -> 
         if isOblivSimple (typeOf e) then
@@ -274,10 +273,20 @@ class typeCheckVisitor = object(self)
       | _ -> t
       in
       if isOblivSimple (typeOf e1) || isOblivSimple (typeOf e2) then
-        let e1 = mkCast e1 (addOblivType (typeOf e1)) in
-        let e2 = mkCast e2 (addOblivType (typeOf e2)) in
-        let tr = addOblivType t2 in
-        BinOp(op,e1,e2,tr)
+        match op with 
+        | PlusPI | MinusPI | IndexPI -> 
+            E.s (E.error "%a: obliv types cannot be used in pointer arithmetic"
+                  d_loc !currentLoc)
+        | Shiftlt | Shiftrt ->
+            if isOblivSimple (typeOf e2) then
+              E.s (E.error "%a obliv types cannot be used as shift amounts"
+                    d_loc !currentLoc)
+            else BinOp(op,e1,e2,addOblivType t2)
+        | _ ->
+            let e1 = mkCast e1 (addOblivType (typeOf e1)) in
+            let e2 = mkCast e2 (addOblivType (typeOf e2)) in
+            let tr = addOblivType t2 in
+            BinOp(op,e1,e2,tr)
       else exp
   | CastE (t,e) when t = typeOf e -> e
   | CastE (t,e) when isImplicitCastResult t ->
@@ -393,11 +402,22 @@ let setComparison fname dest s1 s2 loc =
   Call(None,func,[AddrOf dest; AddrOf s1; AddrOf s2
                  ;xoBitsSizeOf optype],loc)
 
+let setShift fname (dest:lval) (src:lval) (amt:lval) loc =
+  let optype = typeOfLval src in
+  let coptype = typeAddAttributes [constAttr] optype in
+  let fargTypes = ["dest",TPtr(optype,[]),[]
+                  ;"src",TPtr(coptype,[]),[]
+                  ;"bitcount",!typeOfSizeOf,[]
+                  ;"shiftAmount",TInt(IUInt,[]),[]
+  ] in
+  let func = voidFunc fname fargTypes in
+  Call(None,func,[AddrOf dest; AddrOf src; xoBitsSizeOf optype; Lval amt],loc)
+
 (* Same as setComparison, but picks the right function name
  * based on signedness of operators *)
 let setComparisonUS fnames dest s1 s2 loc = 
   let optype = typeOfLval s1 in
-  let fname = match optype with
+  let fname = match unrollType optype with
   | TInt(k,_) -> if isSigned k then snd fnames else fst fnames
   | _ -> E.s (E.error "Cannot operate on obliv values of type %a" d_type optype)
   in
@@ -487,11 +507,16 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
     begin match unrollType t with
     | TInt(kind,a) when hasOblivAttr a ->
         begin match op with
-        | PlusA -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
+        | PlusA  -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
         | MinusA -> setArith "__obliv_c__setPlainSub" v e1 e2 loc
         | Mult   -> setArith "__obliv_c__setMul" v e1 e2 loc
+        | Shiftlt-> setShift "__obliv_c__setLShift" v e1 e2 loc
         | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
         | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
+        | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
+        | Gt -> setComparisonUS cmpLtFuncs v e2 e1 loc
+        | Le -> setComparisonUS cmpLeFuncs v e1 e2 loc
+        | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
         | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAnd" v e1 e2 loc
         | BXor -> setBitwiseOp "__obliv_c__setBitwiseXor" v e1 e2 loc
         | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOr" v e1 e2 loc
@@ -499,18 +524,16 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | LOr  -> setLogicalOp "__obliv_c__setBitOr"  v e1 e2 loc
         | _ when isSigned kind ->
             begin match op with
+            | Shiftrt -> setShift "__obliv_c__setRShiftSigned" v e1 e2 loc
             | Div -> setArith "__obliv_c__setDivSigned" v e1 e2 loc
             | Mod -> setArith "__obliv_c__setModSigned" v e1 e2 loc
             | _ -> instr
             end
         | _ -> 
             begin match op with
+            | Shiftrt -> setShift "__obliv_c__setRShiftUnsigned" v e1 e2 loc
             | Div -> setArith "__obliv_c__setDivUnsigned" v e1 e2 loc
             | Mod -> setArith "__obliv_c__setModUnsigned" v e1 e2 loc
-            | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
-            | Gt -> setComparisonUS cmpLtFuncs v e2 e1 loc
-            | Le -> setComparisonUS cmpLeFuncs v e1 e2 loc
-            | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
             | _ -> instr
             end
         end
