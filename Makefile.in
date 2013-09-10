@@ -13,7 +13,7 @@
 # 
 
 # Debugging. Set ECHO= to debug this Makefile 
-.PHONY: setup quickbuild doc distrib machdep cilversion
+.PHONY: setup quickbuild doc distrib machdep cilversion oblivruntime
 ECHO = @
 
 # It is important to build quickbuild first,to generate the proper dependencies
@@ -34,8 +34,6 @@ configure: configure.in aclocal.m4
 	autoconf
 
 @DEFAULT_COMPILER@=1
-
-
 
 ifdef RELEASE
   NATIVECAML := 1
@@ -142,8 +140,26 @@ $(OBJDIR)/cilly$(EXE) : $(CILLY_MODULES:%=$(OBJDIR)/%.$(CMO))
                     $(CILLY_LIBS:%=%.$(CMXA)) \
                     $^
 
+# ------ these lines were added for obliv-C runtime -----------
+OCSRCDIR = src/ext/oblivc
+OCPARTS += obliv_bits ot
 
-quickbuild: cilversion machdep cilly lib/Cilly.pm
+oblivruntime: $(OBJDIR)/libobliv.a
+	
+$(OBJDIR)/libobliv.a: $(OCPARTS:%=$(OBJDIR)/%.o)
+	ar cr $@ $^
+
+$(OCPARTS:%=$(DEPENDDIR)/%.d): $(DEPENDDIR)/%.d: $(OCSRCDIR)/%.c
+	$(CC) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.o > $@
+	echo '	$$(CC) -c $$< -o $$@ -I $$(OCSRCDIR)' >> $@
+
+# CLEANING defind in ocamlutil/Makefile.ocaml based on $(MAKECMDGOALS)
+ifndef CLEANING
+  -include $(OCPARTS:%=$(DEPENDDIR)/%.d)
+endif
+# ------ end of obliv-C runtime -------------------------------
+
+quickbuild: cilversion machdep cilly lib/Cilly.pm oblivruntime
 
 # Setup also makes the native code versions
 

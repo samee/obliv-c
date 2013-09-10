@@ -485,7 +485,7 @@ $(DEPENDDIR)/%.di: %.mli $(BEFOREDEPS)
 # (which is not set anywhere else, currently)
 ifeq ($(MAKECMDGOALS),clean)
   #$(warning "Skipping dependency rules because we're cleaning")
-  CLEANING := 1
+  CLEANING = 1
 endif
 
 ifndef CLEANING
