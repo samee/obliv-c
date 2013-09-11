@@ -63,8 +63,6 @@ bool __obliv_c__bitIsKnown(const OblivBit* bit,bool* v)
   return known(bit);
 }
 
-static int tobool(int x) { return x?1:0; }
-
 // TODO all sorts of identical parameter optimizations
 // Implementation note: remember that all these pointers may alias each other
 void dbgProtoSetBitAnd(ProtocolDesc* pd,
@@ -85,7 +83,7 @@ void dbgProtoSetBitOr(ProtocolDesc* pd,
 void dbgProtoSetBitXor(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
-  dest->knownValue= (tobool(a->knownValue) != tobool(b->knownValue));
+  dest->knownValue= (!!a->knownValue != !!b->knownValue);
   dest->unknown = true;
   currentProto.debug.xorCount++;
 }
@@ -471,7 +469,7 @@ widest_t dbgProtoRevealOblivBits
 { widest_t rv=0;
   if(currentProto.thisParty==1)
   { dest+=size;
-    while(size-->0) rv = (rv<<1)+tobool((--dest)->knownValue);
+    while(size-->0) rv = (rv<<1)+!!(--dest)->knownValue;
     if(party==0 || party==2) osend(pd,2,&rv,sizeof(rv));
     if(party==2) return 0;
     else return rv;
