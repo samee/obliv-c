@@ -26,6 +26,8 @@ let rec checkOblivType t = match t with
 and checkOblivArg (_,t,_) = checkOblivType t
 ;;
 
+let frozen = "frozen"
+
 let boolType = TInt(IBool,[])
 
 let oblivIntType = addOblivType intType
@@ -111,7 +113,7 @@ let isImplicitCastResult t = hasAttribute "implicitCast" (typeAttrs t)
 
 (* Remember that obliv overrides frozen *)
 let isFrozenQualified t = let a = typeAttrs t in
-                          hasAttribute "frozen" a && not (hasOblivAttr a)
+                          hasAttribute frozen a && not (hasOblivAttr a)
 
 let isFrozenPtr e = match e with
 | TPtr(t,_) -> isFrozenQualified t
@@ -184,6 +186,11 @@ class depthTracker = object(self)
   method defaultVFunc fundec = self#wrapVFunc (fun _ -> DoChildren) fundec
 end
 
+let rec dropFrozenAttr (t:typ) = match unrollType t with
+| TPtr(t,a) -> TPtr(dropFrozenAttr t,dropAttribute frozen a)
+| TArray(t,exp,a) -> TArray(dropFrozenAttr t,exp,dropAttribute frozen a)
+| t -> typeRemoveAttributes [frozen] t
+
 class typeCheckVisitor = object(self)
   inherit nopCilVisitor
   val dt = new depthTracker
@@ -199,8 +206,10 @@ class typeCheckVisitor = object(self)
 
   (* Adds a 'frozen' qualification to type if necessary *)
   method effectiveVarType vinfo = 
-    if dt#curDepth() = dt#varDepth vinfo then vinfo.vtype
-    else typeAddAttributes [Attr("frozen",[])] vinfo.vtype
+    (* Looks like a hack. Think of types a little better *)
+    if dt#curDepth() = 0 then dropFrozenAttr vinfo.vtype
+    else if dt#curDepth() = dt#varDepth vinfo then vinfo.vtype
+    else typeAddAttributes [Attr(frozen,[])] vinfo.vtype
 
   (* Counting up on obliv-if and ~obliv blocks  *)
   method vblock = dt#defaultVBlock
@@ -315,7 +324,7 @@ class typeCheckVisitor = object(self)
   | CastE (t,e2) when isImplicitCastResult t && isFrozenPtr (typeOf e2) ->
       begin match t with 
       | TPtr(t2,a) -> 
-          let t' = TPtr(typeAddAttributes [Attr("frozen",[])] t2,a) in
+          let t' = TPtr(typeAddAttributes [Attr(frozen,[])] t2,a) in
           CastE (t',e2)
       | _ -> e
       end
@@ -690,13 +699,14 @@ end
 class typeFixVisitor wasObliv : cilVisitor = object(self)
   inherit nopCilVisitor
   method vtype t = 
-    let t' = typeRemoveAttributes ["implicitCast";"frozen"] t in
+    let t' = typeRemoveAttributes ["implicitCast";frozen] t in
     ChangeDoChildrenPost (t', fun t -> match t with
     | TInt(k,a) when hasOblivAttr a -> 
         let a2 = dropOblivAttr a in
         setTypeAttrs (intTargetType k) a2
     | TFun(tres,argso,vargs,a) when isOblivFunc t -> 
-        let entarget = visitCilType (self :> cilVisitor) constOblivBoolPtrType in
+        let entarget = visitCilType (self :> cilVisitor) constOblivBoolPtrType 
+        in
         let args = ("__obliv_c__en",entarget,[]) :: argsToList argso in
         let a' = dropOblivAttr a in
         TFun(tres,Some args,vargs,a')
