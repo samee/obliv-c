@@ -383,12 +383,32 @@ class controlCheckVisitor = object(self)
     ChangeDoChildrenPost(s,fun s -> restore(); s)
   end
 
-
   method vglob v = begin match v with
   | GFun ({svar=vi},loc) when isFunctionType vi.vtype ->
       (breakOk:=true; contOk:=true; returnOk:=true; DoChildren)
   | _ -> DoChildren
   end
+
+  val dt = new depthTracker
+  method vfunc = dt#defaultVFunc
+  method vblock = dt#defaultVBlock
+
+  (* I need to check this for (p+5)(x,y) TODO *)
+  method vinst instr = ChangeDoChildrenPost ([instr], List.map (
+    fun instr -> 
+      if dt#curDepth () = 0 then instr else begin match instr with
+      | Call (lvopt,f,args,loc) -> 
+          begin match unrollType (typeOf f) with
+          | TFun (tr,targsPack,isVarg,a) ->
+            if hasOblivAttr a then instr
+            else 
+              E.s (E.error "%a: cannot invoke non-obliv function in obliv \
+              scope\n" d_loc !currentLoc);
+          | _ -> instr
+          end
+      | _ -> instr
+      end
+  ))
 end
 
 let voidFunc name argTypes =
