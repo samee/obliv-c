@@ -85,7 +85,7 @@ type bExp = exp  (* Basic expression *)
 let debug = true
 
 (* Whether to split structs *)
-let splitStructs = ref true
+let splitStructs = ref false
 
 (* Whether to simplify inside of Mem *)
 let simpleMem = ref true
@@ -768,8 +768,6 @@ let feature : featureDescr =
     fd_enabled = ref false;
     fd_description = "compiles CIL to 3-address code";
     fd_extraopt = [
-      ("--no-split-structs", Arg.Clear splitStructs,
-                    " do not split structured variables"); 
       ("--no-convert-direct-calls", Arg.Clear convertDirectCalls,
                     " do not convert direct function calls to function pointer \
                       calls if the address of the function was taken");
