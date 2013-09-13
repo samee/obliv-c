@@ -1423,7 +1423,7 @@ let attributeHash: (string, attributeClass) H.t =
     [ "stdcall";"cdecl"; "fastcall" ];
 
   List.iter (fun a -> H.add table a AttrType)
-    [ "const"; "volatile"; "restrict"; "mode"; "obliv" ];
+    [ "const"; "volatile"; "restrict"; "mode"; "obliv"; "frozen" ];
   table
       
 
