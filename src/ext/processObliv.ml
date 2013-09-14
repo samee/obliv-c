@@ -158,9 +158,10 @@ class depthTracker = object(self)
     (* This 'if' clause shouldn't be necessary, but some temporaries
      * (possibly created from cabs2cil) cause Not_found without it *)
     if !currentOblivDepth = !currentRootDepth then self#curDepth()
-    else
+    else try
       let decldepth = Hashtbl.find vidOblivDepth vinfo.vid in
       max 0 (decldepth - !currentRootDepth)
+      with Not_found -> !currentOblivDepth (* assume temp XXX *)
   (* Should never be negative *)
   method curDepth () = !currentOblivDepth - !currentRootDepth
   method wrapVBlock childVisitor b = 
@@ -297,7 +298,7 @@ class typeCheckVisitor = object(self)
             let tr = addOblivType t2 in
             BinOp(op,e1,e2,tr)
       else exp
-  | CastE (t,e) when t = typeOf e -> e
+  | CastE (t,e) when typeSig t = typeSig (typeOf e) -> e
   | CastE (t,e) when isImplicitCastResult t ->
       let st = typeOf e in
       if isOblivSimple st && not (isOblivSimple t) then
