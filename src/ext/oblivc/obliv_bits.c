@@ -58,7 +58,7 @@ void __obliv_c__assignBitKnown(OblivBit* dest, bool value)
 void __obliv_c__copyBit(OblivBit* dest,const OblivBit* src)
   { if(dest!=src) *dest=*src; }
 
-bool __obliv_c__bitIsKnown(const OblivBit* bit,bool* v)
+bool __obliv_c__bitIsKnown(bool* v,const OblivBit* bit)
 { if(known(bit)) *v=bit->knownValue;
   return known(bit);
 }
@@ -531,7 +531,7 @@ void __obliv_c__setBitsKnown(OblivBit* dest, const bool* value, size_t size)
 void __obliv_c__copyBits(OblivBit* dest, const OblivBit* src, size_t size)
   { if(dest!=src) while(size-->0) __obliv_c__copyBit(dest++,src++); }
 bool __obliv_c__allBitsKnown(const OblivBit* bits, bool* dest, size_t size)
-{ while(size-->0) if(!__obliv_c__bitIsKnown(bits++,dest++)) return false;
+{ while(size-->0) if(!__obliv_c__bitIsKnown(dest++,bits++)) return false;
   return true;
 }
 

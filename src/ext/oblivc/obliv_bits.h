@@ -44,7 +44,7 @@ static const __obliv_c__bool __obliv_c__trueCond = {{false,true}};
 //   in a normal C program, but rather through an obliv-c program.
 void __obliv_c__assignBitKnown(OblivBit* dest, bool value);
 void __obliv_c__copyBit(OblivBit* dest, const OblivBit* src);
-bool __obliv_c__bitIsKnown(const OblivBit* bit,bool* val);
+bool __obliv_c__bitIsKnown(bool* val,const OblivBit* bit);
 
 // TODO error vars
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b);
