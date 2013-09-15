@@ -129,8 +129,10 @@ let typeEqual t1 t2 =
 
 exception BitfieldAccess
 
+(*
 let targetSizeOf t 
   = kinteger !kindOfSizeOf ((bitsSizeOf !oblivBitType/8) * oblivBitsSizeOf t)
+*)
 
 (* Turn an expression into a three address expression (and queue some 
  * instructions in the process) *)
@@ -139,9 +141,12 @@ let rec makeThreeAddress
                               * return that temp *)
     (e: exp) : taExp = 
   match e with 
+  (*
   (* Might have to put these two lines (and others) inside constFold *)
+  multiplication already done in constFold
   | SizeOf t when isOblivSimpleOrArray t -> targetSizeOf t
   | SizeOfE x when isOblivSimpleOrArray (typeOf x) -> targetSizeOf (typeOf x)
+*)
   | SizeOf _ | SizeOfE _ | AlignOf _ |  AlignOfE _ | SizeOfStr _ -> 
       constFold true e
   | Const _ -> e

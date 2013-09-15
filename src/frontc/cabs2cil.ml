@@ -4620,8 +4620,8 @@ and doExp (asconst: bool)   (* This expression is used as a constant *)
   end
 
 and makeCastT_keepObliv e tsrc tdest = 
-  let tdest = if OblivUtils.isOblivSimple tsrc 
-                then OblivUtils.addOblivType tdest else tdest in
+  let tdest = if isOblivSimple tsrc 
+                then addOblivType tdest else tdest in
   makeCastT e tsrc tdest
 
 (* bop is always the arithmetic version. Change it to the appropriate pointer 
@@ -5878,7 +5878,7 @@ and doDecl (isglobal: bool) : A.definition -> chunk = function
               * as well *)
               !currentFunctionFDEC.svar.vtype <- ftype;
               !currentFunctionFDEC.sformals <- formals;
-              meObliv := OblivUtils.isOblivFunc ftype;
+              meObliv := isOblivFunc ftype;
             in
             (* Now change the type of transparent union args back to what it 
              * was so that the body type checks. We must do it this late 

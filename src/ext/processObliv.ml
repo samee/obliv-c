@@ -68,6 +68,7 @@ let updateOblivBitType ci = begin
   oblivBitType := TComp(ci,[]);
   oblivBitPtr := TPtr(!oblivBitType,[]);
   oblivConstBitPtr := typeAddAttributes [constAttr] !oblivBitPtr;
+  oblivBitsSize := bitsSizeOf !oblivBitType;
   let types = 
     [oblivBoolTarget,"__obliv_c__bool",1
     ;oblivCharTarget,"__obliv_c__char",bitsSizeOf charType
@@ -192,6 +193,8 @@ let rec dropFrozenAttr (t:typ) = match unrollType t with
 | TArray(t,exp,a) -> TArray(dropFrozenAttr t,exp,dropAttribute frozen a)
 | t -> typeRemoveAttributes [frozen] t
 
+(* Generally the purpose is typechecking, but also initializes globals in
+ * OblivUtils: oblivBitType, oblivBitPtr, oblivConstBitPtr *)
 class typeCheckVisitor = object(self)
   inherit nopCilVisitor
   val dt = new depthTracker

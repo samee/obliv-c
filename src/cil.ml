@@ -2408,12 +2408,62 @@ and offsetOfFieldAcc ~(fi: fieldinfo)
   if !msvcMode then offsetOfFieldAcc_MSVC fi sofar
   else offsetOfFieldAcc_GCC fi sofar
 
+and oblivBitsSize = ref 1
+
+and hasOblivAttr = hasAttribute "obliv"
+and addOblivAttr a = if not (hasOblivAttr a) 
+                       then addAttribute (Attr("obliv",[])) a
+                       else a
+and dropOblivAttr a = dropAttribute "obliv" a
+
+and addOblivType t = if not (hasOblivAttr (typeAttrs t)) then
+                       typeAddAttributes [Attr("obliv",[])] t
+                     else t
+
+and isOblivFunc t = match unrollType t with
+| TFun(_,_,_,a) -> hasOblivAttr a
+| _ -> false
+
+and isOblivSimple t = match unrollType t with
+| TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
+| _ -> false
+
+and isOblivSimpleOrArray t = match unrollType t with
+| TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
+| TArray(t,_,_) -> isOblivSimpleOrArray t
+| _ -> false
+
+and isNonOblivSimple t = match unrollType t with
+| TInt(_,a) | TFloat(_,a) -> not (hasOblivAttr a)
+| _ -> false
+
+(* Pre-flattening them becomes harder after the CFG is already made *)
+and isOblivBlock b = 
+  if hasOblivAttr b.battrs then true
+  else match b.bstmts with 
+  | [s] -> begin match s.skind with (* only one statement *)
+           | Block b2 -> isOblivBlock b2
+           | _ -> false
+           end
+  | _ -> false
+
+and isRipOblivBlock (b:block) : bool =
+  if hasAttribute "~obliv" b.battrs then true
+  else match b.bstmts with [{skind = Block b2}] -> isRipOblivBlock b2
+                         | _ -> false
+
+and unoblivType t = let t' = unrollType t in
+                    setTypeAttrs t' (dropOblivAttr (typeAttrs t'))
+
 (* The size of a type, in bits. If a struct or array, then trailing padding is 
  * added *)
 and bitsSizeOf t = 
   if not !initCIL_called then 
     E.s (E.error "You did not call Cil.initCIL before using the CIL library");
-  match t with 
+  match unrollType t with 
+  | TInt(IBool,a) when hasOblivAttr a -> !oblivBitsSize
+  | t when isOblivSimple t -> let base = bitsSizeOf (unoblivType t) in
+                              base * !oblivBitsSize
   | TInt (ik,_) -> 8 * (bytesSizeOfInt ik)
   | TFloat(FDouble, _) -> 8 * !M.theMachine.M.sizeof_double
   | TFloat(FLongDouble, _) -> 8 * !M.theMachine.M.sizeof_longdouble
@@ -2421,7 +2471,8 @@ and bitsSizeOf t =
   | TEnum (ei, _) -> bitsSizeOf (TInt(ei.ekind, []))
   | TPtr _ -> 8 * !M.theMachine.M.sizeof_ptr
   | TBuiltin_va_list _ -> 8 * !M.theMachine.M.sizeof_ptr
-  | TNamed (t, _) -> bitsSizeOf t.ttype
+  | TNamed (t, _) -> bitsSizeOf t.ttype  (* should not match, only to shut up
+                                            ocaml  *)
   | TComp (comp, _) when comp.cfields == [] -> begin
       (* Empty structs are allowed in msvc mode *)
       if not comp.cdefined && not !msvcMode then

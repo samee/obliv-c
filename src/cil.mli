@@ -2544,12 +2544,32 @@ val intKindForSize : int -> bool -> ikind
 val floatKindForSize : int-> fkind
 
 (** The size in bytes of the given int kind. *)
-val bytesSizeOfInt: ikind -> int 
+val bytesSizeOfInt : ikind -> int 
+
+(* Moved from OblivUtils for dependency problems. CIL Makefile can't seem to
+ * handle cyclic dependencies *)
+(** Size of of struct OblivBit *)
+val oblivBitsSize : int ref
+
+val hasOblivAttr : attributes -> bool
+val addOblivAttr : attributes -> attributes
+val dropOblivAttr : attributes -> attributes
+val addOblivType : typ -> typ
+val unoblivType : typ -> typ
+
+val isOblivFunc : typ -> bool
+val isOblivSimple : typ -> bool
+val isOblivSimpleOrArray : typ -> bool
+val isNonOblivSimple : typ -> bool
+val isOblivBlock : block -> bool
+val isRipOblivBlock : block -> bool
 
 (** The size of a type, in bits. Trailing padding is added for structs and 
  * arrays. Raises {!Cil.SizeOfError} when it cannot compute the size. This 
  * function is architecture dependent, so you should only call this after you 
- * call {!Cil.initCIL}. Remember that on GCC sizeof(void) is 1! *)
+ * call {!Cil.initCIL}. Remember that on GCC sizeof(void) is 1! 
+ * The size of an obliv types will be correct only after oblivBitSize 
+ * has been initialized (this happens in ProcessObliv.typechecker) *)
 val bitsSizeOf: typ -> int
 
 (** Represents an integer as for a given kind.  Returns a truncation
