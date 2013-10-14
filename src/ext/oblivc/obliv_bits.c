@@ -5,6 +5,8 @@
 #include <inttypes.h>
 #include <stdio.h>      // for protoUseStdio()
 #include <string.h>
+#include <netinet/ip.h>
+#include <netdb.h>
 #include <gcrypt.h>
 
 // Q: What's with all these casts to and from void* ?
@@ -26,12 +28,12 @@ struct stdioTransport
 static bool* stdioFlushFlag(ProtocolDesc* pd)
   { return &((struct stdioTransport*)pd->trans)->needFlush; }
 
-static int stdioSend(ProtocolDesc* pd,int dest,const void* s,size_t n)
+static int stdioSend(ProtocolDesc* pd,int dest,int c,const void* s,size_t n)
 { *stdioFlushFlag(pd)=true;
   return fwrite(s,1,n,stdout); 
 }
 
-static int stdioRecv(ProtocolDesc* pd,int src,void* s,size_t n)
+static int stdioRecv(ProtocolDesc* pd,int src,int c,void* s,size_t n)
 { 
   bool *p = stdioFlushFlag(pd);
   if(*p) { fflush(stdout); *p=false; }
@@ -40,11 +42,102 @@ static int stdioRecv(ProtocolDesc* pd,int src,void* s,size_t n)
 
 static void stdioCleanup(ProtocolDesc* pd) {}
 
+// Extremely simple, no multiplexing: two parties, one connection
 static struct stdioTransport stdioTransport 
-  = {{ stdioSend, stdioRecv, stdioCleanup},false};
+  = {{2, 1, stdioSend, stdioRecv, stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
+
+
+// TCP connections for 2-Party protocols. Ignorse src/dest parameters
+//   since there is only one remote
+struct tcp2PTransport
+{ ProtocolTransport cb;
+  int* socks; // size = cb.maxChannels
+};
+
+static int tcp2PSend(ProtocolDesc* pd,int dest,int c,const void* s,size_t n)
+  { return write(((struct tcp2PTransport*)pd->trans)->socks[c],s,n); }
+
+static int tcp2PRecv(ProtocolDesc* pd,int src,int c,void* s,size_t n)
+  { return read(((struct tcp2PTransport*)pd->trans)->socks[c],s,n); }
+
+static void tcp2PCleanup(ProtocolDesc* pd)
+{ struct tcp2PTransport* t = (struct tcp2PTransport*)pd->trans;
+  int i;
+  for(i=0;i<t->cb.maxChannels;++i) close(t->socks[i]);
+  free(t->socks);
+  free(t);
+}
+
+static struct tcp2PTransport tcp2PTransport
+  = {{2, 0, tcp2PSend, tcp2PRecv, tcp2PCleanup}, NULL};
+
+void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
+{
+  struct tcp2PTransport* trans;
+  trans = malloc(sizeof(*trans));
+  *trans = tcp2PTransport;
+  trans->socks = malloc(sizeof(int)*sockCount);
+  memcpy(trans->socks,socks,sizeof(int)*sockCount);
+  trans->cb.maxChannels = sockCount;
+}
+
+static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
+{
+  struct addrinfo* list;
+  if(getaddrinfo(name,port,NULL,&list) < 0) return -1;
+  memcpy(res,list->ai_addr,list->ai_addrlen);
+  freeaddrinfo(list);
+  return 0;
+}
+// used as sock=tcpConnect(...); ...; close(sock);
+static int tcpConnect(const char* name, const char* port)
+{
+  int outsock;
+  struct sockaddr_in sa;
+
+  if((outsock=socket(AF_INET,SOCK_STREAM,0))<0) return -1;
+  getsockaddr(name,port,(struct sockaddr*)&sa);
+  if(connect(outsock,(struct sockaddr*)&sa,sizeof(sa))<0) return -1;
+  return outsock;
+}
+
+int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port,
+                          int sockCount)
+{
+  int i, *socks = malloc(sizeof(int)*sockCount);
+  for(i=0;i<sockCount;++i) if((socks[i]=tcpConnect(server,port))<0) return -1;
+  protocolUseTcp2P(pd,socks,sockCount);
+  free(socks);
+  return 0;
+}
+
+// used as sock=tcpListenAny(...); sock2=accept(sock); ...; close(both);
+static int tcpListenAny(const char* portn)
+{
+  in_port_t port;
+  int outsock;
+  if(sscanf(portn,"%hu",&port)<1) return -1;
+  if((outsock=socket(AF_INET,SOCK_STREAM,0))<0) return -1;
+  struct sockaddr_in sa = { .sin_family=AF_INET, .sin_port=htons(port)
+                          , .sin_addr={INADDR_ANY} };
+  if(bind(outsock,(struct sockaddr*)&sa,sizeof(sa))<0) return -1;
+  if(listen(outsock,SOMAXCONN)<0) return -1;
+  return outsock;
+}
+int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount)
+{
+  int i, listenSock, *socks = malloc(sizeof(int)*sockCount);
+  listenSock = tcpListenAny(port);
+  for(i=0;i<sockCount;++i) if((socks[i]=accept(listenSock,0,0))<0) return -1;
+  protocolUseTcp2P(pd,socks,sockCount);
+  close(listenSock);
+  free(socks);
+  return 0;
+}
+// ---------------------------------------------------------------------------
 
 void cleanupProtocol(ProtocolDesc* pd)
   { pd->trans->cleanup(pd); }

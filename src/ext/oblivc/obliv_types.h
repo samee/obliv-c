@@ -52,8 +52,9 @@ struct ProtocolDesc {
 };
 
 typedef struct ProtocolTransport {
-  int (*send)(ProtocolDesc*,int,const void*,size_t);
-  int (*recv)(ProtocolDesc*,int,      void*,size_t);
+  int maxParties, maxChannels;
+  int (*send)(ProtocolDesc*,int,int,const void*,size_t);
+  int (*recv)(ProtocolDesc*,int,int,      void*,size_t);
   void (*cleanup)(ProtocolDesc*);
 } ProtocolTransport;
 
