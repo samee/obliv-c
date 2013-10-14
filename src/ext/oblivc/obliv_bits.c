@@ -82,6 +82,7 @@ void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
   trans->socks = malloc(sizeof(int)*sockCount);
   memcpy(trans->socks,socks,sizeof(int)*sockCount);
   trans->cb.maxChannels = sockCount;
+  pd->trans = (ProtocolTransport*)trans;
 }
 
 static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
