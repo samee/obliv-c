@@ -64,4 +64,6 @@ struct OblivInputs {
   size_t size;
 };
 
+// Type of the 'main' function being compiled in obliv-c
+typedef void (*protocol_run)(void*);
 #endif // OBLIV_TYPES_H

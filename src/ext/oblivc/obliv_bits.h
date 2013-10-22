@@ -24,9 +24,6 @@ typedef struct OblivBit {
   };
 } OblivBit;
 
-// Type of the 'main' function being compiled in obliv-c
-typedef void (*protocol_run)(void*);
-
 #define bitsize(type) (8*sizeof(type))
 
 // Note: these structs are often freely casted to and from OblivBit* and void*

@@ -10,6 +10,14 @@ void setupOblivLLong(OblivInputs* spec, obliv long long * dest, long long v);
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party);
 
+// Single variable feeding convenience functions
+obliv bool feedOblivBool(bool v,int party);
+obliv char feedOblivChar(char v,int party);
+obliv short feedOblivShort(short v,int party);
+obliv int feedOblivInt(int v,int party);
+obliv long feedOblivLong(long v,int party);
+obliv long long feedOblivLLong(long long v,int party);
+
 bool revealOblivBool(obliv bool src,int party);
 char revealOblivChar(obliv char src,int party);
 int revealOblivInt(obliv int src,int party);

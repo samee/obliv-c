@@ -1028,6 +1028,24 @@ void setupOblivLLong(OblivInputs* spec, __obliv_c__lLong* dest, long long v)
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
   { currentProto.feedOblivInputs(&currentProto,spec,count,party); }
 
+#define feedOblivFun(t,ot,tname) \
+    __obliv_c__##ot feedObliv##tname (t v,int party) \
+    { __obliv_c__##ot rv; \
+      OblivInputs spec; \
+      setupObliv##tname(&spec,&rv,v); \
+      feedOblivInputs(&spec,1,party); \
+      return rv; \
+    }
+
+feedOblivFun(bool,bool,Bool)
+feedOblivFun(char,char,Char)
+feedOblivFun(short,short,Short)
+feedOblivFun(int,int,Int)
+feedOblivFun(long,long,Long)
+feedOblivFun(long long,lLong,LLong)
+
+#undef feedOblivFun
+
 // TODO pass const values by ref later
 bool revealOblivBool(__obliv_c__bool src,int party)
   { return (bool)__obliv_c__revealOblivBits(src.bits,1,party); }
