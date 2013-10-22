@@ -1,0 +1,40 @@
+#!/bin/bash
+OCCPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/../ && pwd )"
+OCLIB=$OCCPATH/src/ext/oblivc
+COMPILE_ONLY=0
+CCARGS=""
+CILLYARGS=""
+OCSRC=()
+
+while [ $# -ge 1 ]; do
+  if [ "$1" = "-c" ]; then
+    COMPILE_ONLY=1
+    CCARGS+="-c "
+  elif [ "${1%.oc}" != "$1" ]; then
+    OCSRC+=($1)
+    CCARGS+="$1.cil.c "
+  else
+    if [ "$1" = '-L' ]; then
+      CILLYARGS+="-L $2 "
+      CCARGS+="-L $2 "
+      shift
+    elif [ "$1" = '-I' ]; then
+      CILLYARGS+="-I $2 "
+      CCARGS+="-I $2 "
+      shift
+    else
+      CCARGS+="$1 "
+    fi
+  fi
+  shift
+done
+
+for src in ${OCSRC[*]}; do
+  if [ ! -e $src ]; then
+    echo "Cound not find source file $src"
+    exit
+  fi
+  $OCCPATH/bin/cilobliv $src -I $OCLIB $CILLYARGS || exit
+done
+
+gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/obj/x86_LINUX -lgcrypt
