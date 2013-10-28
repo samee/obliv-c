@@ -14,7 +14,7 @@
 //      Might fix it some day. But user code never sees these anyway.
 
 // Right now, we do not support multiple protocols at the same time
-static ProtocolDesc currentProto;
+static ProtocolDesc *currentProto;
 
 inline bool known(const OblivBit* o) { return !o->unknown; }
 
@@ -164,7 +164,7 @@ void dbgProtoSetBitAnd(ProtocolDesc* pd,
 {
   dest->knownValue= (a->knownValue&& b->knownValue);
   dest->unknown = true;
-  currentProto.debug.mulCount++;
+  currentProto->debug.mulCount++;
 }
 
 void dbgProtoSetBitOr(ProtocolDesc* pd,
@@ -172,14 +172,14 @@ void dbgProtoSetBitOr(ProtocolDesc* pd,
 {
   dest->knownValue= (a->knownValue|| b->knownValue);
   dest->unknown = true;
-  currentProto.debug.mulCount++;
+  currentProto->debug.mulCount++;
 }
 void dbgProtoSetBitXor(ProtocolDesc* pd,
     OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   dest->knownValue= (!!a->knownValue != !!b->knownValue);
   dest->unknown = true;
-  currentProto.debug.xorCount++;
+  currentProto->debug.xorCount++;
 }
 void dbgProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
 {
@@ -209,7 +209,7 @@ void gcryDefaultLibInit(void)
 
 static void yaoKeyDebug(const yao_key_t k)
 { int i;
-  fprintf(stderr,"%d: ",currentProto.thisParty);
+  fprintf(stderr,"%d: ",currentProto->thisParty);
   for(i=YAO_KEY_BYTES-1;i>=0;--i) fprintf(stderr,"%02x ",0xff&k[i]);
   fprintf(stderr,"\n");
 }
@@ -442,7 +442,7 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   r->unknown = true;
 }
 
-unsigned yaoGateCount() { return currentProto.yao.gcount; }
+unsigned yaoGateCount() { return currentProto->yao.gcount; }
 
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
@@ -474,7 +474,7 @@ void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     pd->yao.sender = npotSenderNew(1<<OT_BATCH_SIZE,pd,me);
   }else pd->yao.recver = npotRecverNew(1<<OT_BATCH_SIZE,pd,me);
 
-  currentProto = *pd;
+  currentProto = pd;
   start(arg);
 
   if(me==1) npotSenderRelease(pd->yao.sender);
@@ -487,7 +487,7 @@ void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
   { if(!known(a)) { const OblivBit* t=a; a=b; b=t; }
     if(a->knownValue) __obliv_c__copyBit(dest,b);
     else __obliv_c__assignBitKnown(dest,false);
-  }else currentProto.setBitAnd(&currentProto,dest,a,b);
+  }else currentProto->setBitAnd(currentProto,dest,a,b);
 }
 void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
@@ -495,7 +495,7 @@ void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
   { if(!known(a)) { const OblivBit* t=a; a=b; b=t; }
     if(!a->knownValue) __obliv_c__copyBit(dest,b);
     else __obliv_c__assignBitKnown(dest,true);
-  }else currentProto.setBitOr(&currentProto,dest,a,b);
+  }else currentProto->setBitOr(currentProto,dest,a,b);
 }
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
@@ -505,15 +505,15 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
     v = a->knownValue;
     __obliv_c__copyBit(dest,b);
     if(v) __obliv_c__flipBit(dest);
-  }else currentProto.setBitXor(&currentProto,dest,a,b); 
+  }else currentProto->setBitXor(currentProto,dest,a,b); 
 }
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
 { if(known(dest)){ *dest=*a; dest->knownValue=!dest->knownValue; }
-  else currentProto.setBitNot(&currentProto,dest,a); 
+  else currentProto->setBitNot(currentProto,dest,a); 
 }
 void __obliv_c__flipBit(OblivBit* dest) 
 { if(known(dest)) dest->knownValue = !dest->knownValue;
-  else currentProto.flipBit(&currentProto,dest); 
+  else currentProto->flipBit(currentProto,dest); 
 }
 
 static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
@@ -523,8 +523,8 @@ static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
   dest->unknown=true;
   if(party==1) { if(curparty==1) dest->knownValue=a; }
   else if(party==2 && curparty == 1) 
-    orecv(&currentProto,1,&dest->knownValue,sizeof(bool));
-  else if(party==2 && curparty == 2) osend(&currentProto,1,&a,sizeof(bool));
+    orecv(currentProto,1,&dest->knownValue,sizeof(bool));
+  else if(party==2 && curparty == 2) osend(currentProto,1,&a,sizeof(bool));
   else fprintf(stderr,"Error: This is a 2 party protocol\n");
 }
   /*
@@ -554,14 +554,14 @@ void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
 
 /*
 bool __obliv_c__revealOblivBool(const OblivBit* dest,int party)
-{ if(party!=0 && party!=currentProto.thisParty) return false;
+{ if(party!=0 && party!=currentProto->thisParty) return false;
   else return dest->knownValue;
 }
 */
 widest_t dbgProtoRevealOblivBits
   (ProtocolDesc* pd,const OblivBit* dest,size_t size,int party)
 { widest_t rv=0;
-  if(currentProto.thisParty==1)
+  if(currentProto->thisParty==1)
   { dest+=size;
     while(size-->0) rv = (rv<<1)+!!(--dest)->knownValue;
     if(party==0 || party==2) osend(pd,2,&rv,sizeof(rv));
@@ -576,9 +576,9 @@ widest_t dbgProtoRevealOblivBits
 static void broadcastBits(int source,void* p,size_t n)
 {
   int i;
-  if(currentProto.thisParty!=source) orecv(&currentProto,source,p,n);
-  else for(i=1;i<=currentProto.partyCount;++i) if(i!=source)
-      osend(&currentProto,i,p,n);
+  if(currentProto->thisParty!=source) orecv(currentProto,source,p,n);
+  else for(i=1;i<=currentProto->partyCount;++i) if(i!=source)
+      osend(currentProto,i,p,n);
 }
 
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
@@ -591,16 +591,16 @@ void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pd->setBitNot = dbgProtoSetBitNot;
   pd->flipBit   = dbgProtoFlipBit;
   pd->partyCount= 2;
-  currentProto = *pd;
-  currentProto.debug.mulCount = currentProto.debug.xorCount = 0;
+  currentProto = pd;
+  currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
   start(arg);
 }
 
 widest_t __obliv_c__revealOblivBits(const OblivBit* dest, size_t size,
     int party)
-  { return currentProto.revealOblivBits(&currentProto,dest,size,party); }
+  { return currentProto->revealOblivBits(currentProto,dest,size,party); }
 
-int __obliv_c__currentParty() { return currentProto.thisParty; }
+int __obliv_c__currentParty() { return currentProto->thisParty; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)
@@ -1026,7 +1026,7 @@ void setupOblivLLong(OblivInputs* spec, __obliv_c__lLong* dest, long long v)
   { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
-  { currentProto.feedOblivInputs(&currentProto,spec,count,party); }
+  { currentProto->feedOblivInputs(currentProto,spec,count,party); }
 
 #define feedOblivFun(t,ot,tname) \
     __obliv_c__##ot feedObliv##tname (t v,int party) \
