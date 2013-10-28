@@ -3,12 +3,13 @@
 #include<memory.h>
 #include<time.h>
 
-#include"testedit.h"
+#include"editdist.h"
 
 
+int currentParty;
 const char* mySide()
 {
-  if(__obliv_c__currentParty()==1) return "Generator";
+  if(currentParty==1) return "Generator";
   else return "Evaluator";
 }
 
@@ -41,7 +42,8 @@ int main(int argc,char *argv[])
   }
 
   protocolUseStdio(&pd);
-  setCurrentParty(&pd,argv[1][0]=='1'?1:2);
+  currentParty = (argv[1][0]=='1'?1:2);
+  setCurrentParty(&pd,currentParty);
   lap = wallClock();
   execYaoProtocol(&pd,editDistance,&io);
   fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);

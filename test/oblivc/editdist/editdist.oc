@@ -1,7 +1,7 @@
 #include<stdio.h>
 #include<obliv.oh>
 
-#include"testedit.h"
+#include"editdist.h"
 
 void readString(obliv char* dest, int n, const char* src,int party)
 {
@@ -30,7 +30,6 @@ void editDistance(void* args)
   obliv char s1[MAXN], s2[MAXN];
   obliv int dp[MAXN+1][MAXN+1];
 
-  obliv bool a,b,c;
   n1 = ocBroadcastInt(1,io->n);
   n2 = ocBroadcastInt(2,io->n);
   readString(s1,n1,io->s,1);
