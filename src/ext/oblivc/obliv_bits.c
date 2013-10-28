@@ -241,25 +241,33 @@ void yaoSetHashMask(yao_key_t d,const yao_key_t a,const yao_key_t b,
   gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
   memcpy(d,dest,YAO_KEY_BYTES);
 }
-void yaoKeyNewPair(ProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
+void yaoKeyNewPair(YaoProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
 {
-  unsigned* ic = &pd->yao.icount;
+  unsigned* ic = &pd->icount;
   char buf[YAO_KEY_BYTES+sizeof(*ic)], dest[20];
-  memcpy(buf,pd->yao.I,YAO_KEY_BYTES);
+  memcpy(buf,pd->I,YAO_KEY_BYTES);
   memcpy(buf+YAO_KEY_BYTES,ic,sizeof(*ic));
   (*ic)++;
   gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
   memcpy(w0,dest,YAO_KEY_BYTES);
   yaoKeyCopy(w1,w0);
-  yaoKeyXor(w1,pd->yao.R);
+  yaoKeyXor(w1,pd->R);
 }
 
-void yaoSetBitAnd(ProtocolDesc* pd,OblivBit* r,
+// Because I am evil and I do not like 
+// Java-style redundant "say the type twice" practice
+#define CAST(p) ((void*)p)
+
+void yaoSetBitAnd(ProtocolDesc* pdsuper,OblivBit* r,
                   const OblivBit* a,const OblivBit* b)
-  { pd->yao.nonFreeGate(pd,r,0x8,a,b); }
-void yaoSetBitOr(ProtocolDesc* pd,OblivBit* r,
+{ YaoProtocolDesc* pd = CAST(pdsuper);
+  pd->nonFreeGate(pd,r,0x8,a,b); 
+}
+void yaoSetBitOr(ProtocolDesc* pdsuper,OblivBit* r,
                  const OblivBit* a,const OblivBit* b)
-  { pd->yao.nonFreeGate(pd,r,0xE,a,b); }
+{ YaoProtocolDesc* pd = CAST(pdsuper);
+  pd->nonFreeGate(pd,r,0xE,a,b); 
+}
 void yaoSetBitXor(ProtocolDesc* pd,OblivBit* r,
                  const OblivBit* a,const OblivBit* b)
 {
@@ -287,19 +295,20 @@ static int bitCount(OIBitSrc* s)
   for(i=0;i<s->n;++i) res+=s->oi[i].size;
   return res;
 }
-
-void yaoGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
+void yaoGenrFeedOblivInputs(ProtocolDesc* pdsuper
+                           ,OblivInputs* oi,size_t n,int src)
 { 
+  YaoProtocolDesc* pd = CAST(pdsuper);
   yao_key_t w0,w1;
   OIBitSrc it = {0,0,oi,n};
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
     yaoKeyNewPair(pd,w0,w1);
-    if(curBit(&it)) osend(pd,2,w1,YAO_KEY_BYTES);
-    else osend(pd,2,w0,YAO_KEY_BYTES);
+    if(curBit(&it)) osend(pdsuper,2,w1,YAO_KEY_BYTES);
+    else osend(pdsuper,2,w0,YAO_KEY_BYTES);
     o->yao.inverted = false; o->unknown = true;
     yaoKeyCopy(o->yao.w,w0);
-    pd->yao.icount++;
+    pd->icount++;
   }else 
   {
     char buf0[OT_BATCH_SIZE*YAO_KEY_BYTES], buf1[OT_BATCH_SIZE*YAO_KEY_BYTES];
@@ -312,22 +321,24 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
       yaoKeyCopy(buf1+bp*YAO_KEY_BYTES,w1);
       o->yao.inverted = false; o->unknown = true;
       yaoKeyCopy(o->yao.w,w0);
-      pd->yao.icount++;
+      pd->icount++;
       if(++bp>=OT_BATCH_SIZE)
-      { npotSend1Of2Once(pd->yao.sender,buf0,buf1,OT_BATCH_SIZE,YAO_KEY_BYTES);
+      { npotSend1Of2Once(pd->sender,buf0,buf1,OT_BATCH_SIZE,YAO_KEY_BYTES);
         bp=0;
       }
     }
-    if(bp>0) npotSend1Of2Once(pd->yao.sender,buf0,buf1,bp,YAO_KEY_BYTES);
+    if(bp>0) npotSend1Of2Once(pd->sender,buf0,buf1,bp,YAO_KEY_BYTES);
   }
 }
-void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
+void yaoEvalFeedOblivInputs(ProtocolDesc* pdsuper
+                           ,OblivInputs* oi,size_t n,int src)
 { OIBitSrc it = {0,0,oi,n};
+  YaoProtocolDesc* pd = CAST(pdsuper);
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
-    orecv(pd,1,o->yao.w,YAO_KEY_BYTES);
+    orecv(pdsuper,1,o->yao.w,YAO_KEY_BYTES);
     o->unknown = true;
-    pd->yao.icount++;
+    pd->icount++;
   }else 
   { char buf[OT_BATCH_SIZE*YAO_KEY_BYTES], *dest[OT_BATCH_SIZE];
     int mask=0;
@@ -337,60 +348,63 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
       dest[bp]=o->yao.w;
       mask|=(curBit(&it)?1<<bp:0);
       o->unknown = true; // Known to me, but not to both parties
-      pd->yao.icount++;
+      pd->icount++;
       if(++bp>=OT_BATCH_SIZE)
-      { npotRecv1Of2Once(pd->yao.recver,buf,mask,OT_BATCH_SIZE,YAO_KEY_BYTES);
+      { npotRecv1Of2Once(pd->recver,buf,mask,OT_BATCH_SIZE,YAO_KEY_BYTES);
         for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
         bp=0;
         mask=0;
       }
     }
     if(bp>0)
-    { npotRecv1Of2Once(pd->yao.recver,buf,mask,bp,YAO_KEY_BYTES);
+    { npotRecv1Of2Once(pd->recver,buf,mask,bp,YAO_KEY_BYTES);
       for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
     }
   }
 }
 
-widest_t yaoGenrRevealOblivBits(ProtocolDesc* pd,
+widest_t yaoGenrRevealOblivBits(ProtocolDesc* pdsuper,
     const OblivBit* o,size_t n,int party)
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
+  YaoProtocolDesc *pd = CAST(pdsuper);
   for(i=0;i<n;++i) if(o[i].unknown)
     flipflags |= ((yaoKeyLsb(o[i].yao.w) != o[i].yao.inverted)?1LL<<i:0);
   // Assuming little endian
-  if(party != 1) osend(pd,2,&flipflags,bc);
-  if(party != 2) { orecv(pd,2,&rv,bc); rv^=flipflags; }
+  if(party != 1) osend(pdsuper,2,&flipflags,bc);
+  if(party != 2) { orecv(pdsuper,2,&rv,bc); rv^=flipflags; }
   for(i=0;i<n;++i) if(!o[i].unknown && o[i].knownValue)
     rv |= (1LL<<i);
-  pd->yao.ocount+=n;
+  pd->ocount+=n;
   return rv;
 }
-widest_t yaoEvalRevealOblivBits(ProtocolDesc* pd,
+widest_t yaoEvalRevealOblivBits(ProtocolDesc* pdsuper,
     const OblivBit* o,size_t n,int party)
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
+  YaoProtocolDesc* pd = CAST(pdsuper);
   for(i=0;i<n;++i) if(o[i].unknown)
     flipflags |= (yaoKeyLsb(o[i].yao.w)?1LL<<i:0);
   // Assuming little endian
-  if(party != 1) { orecv(pd,1,&rv,bc); rv^=flipflags; }
-  if(party != 2) osend(pd,1,&flipflags,bc);
+  if(party != 1) { orecv(pdsuper,1,&rv,bc); rv^=flipflags; }
+  if(party != 2) osend(pdsuper,1,&flipflags,bc);
   for(i=0;i<n;++i) if(!o[i].unknown && o[i].knownValue)
     rv |= (1LL<<i);
-  pd->yao.ocount+=n;
+  pd->ocount+=n;
   return rv;
 }
 
 // Encodes a 2-input truth table for f(a,b) = ((ttable&(1<<(2*a+b)))!=0)
-void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
+void yaoGenerateGate(YaoProtocolDesc* pd, OblivBit* r, char ttable, 
     const OblivBit* a, const OblivBit* b)
-{ uint64_t k = pd->yao.gcount;
+{ 
+  uint64_t k = pd->gcount;
   int im=0,i;
   yao_key_t wa,wb,wc,wt;
   yao_key_t wdebug;
-  const char* R = pd->yao.R;
+  const char* R = pd->R;
 
   // adjust truth table according to invert fields (faster with im^=...) TODO
   if(a->yao.inverted) ttable = (((ttable&3)<<2)|((ttable>>2)&3));
@@ -412,16 +426,16 @@ void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
     yaoSetHashMask(wt,wa,wb,k,i);
     yaoKeyXor(wt,wc);
     if(ttable&(1<<(i^im))) yaoKeyXor(wt,R);
-    osend(pd,2,wt,YAO_KEY_BYTES);
+    osend(PROTOCOL_DESC(pd),2,wt,YAO_KEY_BYTES);
   }
 
   // r may alias a and b, so modify at the end
   yaoKeyCopy(r->yao.w,wc);
   r->unknown = true; r->yao.inverted = false;
-  pd->yao.gcount++;
+  pd->gcount++;
 }
 
-void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
+void yaoEvaluateGate(YaoProtocolDesc* pd, OblivBit* r, char ttable, 
   const OblivBit* a, const OblivBit* b)
 {
   int i=0,j;
@@ -432,53 +446,54 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   // I wonder: can the generator do timing attacks here?
   if(i==0) yaoKeyCopy(w,t);
   for(j=1;j<4;++j)
-  { orecv(pd,1,t,sizeof(yao_key_t));
+  { orecv(PROTOCOL_DESC(pd),1,t,sizeof(yao_key_t));
     if(i==j) yaoKeyCopy(w,t);
   }
-  yaoSetHashMask(t,a->yao.w,b->yao.w,pd->yao.gcount++,i);
+  yaoSetHashMask(t,a->yao.w,b->yao.w,pd->gcount++,i);
   yaoKeyXor(w,t);
   // r may alias a and b, so modify at the end
   yaoKeyCopy(r->yao.w,w);
   r->unknown = true;
 }
 
-unsigned yaoGateCount() { return currentProto->yao.gcount; }
+unsigned yaoGateCount() { return ((YaoProtocolDesc*)currentProto)->gcount; }
 
-void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+void execYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
 {
-  int me = pd->thisParty;
+  ProtocolDesc* pdb = &pd->base;
+  int me = pdb->thisParty;
   int tailind,tailpos;
-  pd->partyCount = 2;
-  pd->yao.nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
-  pd->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
-  pd->revealOblivBits = (me==1?yaoGenrRevealOblivBits:yaoEvalRevealOblivBits);
-  pd->setBitAnd = yaoSetBitAnd;
-  pd->setBitOr  = yaoSetBitOr;
-  pd->setBitXor = yaoSetBitXor;
-  pd->setBitNot = yaoSetBitNot;
-  pd->flipBit   = yaoFlipBit;
-  pd->yao.gcount = pd->yao.icount = pd->yao.ocount = 0;
+  pdb->partyCount = 2;
+  pd->nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
+  pdb->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
+  pdb->revealOblivBits = (me==1?yaoGenrRevealOblivBits:yaoEvalRevealOblivBits);
+  pdb->setBitAnd = yaoSetBitAnd;
+  pdb->setBitOr  = yaoSetBitOr;
+  pdb->setBitXor = yaoSetBitXor;
+  pdb->setBitNot = yaoSetBitNot;
+  pdb->flipBit   = yaoFlipBit;
+  pd->gcount = pd->icount = pd->ocount = 0;
 
   dhRandomInit();
 
   if(me==1)
   {
-    gcry_randomize(pd->yao.R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
-    gcry_randomize(pd->yao.I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
-    pd->yao.R[0] |= 1;   // flipper bit
+    gcry_randomize(pd->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    gcry_randomize(pd->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    pd->R[0] |= 1;   // flipper bit
 
     tailind=YAO_KEY_BYTES-1;
     tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
-    pd->yao.R[tailind] &= (1<<tailpos)-1;
-    pd->yao.I[tailind] &= (1<<tailpos)-1;
-    pd->yao.sender = npotSenderNew(1<<OT_BATCH_SIZE,pd,me);
-  }else pd->yao.recver = npotRecverNew(1<<OT_BATCH_SIZE,pd,me);
+    pd->R[tailind] &= (1<<tailpos)-1;
+    pd->I[tailind] &= (1<<tailpos)-1;
+    pd->sender = npotSenderNew(1<<OT_BATCH_SIZE,pdb,me);
+  }else pd->recver = npotRecverNew(1<<OT_BATCH_SIZE,pdb,me);
 
-  currentProto = pd;
+  currentProto = pdb;
   start(arg);
 
-  if(me==1) npotSenderRelease(pd->yao.sender);
-  else npotRecverRelease(pd->yao.recver);
+  if(me==1) npotSenderRelease(pd->sender);
+  else npotRecverRelease(pd->recver);
 }
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)

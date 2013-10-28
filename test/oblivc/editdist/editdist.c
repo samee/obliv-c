@@ -25,7 +25,7 @@ double lap;
 
 int main(int argc,char *argv[])
 {
-  ProtocolDesc pd;
+  YaoProtocolDesc pd;
   protocolIO io;
   if(argc<3)
   { if(argc<2) fprintf(stderr,"Party missing\n");
@@ -41,14 +41,14 @@ int main(int argc,char *argv[])
     return 1;
   }
 
-  protocolUseStdio(&pd);
+  protocolUseStdio(PROTOCOL_DESC(&pd));
   currentParty = (argv[1][0]=='1'?1:2);
-  setCurrentParty(&pd,currentParty);
+  setCurrentParty(PROTOCOL_DESC(&pd),currentParty);
   lap = wallClock();
   execYaoProtocol(&pd,editDistance,&io);
   fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);
   fprintf(stderr,"%u\n",yaoGateCount());
-  cleanupProtocol(&pd);
+  cleanupProtocol(PROTOCOL_DESC(&pd));
   fprintf(stderr,"Result: %d\n",io.res);
   return 0;
 }

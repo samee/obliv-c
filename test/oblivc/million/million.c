@@ -6,7 +6,7 @@
 
 int main(int argc,char *argv[])
 {
-  ProtocolDesc pd;
+  YaoProtocolDesc pd;
   protocolIO io;
   if(argc<3)
   { if(argc<2) fprintf(stderr,"Party missing\n");
@@ -17,10 +17,10 @@ int main(int argc,char *argv[])
 
   // missing format check TODO
   sscanf(argv[2],"%d",&io.mywealth);
-  protocolUseStdio(&pd);
-  setCurrentParty(&pd,argv[1][0]=='1'?1:2);
+  protocolUseStdio(PROTOCOL_DESC(&pd));
+  setCurrentParty(PROTOCOL_DESC(&pd),argv[1][0]=='1'?1:2);
   execYaoProtocol(&pd,millionaire,&io);
-  cleanupProtocol(&pd);
+  cleanupProtocol(PROTOCOL_DESC(&pd));
   fprintf(stderr,"Result: %d\n",io.cmp);
   return 0;
 }

@@ -30,14 +30,7 @@ struct ProtocolDesc {
   int partyCount, thisParty;
   struct ProtocolTransport* trans;
   union // a struct for each protocol-specific info
-  { struct 
-    { yao_key_t R,I; // LSB of R needs to be 1
-      uint64_t gcount;
-      unsigned icount, ocount;
-      void (*nonFreeGate)(ProtocolDesc*,OblivBit*,char,
-          const OblivBit*,const OblivBit*);
-      union { struct NpotSender* sender; struct NpotRecver* recver; };
-    } yao;
+  { 
     struct { unsigned mulCount,xorCount; } debug;
   };
 
@@ -50,6 +43,18 @@ struct ProtocolDesc {
   void (*setBitNot)(ProtocolDesc*,OblivBit*,const OblivBit*);
   void (*flipBit  )(ProtocolDesc*,OblivBit*); // Sometimes avoids a struct copy
 };
+
+#define PROTOCOL_DESC(p) (&(p)->base)
+
+typedef struct YaoProtocolDesc {
+  struct ProtocolDesc base;
+  yao_key_t R,I; // LSB of R needs to be 1
+  uint64_t gcount;
+  unsigned icount, ocount;
+  void (*nonFreeGate)(struct YaoProtocolDesc*,OblivBit*,char,
+      const OblivBit*,const OblivBit*);
+  union { struct NpotSender* sender; struct NpotRecver* recver; };
+} YaoProtocolDesc;
 
 typedef struct ProtocolTransport {
   int maxParties, maxChannels;
