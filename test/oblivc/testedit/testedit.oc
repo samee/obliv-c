@@ -1,0 +1,52 @@
+#include<stdio.h>
+#include<obliv.oh>
+
+#include"testedit.h"
+
+void readString(obliv char* dest, int n, const char* src,int party)
+{
+  OblivInputs specs[MAXN];
+  int i;
+  for(i=0;i<n;++i) setupOblivChar(specs+i,dest+i,src[i]);
+  feedOblivInputs(specs,n,party);
+}
+
+typedef obliv int oint;
+// This is where the obliv keyword is just an overhead that can be left out
+oint omin(obliv int a, obliv int b) obliv
+{
+  obliv int res;
+  obliv if(a<b) res=a; else res=b;  // cannot return directly from obliv-if
+  return res;
+}
+
+
+void editDistance(void* args)
+{
+  protocolIO *io = args;
+  int n1,n2;
+  int i,j;
+  double lap2;
+  obliv char s1[MAXN], s2[MAXN];
+  obliv int dp[MAXN+1][MAXN+1];
+
+  obliv bool a,b,c;
+  n1 = ocBroadcastInt(1,io->n);
+  n2 = ocBroadcastInt(2,io->n);
+  readString(s1,n1,io->s,1);
+  readString(s2,n2,io->s,2);
+  // These really only work with single threaded protocols
+  //   namely, YaoProtocol and DebugProtocol
+  lap2 = wallClock();
+  fprintf(stderr,"%s OT time: %lf s\n",mySide(),lap2-lap);
+
+  for(i=0;i<=n1;++i) dp[i][0]=i;
+  for(j=0;j<=n2;++j) dp[0][j]=j;
+  for(i=1;i<=n1;++i) for(j=1;j<=n2;++j)
+  {
+    obliv int temp = dp[i-1][j-1] + (s1[i-1]!=s2[j-1]);
+    obliv int temp2 = omin (dp[i][j-1], dp[i-1][j]) + 1;
+    dp[i][j] = omin(temp,temp2);
+  }
+  io->res=revealOblivInt(dp[n1][n2],0);
+}
