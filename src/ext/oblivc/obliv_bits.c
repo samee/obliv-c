@@ -470,7 +470,7 @@ unsigned yaoGateCount() { return ((YaoProtocolDesc*)currentProto)->gcount; }
 
 void execYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
 {
-  ProtocolDesc* pdb = &pd->base;
+  ProtocolDesc* pdb = PROTOCOL_DESC(pd);
   int me = pdb->thisParty;
   int tailind,tailpos;
   pdb->partyCount = 2;
