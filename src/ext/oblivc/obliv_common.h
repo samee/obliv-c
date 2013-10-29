@@ -7,15 +7,9 @@ void gcryDefaultLibInit(void);
 
 // Convenience functions
 static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
-  { return pd->trans->recv(pd,s,0,p,n); }
+  { return pd->trans->recv(pd->trans,s,p,n); }
 static inline int osend(ProtocolDesc* pd,int d,void* p,size_t n)
-  { return pd->trans->send(pd,d,0,p,n); }
-
-// Send on a particular channel, in case many exist
-static inline int orecvc(ProtocolDesc* pd,int s,int c,void* p,size_t n)
-  { return pd->trans->recv(pd,s,c,p,n); }
-static inline int osendc(ProtocolDesc* pd,int d,int c,void* p,size_t n)
-  { return pd->trans->send(pd,d,c,p,n); }
+  { return pd->trans->send(pd->trans,d,p,n); }
 
 void dhRandomInit(void);
 void dhRandomFinalize(void);

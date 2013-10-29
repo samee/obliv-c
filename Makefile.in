@@ -151,7 +151,7 @@ $(OBJDIR)/libobliv.a: $(OCPARTS:%=$(OBJDIR)/%.o)
 
 $(OCPARTS:%=$(DEPENDDIR)/%.d): $(DEPENDDIR)/%.d: $(OCSRCDIR)/%.c
 	$(CC) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.o > $@
-	echo '	$$(CC) -c $$< -o $$@ -I $$(OCSRCDIR)' >> $@
+	echo '	$$(CC) -c $$< -o $$@ -I $$(OCSRCDIR) $$(CFLAGS)' >> $@
 
 # CLEANING defind in ocamlutil/Makefile.ocaml based on $(MAKECMDGOALS)
 ifndef CLEANING

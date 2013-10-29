@@ -18,6 +18,10 @@ static ProtocolDesc *currentProto;
 
 inline bool known(const OblivBit* o) { return !o->unknown; }
 
+// Because I am evil and I do not like 
+// Java-style redundant "say the type twice" practice
+#define CAST(p) ((void*)p)
+
 // --------------------------- Transports -----------------------------------
 struct stdioTransport
 { ProtocolTransport cb;
@@ -25,26 +29,28 @@ struct stdioTransport
 };
 
 // Ignores 'dest' parameter. So you can't osend to yourself
-static bool* stdioFlushFlag(ProtocolDesc* pd)
-  { return &((struct stdioTransport*)pd->trans)->needFlush; }
+static bool* stdioFlushFlag(ProtocolTransport* pt) 
+  { return &((struct stdioTransport*)pt)->needFlush; }
 
-static int stdioSend(ProtocolDesc* pd,int dest,int c,const void* s,size_t n)
-{ *stdioFlushFlag(pd)=true;
+static int stdioSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
+{ *stdioFlushFlag(pt)=true;
   return fwrite(s,1,n,stdout); 
 }
 
-static int stdioRecv(ProtocolDesc* pd,int src,int c,void* s,size_t n)
+static int stdioRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { 
-  bool *p = stdioFlushFlag(pd);
+  bool *p = stdioFlushFlag(pt);
   if(*p) { fflush(stdout); *p=false; }
   return fread(s,1,n,stdin); 
 }
 
-static void stdioCleanup(ProtocolDesc* pd) {}
+static void stdioSetChannel(ProtocolTransport* pt,int x) {}
+
+static void stdioCleanup(ProtocolTransport* pt) {}
 
 // Extremely simple, no multiplexing: two parties, one connection
 static struct stdioTransport stdioTransport 
-  = {{2, 1, stdioSend, stdioRecv, stdioCleanup},false};
+  = {{2, 1, 0, stdioSetChannel, stdioSend, stdioRecv, stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
@@ -55,24 +61,31 @@ void protocolUseStdio(ProtocolDesc* pd)
 struct tcp2PTransport
 { ProtocolTransport cb;
   int* socks; // size = cb.maxChannels
+  int cursock;
 };
 
-static int tcp2PSend(ProtocolDesc* pd,int dest,int c,const void* s,size_t n)
-  { return write(((struct tcp2PTransport*)pd->trans)->socks[c],s,n); }
+static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
+  { return write(((struct tcp2PTransport*)pt)->cursock,s,n); }
 
-static int tcp2PRecv(ProtocolDesc* pd,int src,int c,void* s,size_t n)
-  { return read(((struct tcp2PTransport*)pd->trans)->socks[c],s,n); }
+static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
+  { return read(((struct tcp2PTransport*)pt)->cursock,s,n); }
 
-static void tcp2PCleanup(ProtocolDesc* pd)
-{ struct tcp2PTransport* t = (struct tcp2PTransport*)pd->trans;
+static void tcp2PCleanup(ProtocolTransport* pt)
+{ struct tcp2PTransport* t = CAST(pt);
   int i;
   for(i=0;i<t->cb.maxChannels;++i) close(t->socks[i]);
   free(t->socks);
   free(t);
 }
 
+static void tcp2PSetChannel(ProtocolTransport* pt,int c)
+{ struct tcp2PTransport* t = CAST(pt);
+  t->cb.curChannel=c;
+  t->cursock = t->socks[c];
+}
+
 static struct tcp2PTransport tcp2PTransport
-  = {{2, 0, tcp2PSend, tcp2PRecv, tcp2PCleanup}, NULL};
+  = {{2, 0, 0, tcp2PSetChannel, tcp2PSend, tcp2PRecv, tcp2PCleanup}, NULL, 0};
 
 void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
 {
@@ -82,6 +95,7 @@ void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
   trans->socks = malloc(sizeof(int)*sockCount);
   memcpy(trans->socks,socks,sizeof(int)*sockCount);
   trans->cb.maxChannels = sockCount;
+  trans->cursock = socks[0];
   pd->trans = (ProtocolTransport*)trans;
 }
 
@@ -141,7 +155,7 @@ int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount)
 // ---------------------------------------------------------------------------
 
 void cleanupProtocol(ProtocolDesc* pd)
-  { pd->trans->cleanup(pd); }
+  { pd->trans->cleanup(pd->trans); }
 
 void setCurrentParty(ProtocolDesc* pd, int party)
   { pd->thisParty=party; }
@@ -253,10 +267,6 @@ void yaoKeyNewPair(YaoProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
   yaoKeyCopy(w1,w0);
   yaoKeyXor(w1,pd->R);
 }
-
-// Because I am evil and I do not like 
-// Java-style redundant "say the type twice" practice
-#define CAST(p) ((void*)p)
 
 void yaoSetBitAnd(ProtocolDesc* pdsuper,OblivBit* r,
                   const OblivBit* a,const OblivBit* b)

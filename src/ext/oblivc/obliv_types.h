@@ -56,12 +56,15 @@ typedef struct YaoProtocolDesc {
   union { struct NpotSender* sender; struct NpotRecver* recver; };
 } YaoProtocolDesc;
 
-typedef struct ProtocolTransport {
-  int maxParties, maxChannels;
-  int (*send)(ProtocolDesc*,int,int,const void*,size_t);
-  int (*recv)(ProtocolDesc*,int,int,      void*,size_t);
-  void (*cleanup)(ProtocolDesc*);
-} ProtocolTransport;
+typedef struct ProtocolTransport ProtocolTransport;
+
+struct ProtocolTransport {
+  int maxParties, maxChannels, curChannel;
+  void (*setChannel)(ProtocolTransport*,int);
+  int (*send)(ProtocolTransport*,int,const void*,size_t);
+  int (*recv)(ProtocolTransport*,int,      void*,size_t);
+  void (*cleanup)(ProtocolTransport*);
+};
 
 struct OblivInputs {
   unsigned long long src;
