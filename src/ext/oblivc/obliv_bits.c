@@ -358,6 +358,9 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pdsuper
   { char buf[OT_BATCH_SIZE*YAO_KEY_BYTES], *dest[OT_BATCH_SIZE];
     int mask=0;
     int bp=0,i;
+    // XXX we are currently using NPOT, so it can be used with any protocol
+    //   later on if we change it (to use e.g. passive-secure OT-extension)
+    //   we might have to use different functions for each protocol
     for(;hasBit(&it);nextBit(&it))
     { OblivBit* o = curDestBit(&it);
       dest[bp]=o->yao.w;
@@ -472,11 +475,12 @@ void yaoEvaluateGate(YaoProtocolDesc* pd, OblivBit* r, char ttable,
 
 unsigned yaoGateCount() { return ((YaoProtocolDesc*)currentProto)->gcount; }
 
-void execYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
+/* execYaoProtocol is divided into 2 parts which are reused by other
+   protocols such as DualEx */
+void setupYaoProtocol(YaoProtocolDesc* pd)
 {
   ProtocolDesc* pdb = PROTOCOL_DESC(pd);
   int me = pdb->thisParty;
-  int tailind,tailpos;
   pdb->partyCount = 2;
   pd->nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
   pdb->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
@@ -486,10 +490,15 @@ void execYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
   pdb->setBitXor = yaoSetBitXor;
   pdb->setBitNot = yaoSetBitNot;
   pdb->flipBit   = yaoFlipBit;
+
+  dhRandomInit(); // FIXME use pthread_once
+}
+void mainYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
+{
+  ProtocolDesc* pdb = PROTOCOL_DESC(pd);
+  int me = pdb->thisParty;
+  int tailind,tailpos;
   pd->gcount = pd->icount = pd->ocount = 0;
-
-  dhRandomInit();
-
   if(me==1)
   {
     gcry_randomize(pd->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
@@ -508,6 +517,12 @@ void execYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
 
   if(me==1) npotSenderRelease(pd->sender);
   else npotRecverRelease(pd->recver);
+}
+
+void execYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
+{
+  setupYaoProtocol(pd);
+  mainYaoProtocol(pd,start,arg);
 }
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
