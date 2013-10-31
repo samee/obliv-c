@@ -7,6 +7,7 @@
 #include <string.h>
 #include <netinet/ip.h>
 #include <netdb.h>
+#include <unistd.h>
 #include <gcrypt.h>
 
 // Q: What's with all these casts to and from void* ?
@@ -221,6 +222,7 @@ void gcryDefaultLibInit(void)
 
 // Assume: generator is party 1, evaluator is party 2
 
+/*
 static void yaoKeyDebug(const yao_key_t k)
 { int i;
   fprintf(stderr,"%d: ",currentProto->thisParty);
@@ -235,6 +237,7 @@ static void debugOblivBit(const OblivBit* o)
     yaoKeyDebug(o->yao.w);
   }
 }
+*/
 
 void yaoKeyCopy(yao_key_t d, const yao_key_t s) { memcpy(d,s,YAO_KEY_BYTES); }
 void yaoKeyZero(yao_key_t d) { memset(d,0,YAO_KEY_BYTES); }
@@ -300,11 +303,13 @@ static bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1<<s->j); }
 static OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
 static void nextBit(OIBitSrc* s) 
   { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
+/*
 static int bitCount(OIBitSrc* s) 
 { int res=0,i;
   for(i=0;i<s->n;++i) res+=s->oi[i].size;
   return res;
 }
+*/
 void yaoGenrFeedOblivInputs(ProtocolDesc* pdsuper
                            ,OblivInputs* oi,size_t n,int src)
 { 
@@ -413,7 +418,6 @@ void yaoGenerateGate(YaoProtocolDesc* pd, OblivBit* r, char ttable,
   uint64_t k = pd->gcount;
   int im=0,i;
   yao_key_t wa,wb,wc,wt;
-  yao_key_t wdebug;
   const char* R = pd->R;
 
   // adjust truth table according to invert fields (faster with im^=...) TODO
@@ -827,11 +831,9 @@ void __obliv_c__setMul (void* vdest
                        ,const void* vop1 ,const void* vop2
                        ,size_t size)
 {
-  OblivBit *dest=vdest;
   const OblivBit *op1=vop1, *op2=vop2;
   OblivBit temp[MAX_BITS],sum[MAX_BITS];
   int i;
-  int j;
   assert(size<=MAX_BITS);
   __obliv_c__setUnsignedKnown(sum,0,size);
   for(i=0;i<size;++i)

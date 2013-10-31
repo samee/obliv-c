@@ -19,4 +19,7 @@ void npotSenderRelease(struct NpotSender* s);
 struct NpotRecver* npotRecverNew(int nmax,ProtocolDesc* pd,int srcParty);
 void npotRecverRelease(struct NpotRecver* r);
 
+void npotSend1Of2Once(struct NpotSender* s,char* opt0,char* opt1,int n,int len);
+void npotRecv1Of2Once(struct NpotRecver* r,char* dest
+                     ,unsigned mask,int n,int len);
 #endif
