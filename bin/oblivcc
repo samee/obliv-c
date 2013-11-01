@@ -37,4 +37,4 @@ for src in ${OCSRC[*]}; do
   $OCCPATH/bin/cilobliv $src -I $OCLIB $CILLYARGS || exit
 done
 
-gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/obj/x86_LINUX -lgcrypt
+gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/obj/x86_LINUX -lgcrypt -pthread

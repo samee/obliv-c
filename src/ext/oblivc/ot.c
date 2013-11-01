@@ -1,6 +1,7 @@
 #include<assert.h>
 #include<gcrypt.h>
 #include<inttypes.h>
+#include<pthread.h>
 #include<stdbool.h>
 #include<stdint.h>
 #include<stdio.h>
@@ -45,7 +46,7 @@ typedef struct
 BCipherRandomGen* newBCipherRandomGen() 
 { 
   const int algo = GCRY_CIPHER_AES256; // change SEEDLEN if this changes
-  size_t klen,blen;
+  size_t klen;
   BCipherRandomGen* gen;
   unsigned char key[32];
   int i;
@@ -96,7 +97,6 @@ static gcry_mpi_t dhRandomElt(BCipherRandomGen* gen)
 {
   char out[1+(DHEltBits+7)/8];
   const int outsize = sizeof(out)/sizeof(*out);
-  int i;
   int islarge;
   gcry_mpi_t x;
   out[0]=0;  // needed for unsigned numbers in GCRYMPI_FMT_STD
@@ -109,29 +109,30 @@ static gcry_mpi_t dhRandomElt(BCipherRandomGen* gen)
   return x;
 }
 
-static bool dhRandomInitDone = false;
+static pthread_once_t dhRandomInitDone = PTHREAD_ONCE_INIT;
 // Needs to be invoked before any other functions here
-void dhRandomInit(void) 
+static void dhRandomInitAux(void) 
 {
-  if(dhRandomInitDone) return;
   gcryDefaultLibInit();
   gcryMpiZero = gcry_mpi_set_ui(NULL,0);
   gcryMpiOne  = gcry_mpi_set_ui(NULL,1);
   gcry_mpi_scan(&DHModP,GCRYMPI_FMT_HEX,DHModPString,0,NULL);
   DHModPMinus3 = gcry_mpi_new(0);
   gcry_mpi_sub_ui(DHModPMinus3,DHModP,3);
-  dhRandomInitDone = true;
 }
+
+void dhRandomInit(void) { pthread_once(&dhRandomInitDone,dhRandomInitAux); }
+
 // It would be nice if somebody called this at the end of main, but it
 //   simply frees memory before exit.
 void dhRandomFinalize(void)
 {
-  if(!dhRandomInitDone) return;
+  // if(!dhRandomInitDone) return;
   gcry_mpi_release(DHModP);
   gcry_mpi_release(DHModPMinus3);
   gcry_mpi_release(gcryMpiZero);
   gcry_mpi_release(gcryMpiOne);
-  dhRandomInitDone = false;
+  // dhRandomInitDone = false;
 }
 
 static void dhSerialize(char* buf,gcry_mpi_t x)
@@ -162,12 +163,14 @@ static gcry_mpi_t dhRecv(ProtocolDesc* pd,int party)
   return x;
 }
 
+/*
 static void dhDebug(gcry_mpi_t x)
 {
   unsigned char buff[520];
   gcry_mpi_print(GCRYMPI_FMT_HEX,buff,520,NULL,x);
   fprintf(stderr,"%s\n",buff);
 }
+*/
 
 static void xorBuffer(char* dest,const char* x,const char* y,size_t len)
 { int i;
