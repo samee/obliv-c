@@ -11,6 +11,10 @@
 //   In fact, user code should never be aware of OblivBits type.
 
 void protocolUseStdio(ProtocolDesc*);
+void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount);
+int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port,
+                          int sockCount);
+int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount);
 void cleanupProtocol(ProtocolDesc*);
 
 void setCurrentParty(ProtocolDesc* pd, int party);
