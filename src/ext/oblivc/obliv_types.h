@@ -58,11 +58,17 @@ typedef struct YaoProtocolDesc {
   union { struct NpotSender* sender; struct NpotRecver* recver; };
 } YaoProtocolDesc;
 
+typedef struct DualexProtocolDesc {
+  struct ProtocolDesc base;
+} DualexProtocolDesc;
+
 typedef struct ProtocolTransport ProtocolTransport;
 
+// Channels are just our name for sockets (but we give it a new name since
+//   at times we don't use tcp sockets).
 struct ProtocolTransport {
   int maxParties, maxChannels, curChannel;
-  void (*setChannel)(ProtocolTransport*,int);
+  ProtocolTransport* (*subtransport)(ProtocolTransport*,int);
   int (*send)(ProtocolTransport*,int,const void*,size_t);
   int (*recv)(ProtocolTransport*,int,      void*,size_t);
   void (*cleanup)(ProtocolTransport*);

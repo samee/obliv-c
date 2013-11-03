@@ -15,7 +15,7 @@
 //      Might fix it some day. But user code never sees these anyway.
 
 // Right now, we do not support multiple protocols at the same time
-static ProtocolDesc *currentProto;
+static __thread ProtocolDesc *currentProto;
 
 inline bool known(const OblivBit* o) { return !o->unknown; }
 
@@ -45,13 +45,14 @@ static int stdioRecv(ProtocolTransport* pt,int src,void* s,size_t n)
   return fread(s,1,n,stdin); 
 }
 
-static void stdioSetChannel(ProtocolTransport* pt,int x) {}
+static ProtocolTransport* stdioSubtransport(ProtocolTransport* pt,int x) 
+  { return NULL; }
 
 static void stdioCleanup(ProtocolTransport* pt) {}
 
 // Extremely simple, no multiplexing: two parties, one connection
 static struct stdioTransport stdioTransport 
-  = {{2, 1, 0, stdioSetChannel, stdioSend, stdioRecv, stdioCleanup},false};
+  = {{2, 1, 0, stdioSubtransport, stdioSend, stdioRecv, stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
@@ -79,14 +80,32 @@ static void tcp2PCleanup(ProtocolTransport* pt)
   free(t);
 }
 
+/*
+   XXX
 static void tcp2PSetChannel(ProtocolTransport* pt,int c)
 { struct tcp2PTransport* t = CAST(pt);
   t->cb.curChannel=c;
   t->cursock = t->socks[c];
 }
+*/
+
+static void tcp2PSubCleanup(ProtocolTransport* pt) { free(pt); }
+
+static ProtocolTransport* tcp2PSubtransport(ProtocolTransport* pt,int c)
+{
+  struct tcp2PTransport *t = CAST(pt), *tres;
+  tres = malloc(sizeof(*tres));
+  *tres = *t;
+  tres->socks = t->socks+c;
+  tres->cursock = t->socks[c];
+  tres->cb.maxChannels = 1;
+  tres->cb.curChannel = 0;
+  tres->cb.cleanup = tcp2PSubCleanup;
+  return tres;
+}
 
 static struct tcp2PTransport tcp2PTransport
-  = {{2, 0, 0, tcp2PSetChannel, tcp2PSend, tcp2PRecv, tcp2PCleanup}, NULL, 0};
+  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, NULL, 0};
 
 void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
 {
@@ -97,6 +116,7 @@ void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
   memcpy(trans->socks,socks,sizeof(int)*sockCount);
   trans->cb.maxChannels = sockCount;
   trans->cursock = socks[0];
+  trans->cb.curChannel = 0;
   pd->trans = (ProtocolTransport*)trans;
 }
 
