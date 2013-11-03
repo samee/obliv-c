@@ -132,7 +132,6 @@ void dhRandomFinalize(void)
   gcry_mpi_release(DHModPMinus3);
   gcry_mpi_release(gcryMpiZero);
   gcry_mpi_release(gcryMpiOne);
-  // dhRandomInitDone = false;
 }
 
 static void dhSerialize(char* buf,gcry_mpi_t x)

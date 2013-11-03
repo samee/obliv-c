@@ -2,6 +2,7 @@
 #include<stdio.h>
 
 #include<obliv.h>
+#include<obliv_common.h>
 
 // Create a temporary ProtocolTransport that uses only one of the 
 //   available channels. Becomes invalid when the parent transport is cleaned up
@@ -16,6 +17,10 @@ extern bool yaoGenrRevealOblivBits(ProtocolDesc* pdsuper,
                 widest_t* dest,const OblivBit* o,size_t n,int party);
 extern bool yaoEvalRevealOblivBits(ProtocolDesc* pdsuper,
                 widest_t* dest,const OblivBit* o,size_t n,int party);
+extern void yaoGenrFeedOblivInputs(ProtocolDesc* pdsuper
+               ,OblivInputs* oi,size_t n,int src);
+extern void yaoEvalFeedOblivInputs(ProtocolDesc* pdsuper
+               ,OblivInputs* oi,size_t n,int src);
 
 bool dualexGenrRevealOblivBits(ProtocolDesc* pdb, 
     widest_t* dest,const OblivBit* o,size_t n,int party)
@@ -41,40 +46,57 @@ bool dualexEvalRevealOblivBits(ProtocolDesc* pdb,
 }
 
 typedef struct {
-  YaoProtocolDesc* pd;
+  YaoProtocolDesc ypd;
+  int thisThread;
+  void (*yFeedOblivInputs)(ProtocolDesc*,OblivInputs*,size_t,int);
+} DualexHalfPD;
+
+typedef struct {
+  DualexHalfPD* pd;
   protocol_run start;
   void* startargs;
-  int thisThread;
-} DualexHalf;
+} DualexThreadArgs;
+
+
+void dualexFeedOblivInputs(ProtocolDesc* pdb,OblivInputs* oi,size_t n,int party)
+{
+  DualexHalfPD* pd = CAST(pdb);
+  if(pd->thisThread==2) party=3-party;
+  pd->yFeedOblivInputs(pdb,oi,n,party);
+}
 
 void* dualexThread(void* varg)
-{ DualexHalf* arg = varg;
-  ProtocolDesc* pdb = PROTOCOL_DESC(arg->pd);
-  setupYaoProtocol(arg->pd);
-  pdb->revealOblivBits = (pdb->thisParty==arg->thisThread
+{ DualexThreadArgs* arg = varg;
+  DualexHalfPD* pd = arg->pd;
+  ProtocolDesc* pdb = PROTOCOL_DESC(&pd->ypd);
+  setupYaoProtocol(&pd->ypd);
+  pd->yFeedOblivInputs = pdb->feedOblivInputs;
+  pdb->feedOblivInputs = dualexFeedOblivInputs;
+  pdb->revealOblivBits = (pdb->thisParty==pd->thisThread
                          ?dualexGenrRevealOblivBits:dualexEvalRevealOblivBits);
-  mainYaoProtocol(arg->pd,arg->start,arg->startargs);
+  fprintf(stderr,"Thread %d: Setup done\n",pd->thisThread);
+  mainYaoProtocol(&arg->pd->ypd,arg->start,arg->startargs);
+  fprintf(stderr,"Thread %d: Execution done\n",pd->thisThread);
   return NULL;
 }
 
 void execDualexProtocol(DualexProtocolDesc* pd, protocol_run start, void* arg)
 {
   ProtocolDesc *pdb = PROTOCOL_DESC(pd);
-  YaoProtocolDesc round1,round2;
+  DualexHalfPD round1,round2;
   ProtocolTransport *trans = PROTOCOL_DESC(pd)->trans;
   pthread_t t1,t2;
-  DualexHalf targ1 = {.pd = &round1, .start = start
-                     ,.startargs = arg, .thisThread = 1};
-  DualexHalf targ2 = {.pd = &round2, .start = start
-                     ,.startargs = arg, .thisThread = 2};
+  DualexThreadArgs targ1 = {.pd=&round1, .start=start, .startargs=arg };
+  DualexThreadArgs targ2 = {.pd=&round2, .start=start, .startargs=arg };
 
-  setCurrentParty(PROTOCOL_DESC(&round1),pdb->thisParty);
-  setCurrentParty(PROTOCOL_DESC(&round2),3-pdb->thisParty);
+  setCurrentParty(PROTOCOL_DESC(&round1.ypd),pdb->thisParty);
+  setCurrentParty(PROTOCOL_DESC(&round2.ypd),3-pdb->thisParty);
+  round1.thisThread = 1; round2.thisThread = 2;
 
   // Assign transport channels: assumes Yao protocol never invokes 
   //   setSubtransport, only uses the default channel
-  PROTOCOL_DESC(&round1)->trans = subtransport(trans,1);
-  PROTOCOL_DESC(&round2)->trans = subtransport(trans,2);
+  PROTOCOL_DESC(&round1.ypd)->trans = subtransport(trans,1);
+  PROTOCOL_DESC(&round2.ypd)->trans = subtransport(trans,2);
 
   pthread_create(&t1,NULL,dualexThread,&targ1);
   pthread_create(&t2,NULL,dualexThread,&targ2);
