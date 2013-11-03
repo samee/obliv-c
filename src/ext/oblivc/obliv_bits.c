@@ -381,8 +381,8 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pdsuper
   }
 }
 
-widest_t yaoGenrRevealOblivBits(ProtocolDesc* pdsuper,
-    const OblivBit* o,size_t n,int party)
+bool yaoGenrRevealOblivBits(ProtocolDesc* pdsuper,
+    widest_t* dest,const OblivBit* o,size_t n,int party)
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
@@ -395,10 +395,11 @@ widest_t yaoGenrRevealOblivBits(ProtocolDesc* pdsuper,
   for(i=0;i<n;++i) if(!o[i].unknown && o[i].knownValue)
     rv |= (1LL<<i);
   pd->ocount+=n;
-  return rv;
+  if(party!=2) { *dest=rv; return true; }
+  else return false;
 }
-widest_t yaoEvalRevealOblivBits(ProtocolDesc* pdsuper,
-    const OblivBit* o,size_t n,int party)
+bool yaoEvalRevealOblivBits(ProtocolDesc* pdsuper,
+    widest_t* dest,const OblivBit* o,size_t n,int party)
 {
   int i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
@@ -411,7 +412,8 @@ widest_t yaoEvalRevealOblivBits(ProtocolDesc* pdsuper,
   for(i=0;i<n;++i) if(!o[i].unknown && o[i].knownValue)
     rv |= (1LL<<i);
   pd->ocount+=n;
-  return rv;
+  if(party!=1) { *dest=rv; return true; }
+  else return false;
 }
 
 // Encodes a 2-input truth table for f(a,b) = ((ttable&(1<<(2*a+b)))!=0)
@@ -596,24 +598,18 @@ void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
   }
 }
 
-/*
-bool __obliv_c__revealOblivBool(const OblivBit* dest,int party)
-{ if(party!=0 && party!=currentProto->thisParty) return false;
-  else return dest->knownValue;
-}
-*/
-widest_t dbgProtoRevealOblivBits
-  (ProtocolDesc* pd,const OblivBit* dest,size_t size,int party)
+bool dbgProtoRevealOblivBits
+  (ProtocolDesc* pd,widest_t* dest,const OblivBit* src,size_t size,int party)
 { widest_t rv=0;
   if(currentProto->thisParty==1)
-  { dest+=size;
-    while(size-->0) rv = (rv<<1)+!!(--dest)->knownValue;
+  { src+=size;
+    while(size-->0) rv = (rv<<1)+!!(--src)->knownValue;
     if(party==0 || party==2) osend(pd,2,&rv,sizeof(rv));
-    if(party==2) return 0;
-    else return rv;
+    if(party==2) return false;
+    else { *dest=rv; return true; }
   }else // assuming thisParty==2
-  { if(party==0 || party==2) { orecv(pd,1,&rv,sizeof(rv)); return rv; }
-    else return 0;
+  { if(party==0 || party==2) { orecv(pd,1,dest,sizeof(*dest)); return true; }
+    else return false;
   }
 }
 
@@ -640,9 +636,9 @@ void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   start(arg);
 }
 
-widest_t __obliv_c__revealOblivBits(const OblivBit* dest, size_t size,
-    int party)
-  { return currentProto->revealOblivBits(currentProto,dest,size,party); }
+bool __obliv_c__revealOblivBits (widest_t* dest, const OblivBit* src
+                                ,size_t size, int party)
+  { return currentProto->revealOblivBits(currentProto,dest,src,size,party); }
 
 int __obliv_c__currentParty() { return currentProto->thisParty; }
 
@@ -1089,19 +1085,42 @@ feedOblivFun(long long,lLong,LLong)
 #undef feedOblivFun
 
 // TODO pass const values by ref later
-bool revealOblivBool(__obliv_c__bool src,int party)
-  { return (bool)__obliv_c__revealOblivBits(src.bits,1,party); }
-char revealOblivChar(__obliv_c__char src,int party)
-  { return (char)__obliv_c__revealOblivBits(src.bits,bitsize(char),party); }
-int revealOblivInt(__obliv_c__int src,int party)
-  { return (int)__obliv_c__revealOblivBits(src.bits,bitsize(int),party); }
-short revealOblivShort(__obliv_c__short src,int party)
-  { return (short)__obliv_c__revealOblivBits(src.bits,bitsize(short),party); }
-long revealOblivLong(__obliv_c__long src,int party)
-  { return (long)__obliv_c__revealOblivBits(src.bits,bitsize(long),party); }
-long long revealOblivLLong(__obliv_c__lLong src,int party)
-  { return (long long)__obliv_c__revealOblivBits(src.bits,bitsize(long long)
-                                                 ,party); }
+bool revealOblivBool(bool* dest,__obliv_c__bool src,int party)
+{ widest_t wd;
+  if(__obliv_c__revealOblivBits(&wd,src.bits,1,party)) 
+    { *dest=(bool)wd; return true; }
+  return false;
+}
+bool revealOblivChar(char* dest, __obliv_c__char src,int party)
+{ widest_t wd;
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+    { *dest=(char)wd; return true; }
+  return false;
+}
+bool revealOblivInt(int* dest, __obliv_c__int src,int party)
+{ widest_t wd;
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+    { *dest=(int)wd; return true; }
+  return false;
+}
+bool revealOblivShort(short* dest, __obliv_c__short src,int party)
+{ widest_t wd;
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+    { *dest=(short)wd; return true; }
+  return false;
+}
+bool revealOblivLong(long* dest, __obliv_c__long src,int party)
+{ widest_t wd;
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+    { *dest=(long)wd; return true; }
+  return false;
+}
+bool revealOblivLLong(long long* dest, __obliv_c__lLong src,int party)
+{ widest_t wd;
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+    { *dest=(long long)wd; return true; }
+  return false;
+}
 
 // TODO fix data width
 bool ocBroadcastBool(int source,bool v)

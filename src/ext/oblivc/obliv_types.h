@@ -2,6 +2,7 @@
 #define OBLIV_TYPES_H
 
 #include<stddef.h>
+#include<stdbool.h>
 #include<stdint.h>  // uint64_t
 #include<gcrypt.h>
 
@@ -35,7 +36,8 @@ struct ProtocolDesc {
   };
 
   void (*feedOblivInputs)(ProtocolDesc*,OblivInputs*,size_t,int);
-  widest_t (*revealOblivBits)(ProtocolDesc*,const OblivBit*,size_t,int);
+  // Return value is true if the write was actually done
+  bool (*revealOblivBits)(ProtocolDesc*,widest_t*,const OblivBit*,size_t,int);
 
   void (*setBitAnd)(ProtocolDesc*,OblivBit*,const OblivBit*,const OblivBit*);
   void (*setBitOr )(ProtocolDesc*,OblivBit*,const OblivBit*,const OblivBit*);

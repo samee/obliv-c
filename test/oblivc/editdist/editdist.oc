@@ -47,5 +47,5 @@ void editDistance(void* args)
     obliv int temp2 = omin (dp[i][j-1], dp[i-1][j]) + 1;
     dp[i][j] = omin(temp,temp2);
   }
-  io->res=revealOblivInt(dp[n1][n2],0);
+  revealOblivInt(&io->res,dp[n1][n2],0);
 }
