@@ -72,11 +72,10 @@ void* dualexThread(void* varg)
   setupYaoProtocol(&pd->ypd);
   pd->yFeedOblivInputs = pdb->feedOblivInputs;
   pdb->feedOblivInputs = dualexFeedOblivInputs;
-  pdb->revealOblivBits = (pdb->thisParty==pd->thisThread
+  // In this function, pdb->thisParty == 1 always means generator
+  pdb->revealOblivBits = (pdb->thisParty==1
                          ?dualexGenrRevealOblivBits:dualexEvalRevealOblivBits);
-  fprintf(stderr,"Thread %d: Setup done\n",pd->thisThread);
   mainYaoProtocol(&arg->pd->ypd,arg->start,arg->startargs);
-  fprintf(stderr,"Thread %d: Execution done\n",pd->thisThread);
   return NULL;
 }
 
@@ -95,8 +94,8 @@ void execDualexProtocol(DualexProtocolDesc* pd, protocol_run start, void* arg)
 
   // Assign transport channels: assumes Yao protocol never invokes 
   //   setSubtransport, only uses the default channel
-  PROTOCOL_DESC(&round1.ypd)->trans = subtransport(trans,1);
-  PROTOCOL_DESC(&round2.ypd)->trans = subtransport(trans,2);
+  PROTOCOL_DESC(&round1.ypd)->trans = subtransport(trans,0);
+  PROTOCOL_DESC(&round2.ypd)->trans = subtransport(trans,1);
 
   pthread_create(&t1,NULL,dualexThread,&targ1);
   pthread_create(&t2,NULL,dualexThread,&targ2);

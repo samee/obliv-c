@@ -2,11 +2,13 @@
 #include <obliv_common.h>
 #include <obliv_bits.h>
 #include <assert.h>
+#include <errno.h>      // libgcrypt needs ENOMEM definition
 #include <inttypes.h>
 #include <stdio.h>      // for protoUseStdio()
 #include <string.h>
 #include <netinet/ip.h>
 #include <netdb.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <gcrypt.h>
 
@@ -76,15 +78,6 @@ static void tcp2PCleanup(ProtocolTransport* pt)
   free(t);
 }
 
-/*
-   XXX
-static void tcp2PSetChannel(ProtocolTransport* pt,int c)
-{ struct tcp2PTransport* t = CAST(pt);
-  t->cb.curChannel=c;
-  t->cursock = t->socks[c];
-}
-*/
-
 static void tcp2PSubCleanup(ProtocolTransport* pt) { free(pt); }
 
 static ProtocolTransport* tcp2PSubtransport(ProtocolTransport* pt,int c)
@@ -97,10 +90,10 @@ static ProtocolTransport* tcp2PSubtransport(ProtocolTransport* pt,int c)
   tres->cb.maxChannels = 1;
   tres->cb.curChannel = 0;
   tres->cb.cleanup = tcp2PSubCleanup;
-  return tres;
+  return &tres->cb;
 }
 
-static struct tcp2PTransport tcp2PTransport
+static const struct tcp2PTransport tcp2PTransport
   = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, NULL, 0};
 
 void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
@@ -224,10 +217,16 @@ void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
 
 #define OT_BATCH_SIZE 7
 
-void gcryDefaultLibInit(void)
+static pthread_once_t gcryInitDone = PTHREAD_ONCE_INIT;
+
+GCRY_THREAD_OPTION_PTHREAD_IMPL;
+
+static void gcryDefaultLibInitAux(void)
 {
   if(!gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P))
-  { if(!gcry_check_version(NULL))
+  { 
+    gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+    if(!gcry_check_version(NULL))
     { fprintf(stderr,"libgcrypt init failed\n");
       exit(1);
     }
@@ -235,6 +234,8 @@ void gcryDefaultLibInit(void)
     gcry_control (GCRYCTL_INITIALIZATION_FINISHED, 0);
   }
 }
+void gcryDefaultLibInit(void)
+  { pthread_once(&gcryInitDone,gcryDefaultLibInitAux); }
 
 // Assume: generator is party 1, evaluator is party 2
 
@@ -344,6 +345,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pdsuper
   {
     char buf0[OT_BATCH_SIZE*YAO_KEY_BYTES], buf1[OT_BATCH_SIZE*YAO_KEY_BYTES];
     int bp=0;
+    int i=0;
     for(;hasBit(&it);nextBit(&it))
     { 
       OblivBit* o = curDestBit(&it);
@@ -509,7 +511,7 @@ void setupYaoProtocol(YaoProtocolDesc* pd)
   pdb->setBitNot = yaoSetBitNot;
   pdb->flipBit   = yaoFlipBit;
 
-  dhRandomInit(); // FIXME use pthread_once
+  dhRandomInit();
 }
 void mainYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
 {
@@ -527,8 +529,8 @@ void mainYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg)
     tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
     pd->R[tailind] &= (1<<tailpos)-1;
     pd->I[tailind] &= (1<<tailpos)-1;
-    pd->sender = npotSenderNew(1<<OT_BATCH_SIZE,pdb,me);
-  }else pd->recver = npotRecverNew(1<<OT_BATCH_SIZE,pdb,me);
+    pd->sender = npotSenderNew(1<<OT_BATCH_SIZE,pdb,2);
+  }else pd->recver = npotRecverNew(1<<OT_BATCH_SIZE,pdb,1);
 
   currentProto = pdb;
   start(arg);
