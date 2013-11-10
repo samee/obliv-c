@@ -19,8 +19,8 @@ void cleanupProtocol(ProtocolDesc*);
 
 void setCurrentParty(ProtocolDesc* pd, int party);
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
-void execYaoProtocol(YaoProtocolDesc* pd, protocol_run start, void* arg);
-void execDualexProtocol(DualexProtocolDesc* pd, protocol_run start, void* arg);
+void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
+void execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 
 unsigned yaoGateCount(void);
 

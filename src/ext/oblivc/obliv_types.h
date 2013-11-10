@@ -44,23 +44,18 @@ struct ProtocolDesc {
   void (*setBitXor)(ProtocolDesc*,OblivBit*,const OblivBit*,const OblivBit*);
   void (*setBitNot)(ProtocolDesc*,OblivBit*,const OblivBit*);
   void (*flipBit  )(ProtocolDesc*,OblivBit*); // Sometimes avoids a struct copy
+
+  void* extra;  // protocol-specific information
 };
 
-#define PROTOCOL_DESC(p) (&(p)->base)
-
 typedef struct YaoProtocolDesc {
-  struct ProtocolDesc base;
   yao_key_t R,I; // LSB of R needs to be 1
   uint64_t gcount;
   unsigned icount, ocount;
-  void (*nonFreeGate)(struct YaoProtocolDesc*,OblivBit*,char,
+  void (*nonFreeGate)(struct ProtocolDesc*,OblivBit*,char,
       const OblivBit*,const OblivBit*);
   union { struct NpotSender* sender; struct NpotRecver* recver; };
 } YaoProtocolDesc;
-
-typedef struct DualexProtocolDesc {
-  struct ProtocolDesc base;
-} DualexProtocolDesc;
 
 typedef struct ProtocolTransport ProtocolTransport;
 
