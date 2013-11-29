@@ -222,7 +222,8 @@ class typeCheckVisitor = object(self)
     | None -> DoChildren
     | Some cat -> if cat = "unimplemented" 
                     then E.s (E.unimp "obliv float/double/enum")
-                    else E.s (E.error "%s cannot be obliv-type" cat)
+                    else E.s (E.error "%s:%i: %s cannot be obliv-type" 
+                              !currentLoc.file !currentLoc.line cat)
 
   method vinst instr = ChangeDoChildrenPost ([instr], List.map (
     fun instr -> match instr with
