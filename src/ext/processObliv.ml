@@ -126,6 +126,13 @@ let isNonFrozenPtr e = match e with
 
 let invalidFrozenPtrConvert t1 t2 = isFrozenPtr t1 && isNonFrozenPtr t2
 
+(* Implicit casts were inserted automatically before we inferred the proper
+ * frozen qualifiers in a scope-sensitive way. So we might need to 
+ * bypass those *)
+let rec invalidFrozenPtrAsgn e1 t2 = match e1 with
+| CastE(t1,e1') when isImplicitCastResult t1 -> invalidFrozenPtrAsgn e1' t2
+| _ -> invalidFrozenPtrConvert (typeOf e1) t2
+
 (* Used for ChangeDoChildrenPost *)
 type 't visitorResponse = 't -> ('t * ('t -> 't)) ;;
 
@@ -231,7 +238,7 @@ class typeCheckVisitor = object(self)
           if isFrozenQualified (typeOfLval lv) then
             E.s (E.error "%s:%i:cannot assign to frozen qualified lvalue"
                          loc.file loc.line)
-          else if invalidFrozenPtrConvert (typeOf exp) (typeOfLval lv) then
+          else if invalidFrozenPtrAsgn exp (typeOfLval lv) then
             frozenConversionError loc
           else if invalidOblivConvert (typeOf exp) (typeOfLval lv) then
             oblivConversionError loc
@@ -247,7 +254,7 @@ class typeCheckVisitor = object(self)
               | a::al, (_,b,_)::bl -> 
                   if invalidOblivConvert (typeOf a) b then 
                     oblivConversionError loc
-                  else if invalidFrozenPtrConvert (typeOf a) b then
+                  else if invalidFrozenPtrAsgn a b then
                     frozenConversionError loc
                   else matchArgs al bl
               in
