@@ -135,6 +135,9 @@ let doDeclaration (loc: cabsloc) (specs: spec_elem list) (nl: init_name list) : 
       DECDEF ((specs, nl), loc)  
     end
 
+(* Used to wrap function/function pointer declarators *)
+let cabsAddObliv (dt:decl_type) : decl_type = 
+  PARENTYPE([("obliv",[])],dt,[])
 
 let doFunctionDef (loc: cabsloc)
                   (lend: cabsloc)
@@ -1099,12 +1102,18 @@ direct_decl: /* (* ISO 6.7.5 *) */
 |   direct_decl LBRACKET attributes error RBRACKET
                                    { let (n, decl) = $1 in
                                      (n, ARRAY(decl, $3, NOTHING)) }
-|   direct_decl parameter_list_startscope rest_par_list RPAREN
+|   direct_decl parameter_list_startscope rest_par_list RPAREN obliv_opt
                                    { let (n, decl) = $1 in
                                      let (params, isva) = $3 in
                                      !Lexerhack.pop_context ();
-                                     (n, PROTO(decl, params, isva))
+                                     let decl2 = if $5 then cabsAddObliv decl
+                                                 else decl in
+                                     (n, PROTO(decl2,params,isva))
                                    }
+;
+obliv_opt:
+    /**/    { false }
+|   OBLIV   { true }
 ;
 parameter_list_startscope: 
     LPAREN                         { !Lexerhack.push_context () }
