@@ -695,13 +695,13 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
     | None -> DoChildren
   end
   method vfunc = dt#wrapVFunc begin fun f ->
-    if isOblivFunc f.svar.vtype || hasOblivBlocks f then begin
+    (* if isOblivFunc f.svar.vtype || hasOblivBlocks f then begin *)
       (* This really needs to be done only for obliv types
        * But I am too lazy to traverse through structs *)
-      let nontemp = List.filter (fun v -> not (isTaggedTemp (var v)))
-                                f.slocals in
-      self#queueInstr (List.map (fun v -> zeroSet v !currentLoc) nontemp);
-    end;
+    let nontemp = List.filter (fun v -> not (isTaggedTemp (var v)))
+                              f.slocals in
+    self#queueInstr (List.map (fun v -> zeroSet v !currentLoc) nontemp);
+    (* end; *)
     DoChildren
   end
 end

@@ -581,7 +581,7 @@ void __obliv_c__flipBit(OblivBit* dest)
 
 static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
 { 
-  int curparty = __obliv_c__currentParty();
+  int curparty = ocCurrentParty();
   
   dest->unknown=true;
   if(party==1) { if(curparty==1) dest->knownValue=a; }
@@ -657,7 +657,7 @@ bool __obliv_c__revealOblivBits (widest_t* dest, const OblivBit* src
                                 ,size_t size, int party)
   { return currentProto->revealOblivBits(currentProto,dest,src,size,party); }
 
-int __obliv_c__currentParty() { return currentProto->thisParty; }
+int ocCurrentParty() { return currentProto->thisParty; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)
