@@ -1,7 +1,8 @@
 #ifndef OBLIV_BITS_H
 #define OBLIV_BITS_H
+void* memset(void* s, int c, unsigned long n); // Hack, had to declare memset
 #include<stddef.h> // size_t
-#include<stdlib.h> // memset to zero
+//#include<stdlib.h> // memset to zero
 #include<stdbool.h>
 // This file gets included in every C intermediate file generated from obliv-C
 
