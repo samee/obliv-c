@@ -10,10 +10,6 @@
 #include<obliv_common.h>
 #include<obliv_types.h>
 
-// XXX Interface changes
-// Then, newNpotRecver/Sender needs ProtocolDesc and other party ID
-//   this way, send/recv will not have to change
-
 // ---------------- Diffie Hellman Random Elt Generator ----------------------
 
 // Prime p, copied from RFC3526, 2048-bit group, ID 14
@@ -202,7 +198,27 @@ typedef struct NpotSender
   int destParty;
 } NpotSender;
 
-// nmax has to match the nmax in npotRecverNew
+/* 
+  Returns a new object for performing Naor-Pinkas Oblivious Transfers.
+  Can later be used with npotSend*() family of functions. The basic object
+  is really set up to perform 1-out-of-N transfers, although the npotSend*() 
+  functions often build on top of it to provide other kinds of OT behavior.
+   
+  Parameters: 
+    nmax      : The maximum N value that will be supported by npotSend()
+    pd        : The ProtocolDesc object that is used to 
+                  perform internal send/recv
+    destParty : The receiver for these oblivious transfers
+
+  Caller responsibilities:
+    npotRecverNew() needs to be called at the same time by destParty with
+      the same nmax value.
+    Object is later freed with npotRecverRelease()
+
+  This initialization process also generates and sends out a public key of 
+  size O(nmax) bytes to the receiver. This is why a corresponding call to 
+  npotRecverNew() is needed on the other side.
+*/
 NpotSender* npotSenderNew(int nmax,ProtocolDesc* pd,int destParty)
 {
   NpotSender *s;
@@ -256,7 +272,14 @@ static void npotSend_roundSendData(NpotSender* s,NpotSenderState* q,
   gcry_mpi_release(PKi);
 }
 
-// len must match up with npotRecv
+/*
+  The simplest of npotSend*() family. Performs an 1-out-of-n oblivious
+  transfer, where the receiver gets to choose one of the elements 
+  arr[0]..arr[n-1]. Each arr[i] is assumed to be exactly len bytes long, where
+  len<=HASH_BYTES. Moreover, the same value of n and len must be used on the
+  receiving side as it calls npotRecv to obtain the values. The maximum allowed
+  value of n is the nmax value used when initializing the NpotSender* s.
+  */
 void npotSend(NpotSender* s,char** arr,int n,int len)
 {
   NpotSenderState q;
@@ -287,6 +310,7 @@ typedef struct NpotRecver
 } NpotRecver;
 
 // nmax must match with that on the sender side
+// See comment for npotSenderNew()
 NpotRecver* npotRecverNew(int nmax,ProtocolDesc* pd,int srcParty)
 {
   int i;
@@ -344,7 +368,7 @@ static void npotRecv_roundRecvData(NpotRecver* r,NpotRecverState* q,char* dest,
   gcry_mpi_release(q->k);
 }
 
-// n and len must match those on the sender side
+// n and len must match those on the sender side. See comment for npotSend()
 void npotRecv(NpotRecver* r,char* dest,int seli,int n,int len)
 {
   NpotRecverState q;
@@ -365,7 +389,7 @@ void npotRecverRelease(NpotRecver* r)
 
 // -------------------- Extending OT with base-k trick -----------------------
 
-// ceil(log_b(x))
+// Computes ceil(log_b(x))
 static int logceil(int x,int b)
 { int res=0;
   x--;
