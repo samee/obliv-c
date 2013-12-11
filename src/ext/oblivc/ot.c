@@ -7,6 +7,7 @@
 #include<stdio.h>
 #include<stdlib.h>
 
+#include<bcrandom.h>
 #include<obliv_common.h>
 #include<obliv_types.h>
 
@@ -31,28 +32,21 @@ static gcry_mpi_t DHModP,DHModPMinus3;
 static gcry_mpi_t gcryMpiZero, gcryMpiOne;
 // Generator is 2
 
-#define MAXBLEN 20
-#define SEEDLEN (256/8)
-// Simply applies a block cipher in counter mode on zeroes
-typedef struct 
-{ gcry_cipher_hd_t cipher; unsigned char zeroes[MAXBLEN]; 
-  size_t blen;
-} BCipherRandomGen;
-
 BCipherRandomGen* newBCipherRandomGen() 
 { 
-  const int algo = GCRY_CIPHER_AES256; // change SEEDLEN if this changes
+  const int algo = GCRY_CIPHER_AES256; // change BC_SEEDLEN if this changes
   size_t klen;
   BCipherRandomGen* gen;
   unsigned char key[32];
   int i;
   gcry_cipher_hd_t cipher;
 
+  gcryDefaultLibInit();
   gen = malloc(sizeof(BCipherRandomGen)); 
   gcry_cipher_open(&cipher,algo,GCRY_CIPHER_MODE_CTR,0);
   gen->cipher = cipher;
   klen = gcry_cipher_get_algo_keylen(algo);
-  assert(klen<=SEEDLEN);
+  assert(klen<=BC_SEEDLEN);
   gen->blen = gcry_cipher_get_algo_blklen(algo);
   assert(klen<=sizeof(key));
   assert(gen->blen<=sizeof(gen->zeroes));
@@ -68,15 +62,15 @@ void releaseBCipherRandomGen(BCipherRandomGen* gen)
   free(gen); 
 }
 
-// key is assumed to be SEEDLEN bytes long
+// key is assumed to be BC_SEEDLEN bytes long
 void resetBCipherRandomGen(BCipherRandomGen* gen,char* key)
 {
   gcry_cipher_reset(gen->cipher);
-  gcry_cipher_setkey(gen->cipher,key,SEEDLEN);
+  gcry_cipher_setkey(gen->cipher,key,BC_SEEDLEN);
 }
 
 void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len)
-{ unsigned char lastout[MAXBLEN];
+{ unsigned char lastout[BC_MAXBLEN];
   int i;
   const size_t blen = gen->blen;
   for(i=0;i+blen<=len;i+=blen)
@@ -470,7 +464,7 @@ void npotRecvMany(NpotRecver* r,char* dest,int seli,int n,int len)
 void npotSendLong(NpotSender* s,char** arr,int n,int len)
 {
   char *keys,**kstarts;
-  const int klen = SEEDLEN;
+  const int klen = BC_SEEDLEN;
   char* buf;
   int i;
   BCipherRandomGen* gen;
@@ -501,12 +495,12 @@ void npotSendLong(NpotSender* s,char** arr,int n,int len)
 void npotRecvLong(NpotRecver* r,char* dest,int seli,int n,int len)
 {
   BCipherRandomGen* gen;
-  char *dummy,key[SEEDLEN];
+  char *dummy,key[BC_SEEDLEN];
   int i;
   if(len<=HASH_BYTES) return npotRecvMany(r,dest,seli,n,len);
   dummy = malloc(len);
 
-  npotRecvMany(r,key,seli,n,SEEDLEN);
+  npotRecvMany(r,key,seli,n,BC_SEEDLEN);
   for(i=0;i<n;++i) orecv(r->pd,r->srcParty,i==seli?dest:dummy,len);
 
   gen = newBCipherRandomGen();
