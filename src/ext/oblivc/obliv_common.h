@@ -12,7 +12,7 @@ void gcryDefaultLibInit(void);
 // Convenience functions
 static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
   { return pd->trans->recv(pd->trans,s,p,n); }
-static inline int osend(ProtocolDesc* pd,int d,void* p,size_t n)
+static inline int osend(ProtocolDesc* pd,int d,const void* p,size_t n)
   { return pd->trans->send(pd->trans,d,p,n); }
 
 void dhRandomInit(void);
