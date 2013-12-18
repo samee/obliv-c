@@ -235,10 +235,10 @@ class typeCheckVisitor = object(self)
   method vinst instr = ChangeDoChildrenPost ([instr], List.map (
     fun instr -> match instr with
       | Set (lv,exp,loc) -> 
-          if isFrozenQualified (typeOfLval lv) then
+          if dt#curDepth()>0 && isFrozenQualified (typeOfLval lv) then
             E.s (E.error "%s:%i:cannot assign to frozen qualified lvalue"
                          loc.file loc.line)
-          else if invalidFrozenPtrAsgn exp (typeOfLval lv) then
+          else if dt#curDepth()>0 && invalidFrozenPtrAsgn exp (typeOfLval lv) then
             frozenConversionError loc
           else if invalidOblivConvert (typeOf exp) (typeOfLval lv) then
             oblivConversionError loc
@@ -254,7 +254,7 @@ class typeCheckVisitor = object(self)
               | a::al, (_,b,_)::bl -> 
                   if invalidOblivConvert (typeOf a) b then 
                     oblivConversionError loc
-                  else if invalidFrozenPtrAsgn a b then
+                  else if dt#curDepth()>0 && invalidFrozenPtrAsgn a b then
                     frozenConversionError loc
                   else matchArgs al bl
               in
@@ -313,6 +313,7 @@ class typeCheckVisitor = object(self)
   | CastE (t,e) when isImplicitCastResult t ->
       let st = typeOf e in
       if isOblivSimple st && not (isOblivSimple t) then
+        ignore (Pretty.print "Expr: %a\n" d_exp e;
         E.s (E.error "%a: Cannot convert obliv type '%a' to non-obliv '%a'"
           d_loc !currentLoc d_type st 
             d_type (typeRemoveAttributes ["implicitCast"] t))
