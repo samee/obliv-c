@@ -1048,6 +1048,14 @@ void __obliv_c__setNotEqual (void* vdest
     __obliv_c__setBitOr(dest,dest,&t);
   }
 }
+void __obliv_c__setLogicalNot (void* vdest,const void* vop,size_t size)
+{ OblivBit t;
+  OblivBit *dest=vdest;
+  const OblivBit *op=vop;
+  __obliv_c__assignBitKnown(&t,0);
+  while(size-->0) __obliv_c__setBitOr(&t,&t,op++);
+  __obliv_c__setBitNot(dest,&t);
+}
 
 void __obliv_c__condAdd(const void* vc,void* vdest
                        ,const void* vx,size_t size)

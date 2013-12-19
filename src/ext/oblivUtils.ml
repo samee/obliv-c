@@ -21,6 +21,7 @@ let rec firstSome f l = match l with
 (* Initialized during type-checking *)
 let oblivBitType = ref (TVoid [])
 let oblivBitPtr  = ref (TVoid [])
+let cOblivBitPtr  = ref (TVoid [constAttr])
 let oblivConstBitPtr = ref (TVoid [])
 
 

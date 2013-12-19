@@ -67,6 +67,7 @@ let copySimpleObliv = ref dummyExp
 let updateOblivBitType ci = begin
   oblivBitType := TComp(ci,[]);
   oblivBitPtr := TPtr(!oblivBitType,[]);
+  cOblivBitPtr := TPtr(typeAddAttributes [constAttr] !oblivBitType,[]);
   oblivConstBitPtr := typeAddAttributes [constAttr] !oblivBitPtr;
   oblivBitsSize := bitsSizeOf !oblivBitType;
   let types = 
@@ -313,10 +314,15 @@ class typeCheckVisitor = object(self)
   | CastE (t,e) when isImplicitCastResult t ->
       let st = typeOf e in
       if isOblivSimple st && not (isOblivSimple t) then
-        ignore (Pretty.print "Expr: %a\n" d_exp e;
+        let isint = function TInt _ -> true | _ -> false in
+        if isint st && isint t then CastE(addOblivType t,e)
+        else
+        begin
+        ignore (Pretty.printf "Expr: %a\n" d_exp e);
         E.s (E.error "%a: Cannot convert obliv type '%a' to non-obliv '%a'"
           d_loc !currentLoc d_type st 
             d_type (typeRemoveAttributes ["implicitCast"] t))
+        end
       else CastE(t,e)
   | _ -> exp
   )
@@ -466,14 +472,13 @@ let setComparisonUS fnames dest s1 s2 loc =
   setComparison fname dest s1 s2 loc
 
 let setLogicalOp fname dest s1 s2 loc = 
-  let cOblivBitPtr = TPtr(typeAddAttributes [constAttr] !oblivBitType,[]) in
   let fargTypes = ["dest",!oblivBitPtr,[]
-                  ;"s1",cOblivBitPtr,[]; "s2",cOblivBitPtr,[]
+                  ;"s1",!cOblivBitPtr,[]; "s2",!cOblivBitPtr,[]
                   ] in
   let func = voidFunc fname fargTypes in
   Call(None,func,[CastE(!oblivBitPtr,AddrOf dest)
-                 ;CastE(cOblivBitPtr,AddrOf s1)
-                 ;CastE(cOblivBitPtr,AddrOf s2)],loc)
+                 ;CastE(!cOblivBitPtr,AddrOf s1)
+                 ;CastE(!cOblivBitPtr,AddrOf s2)],loc)
 
 let setBitwiseOp fname dest s1 s2 loc =
   setComparison fname dest s1 s2 loc
@@ -482,6 +487,15 @@ let setBitwiseOp fname dest s1 s2 loc =
 
 (* Same comments as in setBitwiseOp *)
 let setArith fname dest s1 s2 loc = setBitwiseOp fname dest s1 s2 loc
+
+let setUnop fname dest s loc = 
+  let fargTypes = ["dest",!oblivBitPtr,[]
+                  ;"s",!cOblivBitPtr,[]
+                  ;"bitcount",!typeOfSizeOf,[]
+  ] in
+  let func = voidFunc fname fargTypes in
+  Call(None,func,[CastE(!oblivBitPtr,AddrOf dest);CastE(!cOblivBitPtr,AddrOf s)
+                 ;xoBitsSizeOf (typeOfLval s)],loc)
 
 let setIntExtend fname dv dk sv sk loc = 
   let fargTypes = ["dest",TPtr(TVoid [],[]),[]
@@ -545,6 +559,16 @@ let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 
 (* Codegen, when conditions don't matter *)
 let rec codegenUncondInstr (instr:instr) : instr = match instr with
+| Set(v,UnOp(op,Lval e,t),loc) -> 
+    begin match unrollType t with
+    | TInt(kind,a) when hasOblivAttr a -> 
+        begin match op with
+        | Neg  -> setUnop "__obliv_c__setNeg" v e loc
+        | BNot -> setUnop "__obliv_c__setBitwiseNot" v e loc
+        | LNot -> setUnop "__obliv_c__setLogicalNot" v e loc
+        end
+    | _ -> instr
+    end
 | Set(v,BinOp(op,Lval e1,Lval e2,t),loc) ->
     begin match unrollType t with
     | TInt(kind,a) when hasOblivAttr a ->

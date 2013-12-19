@@ -161,6 +161,7 @@ void __obliv_c__setEqualTo (void* dest
 void __obliv_c__setNotEqual (void* dest
                             ,const void* op1,const void* op2
                             ,size_t size);
+void __obliv_c__setLogicalNot (void* dest,const void* op,size_t size);
 
 // Conditionals (TODO other operators) that may be faster at times
 static inline 

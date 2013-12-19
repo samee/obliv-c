@@ -3639,7 +3639,7 @@ and doExp (asconst: bool)   (* This expression is used as a constant *)
         let (se, e', t) = doExp asconst e (AExp None) in
         if isIntegralType t then
           let tres = integralPromotion t in
-          let e'' = UnOp(BNot, makeCastT e' t tres, tres) in
+          let e'' = UnOp(BNot, makeCastT_keepObliv e' t tres, tres) in
           finishExp se e'' tres
         else
           E.s (error "Unary ~ on a non-integral type")
