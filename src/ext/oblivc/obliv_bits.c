@@ -999,7 +999,7 @@ void __obliv_c__setLessThanSigned (void* vdest
   __obliv_c__setLessThanUnit(dest,op2+size-1,op1+size-1,1,dest);
 }
 
-void __obliv_c__setLessThanOrEqualSigned (void* vdest
+void __obliv_c__setLessOrEqualSigned (void* vdest
                                          ,const void* vop1, const void* vop2
                                          ,size_t size)
 {
