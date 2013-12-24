@@ -571,7 +571,7 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
   }else currentProto->setBitXor(currentProto,dest,a,b); 
 }
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
-{ if(known(dest)){ *dest=*a; dest->knownValue=!dest->knownValue; }
+{ if(known(a)){ *dest=*a; dest->knownValue=!dest->knownValue; }
   else currentProto->setBitNot(currentProto,dest,a); 
 }
 void __obliv_c__flipBit(OblivBit* dest) 

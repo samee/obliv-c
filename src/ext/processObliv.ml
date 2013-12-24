@@ -286,9 +286,11 @@ class typeCheckVisitor = object(self)
 
   (* obliv-related typechecking *)
   method vexprObliv e = (e, fun exp -> match exp with
-  | UnOp (op,e,t) -> if isOblivSimple (typeOf e) then
-                       let tr = addOblivType t in UnOp(op,e,tr)
-                     else exp
+  | UnOp (op,e,t) -> 
+      let t2 = match op with LNot -> boolType | _ -> t in
+      if isOblivSimple (typeOf e) then
+        let tr = addOblivType t2 in UnOp(op,e,tr)
+      else exp
   | BinOp(op,e1,e2,t) ->
       let t2 = match op with
       | Lt | Gt | Le | Ge | Eq | Ne | LAnd | LOr -> boolType
