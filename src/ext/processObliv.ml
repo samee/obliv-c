@@ -527,7 +527,7 @@ let condSetKnownInt c v k x loc =
                   ;"val",widestType,[]
                   ] in
   let func = voidFunc "__obliv_c__condAssignKnown" fargTypes in
-  Call(None,func,[ mkAddrOf c; mkAddrOf v; xoBitsSizeOf (typeOf x)
+  Call(None,func,[ mkAddrOf c; mkAddrOf v; xoBitsSizeOf (TInt(k,[]))
                  ; CastE(widestType,CastE(TInt(k,[]),x))
                  ],loc)
 
