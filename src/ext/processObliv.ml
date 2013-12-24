@@ -514,7 +514,7 @@ let setKnownInt v k x loc =
                   ;"value",widestType,[]
                   ] in
   let func = voidFunc "__obliv_c__setSignedKnown" fargTypes in
-  Call(None,func,[ AddrOf v; xoBitsSizeOf (typeOf x)
+  Call(None,func,[ AddrOf v; xoBitsSizeOf (TInt(k,[]))
                  ; CastE(widestType,CastE(TInt(k,[]),x))
                  ],loc)
 

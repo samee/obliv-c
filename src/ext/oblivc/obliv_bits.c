@@ -658,6 +658,7 @@ bool __obliv_c__revealOblivBits (widest_t* dest, const OblivBit* src
   { return currentProto->revealOblivBits(currentProto,dest,src,size,party); }
 
 int ocCurrentParty() { return currentProto->thisParty; }
+ProtocolDesc* ocCurrentProto() { return currentProto; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)
@@ -723,7 +724,7 @@ void __obliv_c__setLShift (void* vdest, const void* vsrc, size_t n,
   int i;
   OblivBit* dest=vdest;
   const OblivBit* src=vsrc;
-  for(i=n-1;i>=shiftAmt;--i) __obliv_c__copyBit(dest+i,src+i-shiftAmt);
+  for(i=n-1;i>=(signed)shiftAmt;--i) __obliv_c__copyBit(dest+i,src+i-shiftAmt);
   for(;i>=0;--i) __obliv_c__assignBitKnown(dest+i,false);
 }
 void __obliv_c__setRShift (void* vdest, const void* vsrc, size_t n,
