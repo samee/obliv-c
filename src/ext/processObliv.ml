@@ -653,7 +653,13 @@ let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list =
       if isOblivSimple (typeOf x) then setUsingTmp v xf loc
       else [condSetKnownInt curCond v k x loc]
   | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
-      [Call(lvo,exp,mkAddrOf curCond::args,loc)]
+      let callinstr lvo' = Call(lvo',exp,mkAddrOf curCond::args,loc) in
+      begin match lvo with
+      | None -> [callinstr None]
+      | Some lv -> let nv = var (tmpVar (typeOfLval lv)) in
+                   callinstr (Some nv) ::
+                     codegenInstr curCond tmpVar isDeepVar (Set(lv,Lval nv,loc))
+      end
   | _ -> [instr]
 
 
