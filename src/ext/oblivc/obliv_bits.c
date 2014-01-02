@@ -1125,25 +1125,25 @@ bool revealOblivChar(char* dest, __obliv_c__char src,int party)
 }
 bool revealOblivInt(int* dest, __obliv_c__int src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(int),party)) 
     { *dest=(int)wd; return true; }
   return false;
 }
 bool revealOblivShort(short* dest, __obliv_c__short src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(short),party)) 
     { *dest=(short)wd; return true; }
   return false;
 }
 bool revealOblivLong(long* dest, __obliv_c__long src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(long),party)) 
     { *dest=(long)wd; return true; }
   return false;
 }
 bool revealOblivLLong(long long* dest, __obliv_c__lLong src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(long long),party)) 
     { *dest=(long long)wd; return true; }
   return false;
 }
