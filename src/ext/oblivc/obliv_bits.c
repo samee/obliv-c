@@ -162,6 +162,52 @@ int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount)
   free(socks);
   return 0;
 }
+
+typedef struct 
+{ ProtocolTransport cb; 
+  ProtocolDesc pd; 
+} SizeCheckTransportAdapter; // spliced object
+
+static int sizeCheckSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
+{ int sent = osend(&((SizeCheckTransportAdapter*)pt)->pd,dest,s,n);
+  if(sent==n) return n;
+  else 
+  { fprintf(stderr,"Was going to send %lu bytes to %d, sent %d\n",
+                   n,dest,sent);
+    if(sent<0) fprintf(stderr,"That means %s\n",strerror(sent));
+    exit(-1);
+  }
+}
+
+static int sizeCheckRecv(ProtocolTransport* pt,int src,void* s,size_t n)
+{ int recv = orecv(&((SizeCheckTransportAdapter*)pt)->pd,src,s,n);
+  if(recv==n) return n;
+  else 
+  { fprintf(stderr,"Was going to recv %lu bytes from %d, received %d\n",
+                    n,src,recv);
+    if(recv<0) fprintf(stderr,"That means %s\n",strerror(recv));
+    exit(-1);
+  }
+}
+static void sizeCheckCleanup(ProtocolTransport* pt)
+{ ProtocolTransport *inner = ((SizeCheckTransportAdapter*)pt)->pd.trans;
+  inner->cleanup(inner);
+  free(pt);
+}
+
+static ProtocolTransport* sizeCheckSubtransport(ProtocolTransport* pt,int ch)
+  { return NULL; }
+
+void protocolAddSizeCheck(ProtocolDesc* pd)
+{
+  SizeCheckTransportAdapter* t = malloc(sizeof(SizeCheckTransportAdapter));
+  t->pd = *pd; // Dummy protocol object, sliced just for the Transport object
+  pd->trans = &t->cb;
+  t->cb.send=sizeCheckSend;
+  t->cb.recv=sizeCheckRecv;
+  t->cb.cleanup=sizeCheckCleanup;
+  t->cb.subtransport=sizeCheckSubtransport;
+}
 // ---------------------------------------------------------------------------
 
 void cleanupProtocol(ProtocolDesc* pd)
