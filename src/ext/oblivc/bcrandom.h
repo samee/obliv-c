@@ -3,7 +3,7 @@
 
 #include<obliv_common.h>
 
-#define BC_MAXBLEN 20
+#define BC_MAXBLEN 20 // internal constant (i.e. private)
 #define BC_SEEDLEN (256/8)
 
 // Simply applies a block cipher in counter mode on zeroes
@@ -18,4 +18,4 @@ void releaseBCipherRandomGen(BCipherRandomGen* gen);
 void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len);
 
 // key is assumed to be BC_SEEDLEN bytes long
-void resetBCipherRandomGen(BCipherRandomGen* gen,char* key);
+void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key);

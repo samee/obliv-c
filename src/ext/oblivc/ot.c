@@ -63,7 +63,7 @@ void releaseBCipherRandomGen(BCipherRandomGen* gen)
 }
 
 // key is assumed to be BC_SEEDLEN bytes long
-void resetBCipherRandomGen(BCipherRandomGen* gen,char* key)
+void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key)
 {
   gcry_cipher_reset(gen->cipher);
   gcry_cipher_setkey(gen->cipher,key,BC_SEEDLEN);
@@ -547,13 +547,13 @@ void npotSend1Of2(NpotSender* s,char* opt0,char* opt1,int n,int len,
   if(i<n) npotSend1Of2Once(s,opt0+i*len,opt1+i*len,n-i,len);
 }
 
-void npotRecv1Of2(NpotRecver* r,char* dest,char* sel,int n,int len,
+void npotRecv1Of2(NpotRecver* r,char* dest,bool* sel,int n,int len,
     int batchsize)
 {
   int i,j;
   unsigned mask;
   for (i=0;i+batchsize<=n;i+=batchsize)
-  { for(j=mask=0;j<batchsize;++j) mask|=((sel[i+j]==1)<<j);
+  { for(j=mask=0;j<batchsize;++j) mask|=((sel[i+j]!=0)<<j);
     npotRecv1Of2Once(r,dest+i*len,mask,batchsize,len);
   }
   if(i<n) 
@@ -561,3 +561,162 @@ void npotRecv1Of2(NpotRecver* r,char* dest,char* sel,int n,int len,
     npotRecv1Of2Once(r,dest+i*len,mask,n-i,len);
   }
 }
+
+// --------------- OT-extension (assuming passive adversary) ----------------
+
+typedef struct 
+{ BCipherRandomGen *keyblock[BC_SEEDLEN*8];
+  BCipherRandomGen *padder;
+  bool S[BC_SEEDLEN*8];
+  char spack[BC_SEEDLEN]; // same as S, in packed bytes
+  ProtocolDesc* pd;
+  int destparty;
+} HonestOTExtSender;
+
+typedef struct
+{ BCipherRandomGen *keyblock0[BC_SEEDLEN*8], *keyblock1[BC_SEEDLEN*8];
+  BCipherRandomGen *padder;
+  ProtocolDesc* pd;
+  int srcparty;
+} HonestOTExtRecver;
+
+#define BATCH_SIZE 6
+// Base OT is done using npotSend1Of2
+HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty)
+{
+  int i;
+  char keys[BC_SEEDLEN*8*BC_SEEDLEN];
+  HonestOTExtSender* sender=malloc(sizeof(HonestOTExtSender));
+  gcry_randomize(sender->spack,BC_SEEDLEN,GCRY_STRONG_RANDOM);
+  sender->pd=pd; sender->destparty=destparty;
+  sender->padder=newBCipherRandomGen();
+  for(i=0;i<BC_SEEDLEN*8;++i)  sender->S[i]=(sender->spack[i/8]&(1<<i%8));
+
+  // Do the base OTs
+  NpotRecver* ot=npotRecverNew(1<<BATCH_SIZE,pd,destparty);
+  npotRecv1Of2(ot,keys,sender->S,BC_SEEDLEN*8,BC_SEEDLEN,BATCH_SIZE);
+  npotRecverRelease(ot);
+
+  // Initialize pseudorandom generators
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { sender->keyblock[i]=newBCipherRandomGen();
+    resetBCipherRandomGen(sender->keyblock[i],keys+i*BC_SEEDLEN);
+  }
+  return sender;
+}
+void honestOTExtSenderRelease(HonestOTExtSender* sender)
+{ int i;
+  for(i=0;i<BC_SEEDLEN*8;++i) releaseBCipherRandomGen(sender->keyblock[i]);
+  releaseBCipherRandomGen(sender->padder);
+  free(sender);
+}
+
+HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty)
+{ int i;
+  char keys0[BC_SEEDLEN*8*BC_SEEDLEN], keys1[BC_SEEDLEN*8*BC_SEEDLEN];
+  HonestOTExtRecver* recver = malloc(sizeof(HonestOTExtRecver));
+  gcry_randomize(keys0,BC_SEEDLEN*8*BC_SEEDLEN,GCRY_STRONG_RANDOM);
+  gcry_randomize(keys1,BC_SEEDLEN*8*BC_SEEDLEN,GCRY_STRONG_RANDOM);
+  recver->pd=pd; recver->srcparty=srcparty;
+  recver->padder=newBCipherRandomGen();
+
+  // Do the base OTs
+  NpotSender* ot=npotSenderNew(1<<BATCH_SIZE,pd,srcparty);
+  npotSend1Of2(ot,keys0,keys1,BC_SEEDLEN*8,BC_SEEDLEN,BATCH_SIZE);
+  npotSenderRelease(ot);
+
+  // Initialize pseudorandom generators
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { recver->keyblock0[i]=newBCipherRandomGen();
+    resetBCipherRandomGen(recver->keyblock0[i],keys0+i*BC_SEEDLEN);
+    recver->keyblock1[i]=newBCipherRandomGen();
+    resetBCipherRandomGen(recver->keyblock1[i],keys1+i*BC_SEEDLEN);
+  }
+  return recver;
+}
+void honestOTExtRecverRelease(HonestOTExtRecver* recver)
+{ int i;
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { releaseBCipherRandomGen(recver->keyblock0[i]);
+    releaseBCipherRandomGen(recver->keyblock1[i]);
+  }
+  releaseBCipherRandomGen(recver->padder);
+  free(recver);
+}
+
+// setBit(a,i,v) == xorBit(a,i,v^getBit(a,i));
+void setBit(char *dest,int ind,bool v)
+{ char mask = (1<<ind%8);
+  dest[ind/8] = (dest[ind/8]&~mask)+(v?mask:0);
+}
+bool getBit(const char* src,int ind) { return src[ind/8]&(1<<ind%8); }
+void xorBit(char *dest,int ind,bool v) { dest[ind/8]^=(v<<ind%8); }
+
+// Same function for encypt and decrypt. One-time pad, so don't reuse keys
+void bcipherCrypt(BCipherRandomGen* gen,const char* key,
+                  char* dest,const char* src,int n)
+{
+  int i;
+  resetBCipherRandomGen(gen,key);
+  randomizeBuffer(gen,dest,n);
+  for(i=0;i<n;++i) dest[i]^=src[i];
+}
+
+void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
+    int n,int len)
+{
+  int i,j;
+  const int bytes = (n+7)/8;
+  char (*cryptokeys)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN); // TODO structify
+  char* pseudorandom = malloc(bytes);
+  char* cipher = malloc(len);
+  orecv(s->pd,s->destparty,cryptokeys,n*BC_SEEDLEN);
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { randomizeBuffer(s->keyblock[i],pseudorandom,bytes);
+    if(s->S[i]==0) for(j=0;j<n;++j) 
+      setBit(cryptokeys[j],i,getBit(pseudorandom,j));
+    else for(j=0;j<n;++j) 
+      xorBit(cryptokeys[j],i,getBit(pseudorandom,j));
+  }
+  for(i=0;i<n;++i)
+  { bcipherCrypt(s->padder,cryptokeys[i],cipher,opt0+i*len,len);
+    osend(s->pd,s->destparty,cipher,len);
+    for(j=0;j<BC_SEEDLEN;++j) cryptokeys[i][j]^=s->spack[j];
+    bcipherCrypt(s->padder,cryptokeys[i],cipher,opt1+i*len,len);
+    osend(s->pd,s->destparty,cipher,len);
+  }
+  free(cipher);
+  free(pseudorandom);
+  free(cryptokeys);
+}
+void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len)
+{
+  int i,j;
+  const int bytes = (n+7)/8;
+  char (*cryptokeys0)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN);
+  char (*cryptokeys1)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN);
+  char* pseudorandom = malloc(bytes);
+  char *cipher0 = malloc(len), *cipher1 = malloc(len);
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { randomizeBuffer(r->keyblock0[i],pseudorandom,bytes);
+    for(j=0;j<n;++j) setBit(cryptokeys0[j],i,getBit(pseudorandom,j));
+    randomizeBuffer(r->keyblock1[i],pseudorandom,bytes);
+    for(j=0;j<n;++j) setBit(cryptokeys1[j],i,sel[j]^getBit(pseudorandom,j));
+  }
+  for(i=0;i<BC_SEEDLEN;++i) for(j=0;j<n;++j) 
+    cryptokeys1[j][i]^=cryptokeys0[j][i];
+  osend(r->pd,r->srcparty,cryptokeys1,n*BC_SEEDLEN);
+  for(i=0;i<n;++i) 
+  { orecv(r->pd,r->srcparty,cipher0,len);
+    orecv(r->pd,r->srcparty,cipher1,len);
+    bcipherCrypt(r->padder,cryptokeys0[i],(sel[i]?cipher1:cipher0),
+                 dest+i*len,len);
+  }
+  free(cryptokeys0);
+  free(cryptokeys1);
+  free(pseudorandom);
+  free(cipher0);
+  free(cipher1);
+}
+#undef BATCH_SIZE
