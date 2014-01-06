@@ -78,6 +78,46 @@ void clock1Of2(int argc, char* argv[])
     free(buf0); free(buf1);
   }
 }
+void testExtension(int argc, char* argv[])
+{
+  int i,n;
+  ProtocolDesc pd;
+  if(argc<3)
+  { fprintf(stderr,"Too few parameters\n");
+    return;
+  }
+  protocolUseStdio(&pd);
+
+  if(argv[1][0]=='R')
+  {
+    struct HonestOTExtRecver* r;
+    char buf[11*20];
+    bool sel[20];
+    int i,n;
+    setCurrentParty(&pd,2);
+    n = argc-2;
+    if(n>20) { fprintf(stderr,"n too large, using n=20\n"); n=20; }
+    for(i=0;i<n;++i) sel[i]=(argv[i+2][0]=='1');
+    r = honestOTExtRecverNew(&pd,1);
+    honestOTExtRecv1Of2(r,buf,sel,n,11);
+    honestOTExtRecverRelease(r);
+    for(i=0;i<n;++i) fprintf(stderr,"Element %d: %s\n",i,buf+11*i);
+  }else
+  { struct HonestOTExtSender* s;
+    char buf0[11*20], buf1[11*20];
+    int i,n=10;
+    setCurrentParty(&pd,1);
+    sscanf(argv[2],"%d",&n);
+    if(n>20) { fprintf(stderr,"n too large, using n=20\n"); n=20; }
+    for(i=0;i<n;++i) 
+    { sprintf(buf0+i*11,"0 %d",i);
+      sprintf(buf1+i*11,"1 %d",i);
+    }
+    s = honestOTExtSenderNew(&pd,2);
+    honestOTExtSend1Of2(s,buf0,buf1,n,11);
+    honestOTExtSenderRelease(s);
+  }
+}
 void test1Of2(int argc, char* argv[])
 {
   int i,n;

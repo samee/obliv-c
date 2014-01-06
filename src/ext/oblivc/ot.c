@@ -4,7 +4,6 @@
 #include<pthread.h>
 #include<stdbool.h>
 #include<stdint.h>
-#include<stdio.h>
 #include<stdlib.h>
 
 #include<bcrandom.h>
@@ -564,7 +563,7 @@ void npotRecv1Of2(NpotRecver* r,char* dest,bool* sel,int n,int len,
 
 // --------------- OT-extension (assuming passive adversary) ----------------
 
-typedef struct 
+typedef struct HonestOTExtSender
 { BCipherRandomGen *keyblock[BC_SEEDLEN*8];
   BCipherRandomGen *padder;
   bool S[BC_SEEDLEN*8];
@@ -573,7 +572,7 @@ typedef struct
   int destparty;
 } HonestOTExtSender;
 
-typedef struct
+typedef struct HonestOTExtRecver
 { BCipherRandomGen *keyblock0[BC_SEEDLEN*8], *keyblock1[BC_SEEDLEN*8];
   BCipherRandomGen *padder;
   ProtocolDesc* pd;
@@ -653,6 +652,7 @@ bool getBit(const char* src,int ind) { return src[ind/8]&(1<<ind%8); }
 void xorBit(char *dest,int ind,bool v) { dest[ind/8]^=(v<<ind%8); }
 
 // Same function for encypt and decrypt. One-time pad, so don't reuse keys
+// Overlapping buffers not supported
 void bcipherCrypt(BCipherRandomGen* gen,const char* key,
                   char* dest,const char* src,int n)
 {
@@ -710,8 +710,8 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   for(i=0;i<n;++i) 
   { orecv(r->pd,r->srcparty,cipher0,len);
     orecv(r->pd,r->srcparty,cipher1,len);
-    bcipherCrypt(r->padder,cryptokeys0[i],(sel[i]?cipher1:cipher0),
-                 dest+i*len,len);
+    bcipherCrypt(r->padder,cryptokeys0[i],dest+i*len,
+        (sel[i]?cipher1:cipher0),len);
   }
   free(cryptokeys0);
   free(cryptokeys1);

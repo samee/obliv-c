@@ -26,4 +26,14 @@ void npotRecverRelease(struct NpotRecver* r);
 void npotSend1Of2Once(struct NpotSender* s,char* opt0,char* opt1,int n,int len);
 void npotRecv1Of2Once(struct NpotRecver* r,char* dest
                      ,unsigned mask,int n,int len);
+
+struct HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty);
+void honestOTExtRecverRelease(struct HonestOTExtRecver* recver);
+void honestOTExtRecv1Of2(struct HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len);
+
+struct HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty);
+void honestOTExtSenderRelease(struct HonestOTExtSender* sender);
+void honestOTExtSend1Of2(struct HonestOTExtSender* s,
+    const char* opt0,const char* opt1,int n,int len);
 #endif
