@@ -16,6 +16,65 @@ double wallClock()
   return t.tv_sec+1e-9*t.tv_nsec;
 }
 
+void clockExtension(int argc, char* argv[])
+{
+  int i,n;
+  ProtocolDesc pd;
+
+  protocolUseStdio(&pd);
+  if(argc<3)
+  { fprintf(stderr,"Too few parameters\n");
+    return;
+  }
+
+  if(argv[1][0]=='R')
+  {
+    struct HonestOTExtRecver* r;
+    char *buf;
+    bool *sel;
+    int i,n;
+    clock_t lap;
+    double wlap;
+    setCurrentParty(&pd,2);
+    sscanf(argv[2],"%d",&n);
+    buf = malloc(11*n); sel = malloc(n);
+    for(i=0;i<n;++i) sel[i]=i%2;
+    lap = clock();
+    wlap = wallClock();
+    r = honestOTExtRecverNew(&pd,1);
+    honestOTExtRecv1Of2(r,buf,sel,n,11);
+    honestOTExtRecverRelease(r);
+    fprintf(stderr,"R CPU time is %lf, wall time is %lf\n",
+        (clock()-lap)/(double)(CLOCKS_PER_SEC),wallClock()-wlap);
+    char ref[11];
+    for(i=0;i<n;++i)
+    { snprintf(ref,11,"%d %d",sel[i],i);
+      if(strncmp(ref,buf+i*11,11)) fprintf(stderr,"Didn't work. Got '%s'\n",buf+i*11);
+    }
+    free(buf); free(sel);
+  }else
+  { struct HonestOTExtSender* s;
+    char *buf0,*buf1;
+    int i,n=10,bs;
+    clock_t lap;
+    double wlap;
+    setCurrentParty(&pd,1);
+    sscanf(argv[2],"%d",&n);
+    buf0 = malloc(11*n); buf1 = malloc(11*n);
+    for(i=0;i<n;++i) 
+    { sprintf(buf0+i*11,"0 %d",i);
+      sprintf(buf1+i*11,"1 %d",i);
+    }
+    lap = clock();
+    wlap = wallClock();
+    s = honestOTExtSenderNew(&pd,2);
+    honestOTExtSend1Of2(s,buf0,buf1,n,11);
+    honestOTExtSenderRelease(s);
+    fprintf(stderr,"S CPU time is %lf, wall time is %lf\n",
+        (clock()-lap)/(double)(CLOCKS_PER_SEC),wallClock()-wlap);
+    free(buf0); free(buf1);
+  }
+}
 void clock1Of2(int argc, char* argv[])
 {
   int i,n;
@@ -238,7 +297,7 @@ void showhex(const unsigned char* c,size_t len)
 int main(int argc, char* argv[])
 {
   dhRandomInit();
-  clock1Of2(argc,argv);
+  clockExtension(argc,argv);
   dhRandomFinalize();
   return 0;
 }

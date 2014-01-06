@@ -579,7 +579,7 @@ typedef struct HonestOTExtRecver
   int srcparty;
 } HonestOTExtRecver;
 
-#define BATCH_SIZE 6
+#define BATCH_SIZE 5
 // Base OT is done using npotSend1Of2
 HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty)
 {
