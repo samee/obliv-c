@@ -48,13 +48,26 @@ struct ProtocolDesc {
   void* extra;  // protocol-specific information
 };
 
+#define NPOT_BATCH_SIZE 7
+typedef struct {
+  void* sender;
+  void (*send)(void*,const char*,const char*,int n,int len);
+  void (*release)(void*);
+} OTsender;
+
+typedef struct {
+  void* recver;
+  void (*recv)(void*,char*,const bool*,int n,int len);
+  void (*release)(void*);
+} OTrecver;
+
 typedef struct YaoProtocolDesc {
   yao_key_t R,I; // LSB of R needs to be 1
   uint64_t gcount;
   unsigned icount, ocount;
   void (*nonFreeGate)(struct ProtocolDesc*,OblivBit*,char,
       const OblivBit*,const OblivBit*);
-  union { struct NpotSender* sender; struct NpotRecver* recver; };
+  union { OTsender sender; OTrecver recver; };
 } YaoProtocolDesc;
 
 typedef struct ProtocolTransport ProtocolTransport;

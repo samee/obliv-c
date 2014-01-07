@@ -512,7 +512,8 @@ void npotRecvLong(NpotRecver* r,char* dest,int seli,int n,int len)
 }
 
 // Finally, I am ditching the double-pointer pattern
-void npotSend1Of2Once(NpotSender* s,char* opt0,char* opt1,int n,int len)
+void npotSend1Of2Once(NpotSender* s,const char* opt0,const char* opt1,
+    int n,int len)
 {
   int i,j,c;
   char *buf,**starts;
@@ -537,7 +538,7 @@ void npotRecv1Of2Once(NpotRecver* r,char* dest,unsigned mask,int n,int len)
   npotRecvLong(r,dest,mask,(1<<n),len*n);
 }
 
-void npotSend1Of2(NpotSender* s,char* opt0,char* opt1,int n,int len,
+void npotSend1Of2(NpotSender* s,const char* opt0,const char* opt1,int n,int len,
     int batchsize)
 {
   int i;
@@ -546,7 +547,7 @@ void npotSend1Of2(NpotSender* s,char* opt0,char* opt1,int n,int len,
   if(i<n) npotSend1Of2Once(s,opt0+i*len,opt1+i*len,n-i,len);
 }
 
-void npotRecv1Of2(NpotRecver* r,char* dest,bool* sel,int n,int len,
+void npotRecv1Of2(NpotRecver* r,char* dest,const bool* sel,int n,int len,
     int batchsize)
 {
   int i,j;
@@ -559,6 +560,23 @@ void npotRecv1Of2(NpotRecver* r,char* dest,bool* sel,int n,int len,
   { for(j=mask=0;i+j<n;++j) mask|=((sel[i+j]==1)<<j);
     npotRecv1Of2Once(r,dest+i*len,mask,n-i,len);
   }
+}
+
+void npotAbstractSend(void* sender,const char* opt0,const char* opt1,
+                      int n,int len)
+  { npotSend1Of2(sender,opt0,opt1,n,len,NPOT_BATCH_SIZE); }
+
+OTsender npotSenderAbstract(NpotSender* s)
+{ return (OTsender) {.sender=(void*)s, .send=npotAbstractSend, 
+                     .release=(void (*)(void*))npotSenderRelease };
+}
+
+void npotAbstractRecv(void* recver,char* dest,const bool* sel,int n,int len)
+  { npotRecv1Of2(recver,dest,sel,n,len,NPOT_BATCH_SIZE); }
+
+OTrecver npotRecverAbstract(NpotRecver* r)
+{ return (OTrecver) {.recver=(void*)r, .recv=npotAbstractRecv,
+                     .release=(void (*)(void*))npotRecverRelease };
 }
 
 // --------------- OT-extension (assuming passive adversary) ----------------

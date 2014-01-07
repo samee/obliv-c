@@ -216,7 +216,6 @@ void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
 //-------------------- Yao Protocol (honest but curious) -------------
 
 // ---- OT Adapter for NPOT, just buffers them ----
-#define OT_BATCH_SIZE 7
 
 static pthread_once_t gcryInitDone = PTHREAD_ONCE_INIT;
 
@@ -352,7 +351,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
       ypd->icount++;
       ++bp;
     }
-    npotSend1Of2(ypd->sender,buf0,buf1,bc,YAO_KEY_BYTES,OT_BATCH_SIZE);
+    ypd->sender.send(ypd->sender.sender,buf0,buf1,bc,YAO_KEY_BYTES);
     free(buf0); free(buf1);
   }
 }
@@ -381,7 +380,7 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
       ypd->icount++;
       ++bp;
     }
-    npotRecv1Of2(ypd->recver,buf,sel,bc,YAO_KEY_BYTES,OT_BATCH_SIZE);
+    ypd->recver.recv(ypd->recver.recver,buf,sel,bc,YAO_KEY_BYTES);
     for(i=0;i<bc;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
     free(buf); free(dest); free(sel);
   }
@@ -520,14 +519,15 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
     ypd->R[tailind] &= (1<<tailpos)-1;
     ypd->I[tailind] &= (1<<tailpos)-1;
-    ypd->sender = npotSenderNew(1<<OT_BATCH_SIZE,pd,2);
-  }else ypd->recver = npotRecverNew(1<<OT_BATCH_SIZE,pd,1);
+    ypd->sender = npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,pd,2));
+  }else 
+    ypd->recver = npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,pd,1));
 
   currentProto = pd;
   start(arg);
 
-  if(me==1) npotSenderRelease(ypd->sender);
-  else npotRecverRelease(ypd->recver);
+  if(me==1) ypd->sender.release(ypd->sender.sender);
+  else ypd->recver.release(ypd->recver.recver);
 }
 
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
