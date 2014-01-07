@@ -215,6 +215,7 @@ void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
 
 //-------------------- Yao Protocol (honest but curious) -------------
 
+// ---- OT Adapter for NPOT, just buffers them ----
 #define OT_BATCH_SIZE 7
 
 static pthread_once_t gcryInitDone = PTHREAD_ONCE_INIT;
@@ -316,13 +317,12 @@ static bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1<<s->j); }
 static OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
 static void nextBit(OIBitSrc* s) 
   { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
-/*
 static int bitCount(OIBitSrc* s) 
 { int res=0,i;
   for(i=0;i<s->n;++i) res+=s->oi[i].size;
   return res;
 }
-*/
+
 void yaoGenrFeedOblivInputs(ProtocolDesc* pd
                            ,OblivInputs* oi,size_t n,int src)
 { 
@@ -338,8 +338,8 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
     yaoKeyCopy(o->yao.w,w0);
     ypd->icount++;
   }else 
-  {
-    char buf0[OT_BATCH_SIZE*YAO_KEY_BYTES], buf1[OT_BATCH_SIZE*YAO_KEY_BYTES];
+  { int bc = bitCount(&it);
+    char *buf0 = malloc(bc*YAO_KEY_BYTES), *buf1 = malloc(bc*YAO_KEY_BYTES);
     int bp=0;
     for(;hasBit(&it);nextBit(&it))
     { 
@@ -350,12 +350,10 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
       o->yao.inverted = false; o->unknown = true;
       yaoKeyCopy(o->yao.w,w0);
       ypd->icount++;
-      if(++bp>=OT_BATCH_SIZE)
-      { npotSend1Of2Once(ypd->sender,buf0,buf1,OT_BATCH_SIZE,YAO_KEY_BYTES);
-        bp=0;
-      }
+      ++bp;
     }
-    if(bp>0) npotSend1Of2Once(ypd->sender,buf0,buf1,bp,YAO_KEY_BYTES);
+    npotSend1Of2(ypd->sender,buf0,buf1,bc,YAO_KEY_BYTES,OT_BATCH_SIZE);
+    free(buf0); free(buf1);
   }
 }
 void yaoEvalFeedOblivInputs(ProtocolDesc* pd
@@ -368,8 +366,9 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
     o->unknown = true;
     ypd->icount++;
   }else 
-  { char buf[OT_BATCH_SIZE*YAO_KEY_BYTES], *dest[OT_BATCH_SIZE];
-    int mask=0;
+  { int bc = bitCount(&it);
+    char *buf = malloc(bc*YAO_KEY_BYTES), **dest = malloc(bc*sizeof(char*));
+    bool* sel = malloc(bc*sizeof(bool));
     int bp=0,i;
     // XXX we are currently using NPOT, so it can be used with any protocol
     //   later on if we change it (to use e.g. passive-secure OT-extension)
@@ -377,20 +376,14 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
     for(;hasBit(&it);nextBit(&it))
     { OblivBit* o = curDestBit(&it);
       dest[bp]=o->yao.w;
-      mask|=(curBit(&it)?1<<bp:0);
+      sel[bp]=curBit(&it);
       o->unknown = true; // Known to me, but not to both parties
       ypd->icount++;
-      if(++bp>=OT_BATCH_SIZE)
-      { npotRecv1Of2Once(ypd->recver,buf,mask,OT_BATCH_SIZE,YAO_KEY_BYTES);
-        for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
-        bp=0;
-        mask=0;
-      }
+      ++bp;
     }
-    if(bp>0)
-    { npotRecv1Of2Once(ypd->recver,buf,mask,bp,YAO_KEY_BYTES);
-      for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
-    }
+    npotRecv1Of2(ypd->recver,buf,sel,bc,YAO_KEY_BYTES,OT_BATCH_SIZE);
+    for(i=0;i<bc;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
+    free(buf); free(dest); free(sel);
   }
 }
 
