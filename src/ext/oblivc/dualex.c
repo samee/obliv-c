@@ -70,6 +70,10 @@ void* dualexThread(void* varg)
   DualexHalfPD* pd = arg->pd;
   setupYaoProtocol(&pd->ypd);
   pd->yFeedOblivInputs = pd->ypd.feedOblivInputs;
+  if(pd->ypd.thisParty==1) ((YaoProtocolDesc*)pd->ypd.extra)->sender = 
+    npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,&pd->ypd,2));
+  else ((YaoProtocolDesc*)pd->ypd.extra)->recver =
+    npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,&pd->ypd,1));
   pd->ypd.feedOblivInputs = dualexFeedOblivInputs;
   // In this function, pd->ypd.thisParty == 1 always means generator
   pd->ypd.revealOblivBits = (pd->ypd.thisParty==1
