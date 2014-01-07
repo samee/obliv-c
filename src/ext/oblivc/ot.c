@@ -738,3 +738,17 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   free(cipher1);
 }
 #undef BATCH_SIZE
+
+void honestWrapperSend(void* s,const char* opt0,const char* opt1,
+    int n,int len) { honestOTExtSend1Of2(s,opt0,opt1,n,len); }
+void honestWrapperRecv(void* r,char* dest,const bool* sel,
+    int n,int len) { honestOTExtRecv1Of2(r,dest,sel,n,len); }
+
+OTsender honestOTExtSenderAbstract(HonestOTExtSender* s)
+{ return (OTsender){.sender=s, .send=honestWrapperSend, 
+                    .release=(void(*)(void*))honestOTExtSenderRelease};
+}
+OTrecver honestOTExtRecverAbstract(HonestOTExtRecver* r)
+{ return (OTrecver){.recver=r, .recv=honestWrapperRecv, 
+                    .release=(void(*)(void*))honestOTExtRecverRelease};
+}

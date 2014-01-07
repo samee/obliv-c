@@ -522,10 +522,10 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     ypd->R[tailind] &= (1<<tailpos)-1;
     ypd->I[tailind] &= (1<<tailpos)-1;
     if(ypd->sender.sender==NULL)
-      ypd->sender = npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,pd,2));
+      ypd->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
   }else 
     if(ypd->recver.recver==NULL)
-      ypd->recver = npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,pd,1));
+      ypd->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,1));
 
   currentProto = pd;
   start(arg);

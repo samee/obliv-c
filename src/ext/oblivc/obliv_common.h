@@ -38,9 +38,11 @@ struct HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty);
 void honestOTExtRecverRelease(struct HonestOTExtRecver* recver);
 void honestOTExtRecv1Of2(struct HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len);
+OTrecver honestOTExtRecverAbstract(struct HonestOTExtRecver* r);
 
 struct HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty);
 void honestOTExtSenderRelease(struct HonestOTExtSender* sender);
 void honestOTExtSend1Of2(struct HonestOTExtSender* s,
     const char* opt0,const char* opt1,int n,int len);
+OTsender honestOTExtSenderAbstract(struct HonestOTExtSender* s);
 #endif
