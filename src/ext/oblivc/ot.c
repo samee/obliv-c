@@ -4,7 +4,6 @@
 #include<pthread.h>
 #include<stdbool.h>
 #include<stdint.h>
-#include<stdio.h>
 #include<stdlib.h>
 
 #include<bcrandom.h>
@@ -63,7 +62,7 @@ void releaseBCipherRandomGen(BCipherRandomGen* gen)
 }
 
 // key is assumed to be BC_SEEDLEN bytes long
-void resetBCipherRandomGen(BCipherRandomGen* gen,char* key)
+void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key)
 {
   gcry_cipher_reset(gen->cipher);
   gcry_cipher_setkey(gen->cipher,key,BC_SEEDLEN);
@@ -513,7 +512,8 @@ void npotRecvLong(NpotRecver* r,char* dest,int seli,int n,int len)
 }
 
 // Finally, I am ditching the double-pointer pattern
-void npotSend1Of2Once(NpotSender* s,char* opt0,char* opt1,int n,int len)
+void npotSend1Of2Once(NpotSender* s,const char* opt0,const char* opt1,
+    int n,int len)
 {
   int i,j,c;
   char *buf,**starts;
@@ -538,7 +538,7 @@ void npotRecv1Of2Once(NpotRecver* r,char* dest,unsigned mask,int n,int len)
   npotRecvLong(r,dest,mask,(1<<n),len*n);
 }
 
-void npotSend1Of2(NpotSender* s,char* opt0,char* opt1,int n,int len,
+void npotSend1Of2(NpotSender* s,const char* opt0,const char* opt1,int n,int len,
     int batchsize)
 {
   int i;
@@ -547,13 +547,13 @@ void npotSend1Of2(NpotSender* s,char* opt0,char* opt1,int n,int len,
   if(i<n) npotSend1Of2Once(s,opt0+i*len,opt1+i*len,n-i,len);
 }
 
-void npotRecv1Of2(NpotRecver* r,char* dest,char* sel,int n,int len,
+void npotRecv1Of2(NpotRecver* r,char* dest,const bool* sel,int n,int len,
     int batchsize)
 {
   int i,j;
   unsigned mask;
   for (i=0;i+batchsize<=n;i+=batchsize)
-  { for(j=mask=0;j<batchsize;++j) mask|=((sel[i+j]==1)<<j);
+  { for(j=mask=0;j<batchsize;++j) mask|=((sel[i+j]!=0)<<j);
     npotRecv1Of2Once(r,dest+i*len,mask,batchsize,len);
   }
   if(i<n) 
@@ -562,195 +562,193 @@ void npotRecv1Of2(NpotRecver* r,char* dest,char* sel,int n,int len,
   }
 }
 
-/*
-// -------------- Test suite, belongs in a separate file ---------------------
+void npotAbstractSend(void* sender,const char* opt0,const char* opt1,
+                      int n,int len)
+  { npotSend1Of2(sender,opt0,opt1,n,len,NPOT_BATCH_SIZE); }
 
-#define ARRSIZE(a) (sizeof(a)/sizeof(*a))
-#define XBYTES 6
-
-#include<time.h>
-
-double wallClock()
-{
-  struct timespec t;
-  clock_gettime(CLOCK_REALTIME,&t);
-  return t.tv_sec+1e-9*t.tv_nsec;
+OTsender npotSenderAbstract(NpotSender* s)
+{ return (OTsender) {.sender=(void*)s, .send=npotAbstractSend, 
+                     .release=(void (*)(void*))npotSenderRelease };
 }
 
-void clock1Of2(int argc, char* argv[])
-{
-  int i,n;
-  if(argc<3)
-  { fprintf(stderr,"Too few parameters\n");
-    return;
-  }
+void npotAbstractRecv(void* recver,char* dest,const bool* sel,int n,int len)
+  { npotRecv1Of2(recver,dest,sel,n,len,NPOT_BATCH_SIZE); }
 
-  if(argv[1][0]=='R')
-  {
-    NpotRecver* r;
-    char *buf,*sel;
-    int i,n,bs;
-    clock_t lap;
-    double wlap;
-    sscanf(argv[2],"%d",&n);
-    buf = malloc(11*n); sel = malloc(n);
-    for(i=0;i<n;++i) sel[i]=0;
-    for(bs=1;bs<=16;++bs)
-    { lap = clock();
-      wlap = wallClock();
-      r = npotRecverNew(1<<bs);
-      npotRecv1Of2(r,buf,sel,n,11,bs);
-      npotRecverRelease(r);
-      fprintf(stderr,"R For batch size %d, CPU time is %lf, wall time is %lf\n",
-          bs,(clock()-lap)/(double)(CLOCKS_PER_SEC),wallClock()-wlap);
-    }
-    free(buf); free(sel);
-  }else
-  { NpotSender* s;
-    char *buf0,*buf1;
-    int i,n=10,bs;
-    clock_t lap;
-    double wlap;
-    sscanf(argv[2],"%d",&n);
-    buf0 = malloc(11*n); buf1 = malloc(11*n);
-    for(i=0;i<n;++i) 
-    { sprintf(buf0+i*11,"0 %d",i);
-      sprintf(buf1+i*11,"1 %d",i);
-    }
-    for(bs=1;bs<=16;++bs)
-    { lap = clock();
-      wlap = wallClock();
-      s = npotSenderNew(1<<bs);
-      npotSend1Of2(s,buf0,buf1,n,11,bs);
-      npotSenderRelease(s);
-      fprintf(stderr,"S For batch size %d, CPU time is %lf, wall time is %lf\n",
-          bs,(clock()-lap)/(double)(CLOCKS_PER_SEC),wallClock()-wlap);
-    }
-    free(buf0); free(buf1);
-  }
-}
-void test1Of2(int argc, char* argv[])
-{
-  int i,n;
-  if(argc<3)
-  { fprintf(stderr,"Too few parameters\n");
-    return;
-  }
-
-  if(argv[1][0]=='R')
-  {
-    NpotRecver* r;
-    char buf[11*20],sel[20];
-    int i,n;
-    n = argc-2;
-    if(n>20) { fprintf(stderr,"n too large, using n=20\n"); n=20; }
-    for(i=0;i<n;++i) sel[i]=(argv[i+2][0]=='1');
-    r = npotRecverNew(8);
-    npotRecv1Of2(r,buf,sel,n,11,4);
-    npotRecverRelease(r);
-    for(i=0;i<n;++i) fprintf(stderr,"Element %d: %s\n",i,buf+11*i);
-  }else
-  { NpotSender* s;
-    char buf0[11*20], buf1[11*20];
-    int i,n=10;
-    sscanf(argv[2],"%d",&n);
-    if(n>20) { fprintf(stderr,"n too large, using n=20\n"); n=20; }
-    for(i=0;i<n;++i) 
-    { sprintf(buf0+i*11,"0 %d",i);
-      sprintf(buf1+i*11,"1 %d",i);
-    }
-    s = npotSenderNew(8);
-    npotSend1Of2(s,buf0,buf1,n,11,4);
-    npotSenderRelease(s);
-  }
+OTrecver npotRecverAbstract(NpotRecver* r)
+{ return (OTrecver) {.recver=(void*)r, .recv=npotAbstractRecv,
+                     .release=(void (*)(void*))npotRecverRelease };
 }
 
-void testBaseLarge(int argc, char* argv[])
-{
-  const int len = 80;
-  int n,i;
-  if(argc<2
-      || (argv[1][0]=='R' && argc<4)
-      || (argv[1][0]=='S' && argc<3)) { 
-    fprintf(stderr,"Too few parameters\n"); 
-    return; 
-  }
-  
-  sscanf(argv[2],"%d",&n);
-  if(n<1) n=1;
+// --------------- OT-extension (assuming passive adversary) ----------------
 
-  if(argv[1][0]=='S')
-  {
-    char** buf;
-    NpotSender* s;
-    buf=malloc(sizeof(char*)*n);
-    for(i=0;i<n;++i)
-    { buf[i]=malloc(len*sizeof(char));
-      sprintf(buf[i],"Item lsdflkdfndslkfsdlkdfdlkf"
-          "dlkfldsmfkldsfsdfldsfdslkfjsdklf %d",i+5);
-    }
-    s = npotSenderNew(4);
-    npotSendLong(s,buf,n,len);
-    npotSenderRelease(s);
-    for(i=0;i<n;++i) free(buf[i]);
-    free(buf);
-  }else
-  {
-    char* buf;
-    NpotRecver* r;
-    buf = malloc(sizeof(char)*len);
-    r = npotRecverNew(4);
-    sscanf(argv[3],"%d",&i);
-    if(i<0 || i>=n) { fprintf(stderr,"index out of range\n"); return; }
-    npotRecvLong(r,buf,i,n,len);
-    buf[len-1]=0;
-    fprintf(stderr,"Data received: %s\n",buf);
-    npotRecverRelease(r);
-    free(buf);
-  }
-}
-void testBaseFour(int argc, char* argv[])
-{
-  int n = 4;
-  if(argc<=2 || argv[1][0]=='S')
-  { char* buf[] = {"Hello", "World", "Seven", "More!" };
-    NpotSender* s = npotSenderNew(n);
-    npotSend(s,buf,n,XBYTES);
-    npotSenderRelease(s);
-  }else
-  { char buf[XBYTES];
-    NpotRecver* r = npotRecverNew(n);
-    npotRecv(r,buf,argv[2][0]-'0',n,XBYTES);
-    npotRecverRelease(r);
-    buf[XBYTES-1]=0;
-    fprintf(stderr,"Data received: %s\n",buf);
-  }
-}
+typedef struct HonestOTExtSender
+{ BCipherRandomGen *keyblock[BC_SEEDLEN*8];
+  BCipherRandomGen *padder;
+  bool S[BC_SEEDLEN*8];
+  char spack[BC_SEEDLEN]; // same as S, in packed bytes
+  ProtocolDesc* pd;
+  int destparty;
+} HonestOTExtSender;
 
-void showhex(const unsigned char* c,size_t len)
-{
-  size_t i;
-  for(i=0;i<len;++i) fprintf(stderr,"%02x",c[i]);
-  fprintf(stderr,"\n");
-}
+typedef struct HonestOTExtRecver
+{ BCipherRandomGen *keyblock0[BC_SEEDLEN*8], *keyblock1[BC_SEEDLEN*8];
+  BCipherRandomGen *padder;
+  ProtocolDesc* pd;
+  int srcparty;
+} HonestOTExtRecver;
 
-void testMpiLoad()
+#define BATCH_SIZE 5
+// Base OT is done using npotSend1Of2
+HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty)
 {
-  BCipherRandomGen* gen = newBCipherRandomGen();
-  gcry_mpi_t x;
-  unsigned char buf[1000];
   int i;
-  for(i=0;i<1000000;++i) x=dhRandomElt(gen);
-  gcry_mpi_print(GCRYMPI_FMT_HEX,buf,1000,NULL,x);
-  fprintf(stderr,"%s\n",buf);
-  releaseBCipherRandomGen(gen);
+  char keys[BC_SEEDLEN*8*BC_SEEDLEN];
+  HonestOTExtSender* sender=malloc(sizeof(HonestOTExtSender));
+  gcry_randomize(sender->spack,BC_SEEDLEN,GCRY_STRONG_RANDOM);
+  sender->pd=pd; sender->destparty=destparty;
+  sender->padder=newBCipherRandomGen();
+  for(i=0;i<BC_SEEDLEN*8;++i)  sender->S[i]=(sender->spack[i/8]&(1<<i%8));
+
+  // Do the base OTs
+  NpotRecver* ot=npotRecverNew(1<<BATCH_SIZE,pd,destparty);
+  npotRecv1Of2(ot,keys,sender->S,BC_SEEDLEN*8,BC_SEEDLEN,BATCH_SIZE);
+  npotRecverRelease(ot);
+
+  // Initialize pseudorandom generators
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { sender->keyblock[i]=newBCipherRandomGen();
+    resetBCipherRandomGen(sender->keyblock[i],keys+i*BC_SEEDLEN);
+  }
+  return sender;
+}
+void honestOTExtSenderRelease(HonestOTExtSender* sender)
+{ int i;
+  for(i=0;i<BC_SEEDLEN*8;++i) releaseBCipherRandomGen(sender->keyblock[i]);
+  releaseBCipherRandomGen(sender->padder);
+  free(sender);
 }
 
-int main(int argc, char* argv[])
-{
-  dhRandomInit();
-  clock1Of2(argc,argv);
-  dhRandomFinalize();
-  return 0;
+HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty)
+{ int i;
+  char keys0[BC_SEEDLEN*8*BC_SEEDLEN], keys1[BC_SEEDLEN*8*BC_SEEDLEN];
+  HonestOTExtRecver* recver = malloc(sizeof(HonestOTExtRecver));
+  gcry_randomize(keys0,BC_SEEDLEN*8*BC_SEEDLEN,GCRY_STRONG_RANDOM);
+  gcry_randomize(keys1,BC_SEEDLEN*8*BC_SEEDLEN,GCRY_STRONG_RANDOM);
+  recver->pd=pd; recver->srcparty=srcparty;
+  recver->padder=newBCipherRandomGen();
+
+  // Do the base OTs
+  NpotSender* ot=npotSenderNew(1<<BATCH_SIZE,pd,srcparty);
+  npotSend1Of2(ot,keys0,keys1,BC_SEEDLEN*8,BC_SEEDLEN,BATCH_SIZE);
+  npotSenderRelease(ot);
+
+  // Initialize pseudorandom generators
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { recver->keyblock0[i]=newBCipherRandomGen();
+    resetBCipherRandomGen(recver->keyblock0[i],keys0+i*BC_SEEDLEN);
+    recver->keyblock1[i]=newBCipherRandomGen();
+    resetBCipherRandomGen(recver->keyblock1[i],keys1+i*BC_SEEDLEN);
+  }
+  return recver;
 }
-*/
+void honestOTExtRecverRelease(HonestOTExtRecver* recver)
+{ int i;
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { releaseBCipherRandomGen(recver->keyblock0[i]);
+    releaseBCipherRandomGen(recver->keyblock1[i]);
+  }
+  releaseBCipherRandomGen(recver->padder);
+  free(recver);
+}
+
+// setBit(a,i,v) == xorBit(a,i,v^getBit(a,i));
+void setBit(char *dest,int ind,bool v)
+{ char mask = (1<<ind%8);
+  dest[ind/8] = (dest[ind/8]&~mask)+(v?mask:0);
+}
+bool getBit(const char* src,int ind) { return src[ind/8]&(1<<ind%8); }
+void xorBit(char *dest,int ind,bool v) { dest[ind/8]^=(v<<ind%8); }
+
+// Same function for encypt and decrypt. One-time pad, so don't reuse keys
+// Overlapping buffers not supported
+void bcipherCrypt(BCipherRandomGen* gen,const char* key,
+                  char* dest,const char* src,int n)
+{
+  int i;
+  resetBCipherRandomGen(gen,key);
+  randomizeBuffer(gen,dest,n);
+  for(i=0;i<n;++i) dest[i]^=src[i];
+}
+
+void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
+    int n,int len)
+{
+  int i,j;
+  const int bytes = (n+7)/8;
+  char (*cryptokeys)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN); // TODO structify
+  char* pseudorandom = malloc(bytes);
+  char* cipher = malloc(len);
+  orecv(s->pd,s->destparty,cryptokeys,n*BC_SEEDLEN);
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { randomizeBuffer(s->keyblock[i],pseudorandom,bytes);
+    if(s->S[i]==0) for(j=0;j<n;++j) 
+      setBit(cryptokeys[j],i,getBit(pseudorandom,j));
+    else for(j=0;j<n;++j) 
+      xorBit(cryptokeys[j],i,getBit(pseudorandom,j));
+  }
+  for(i=0;i<n;++i)
+  { bcipherCrypt(s->padder,cryptokeys[i],cipher,opt0+i*len,len);
+    osend(s->pd,s->destparty,cipher,len);
+    for(j=0;j<BC_SEEDLEN;++j) cryptokeys[i][j]^=s->spack[j];
+    bcipherCrypt(s->padder,cryptokeys[i],cipher,opt1+i*len,len);
+    osend(s->pd,s->destparty,cipher,len);
+  }
+  free(cipher);
+  free(pseudorandom);
+  free(cryptokeys);
+}
+void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len)
+{
+  int i,j;
+  const int bytes = (n+7)/8;
+  char (*cryptokeys0)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN);
+  char (*cryptokeys1)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN);
+  char* pseudorandom = malloc(bytes);
+  char *cipher0 = malloc(len), *cipher1 = malloc(len);
+  for(i=0;i<BC_SEEDLEN*8;++i)
+  { randomizeBuffer(r->keyblock0[i],pseudorandom,bytes);
+    for(j=0;j<n;++j) setBit(cryptokeys0[j],i,getBit(pseudorandom,j));
+    randomizeBuffer(r->keyblock1[i],pseudorandom,bytes);
+    for(j=0;j<n;++j) setBit(cryptokeys1[j],i,sel[j]^getBit(pseudorandom,j));
+  }
+  for(i=0;i<BC_SEEDLEN;++i) for(j=0;j<n;++j) 
+    cryptokeys1[j][i]^=cryptokeys0[j][i];
+  osend(r->pd,r->srcparty,cryptokeys1,n*BC_SEEDLEN);
+  for(i=0;i<n;++i) 
+  { orecv(r->pd,r->srcparty,cipher0,len);
+    orecv(r->pd,r->srcparty,cipher1,len);
+    bcipherCrypt(r->padder,cryptokeys0[i],dest+i*len,
+        (sel[i]?cipher1:cipher0),len);
+  }
+  free(cryptokeys0);
+  free(cryptokeys1);
+  free(pseudorandom);
+  free(cipher0);
+  free(cipher1);
+}
+#undef BATCH_SIZE
+
+void honestWrapperSend(void* s,const char* opt0,const char* opt1,
+    int n,int len) { honestOTExtSend1Of2(s,opt0,opt1,n,len); }
+void honestWrapperRecv(void* r,char* dest,const bool* sel,
+    int n,int len) { honestOTExtRecv1Of2(r,dest,sel,n,len); }
+
+OTsender honestOTExtSenderAbstract(HonestOTExtSender* s)
+{ return (OTsender){.sender=s, .send=honestWrapperSend, 
+                    .release=(void(*)(void*))honestOTExtSenderRelease};
+}
+OTrecver honestOTExtRecverAbstract(HonestOTExtRecver* r)
+{ return (OTrecver){.recver=r, .recv=honestWrapperRecv, 
+                    .release=(void(*)(void*))honestOTExtRecverRelease};
+}
