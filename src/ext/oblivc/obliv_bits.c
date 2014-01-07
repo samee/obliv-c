@@ -501,11 +501,9 @@ void setupYaoProtocol(ProtocolDesc* pd)
   pd->setBitNot = yaoSetBitNot;
   pd->flipBit   = yaoFlipBit;
 
+  if(pd->thisParty==1) ypd->sender.sender=NULL;
+  else ypd->recver.recver=NULL;
   dhRandomInit();
-  if(pd->thisParty==1) 
-    ypd->sender = npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,pd,2));
-  else
-    ypd->recver = npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,pd,1));
 }
 void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
@@ -523,7 +521,11 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
     ypd->R[tailind] &= (1<<tailpos)-1;
     ypd->I[tailind] &= (1<<tailpos)-1;
-  }
+    if(ypd->sender.sender==NULL)
+      ypd->sender = npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,pd,2));
+  }else 
+    if(ypd->recver.recver==NULL)
+      ypd->recver = npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,pd,1));
 
   currentProto = pd;
   start(arg);
