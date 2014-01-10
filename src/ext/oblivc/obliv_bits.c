@@ -261,8 +261,6 @@ void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
 
 //-------------------- Yao Protocol (honest but curious) -------------
 
-// ---- OT Adapter for NPOT, just buffers them ----
-
 static pthread_once_t gcryInitDone = PTHREAD_ONCE_INIT;
 
 GCRY_THREAD_OPTION_PTHREAD_IMPL;
