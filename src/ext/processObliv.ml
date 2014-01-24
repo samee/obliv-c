@@ -607,12 +607,14 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         end
     | _ -> instr
     end
-| Set(v,CastE(TInt(k,a) as dt,x),loc) 
-    when isOblivSimple dt && not (isOblivSimple (typeOf x)) ->
-      setKnownInt v k x loc
-| Set(dv,CastE(TInt(dk,da),Lval sv),loc) when hasOblivAttr da ->
-    begin match typeOfLval sv with
-    | TInt(sk,sa) when hasOblivAttr sa ->
+| Set(v,CastE(dt,x),loc) when isOblivSimple dt && not (isOblivSimple (typeOf x)) ->
+    begin match unrollType dt with 
+    | TInt(k,_) -> setKnownInt v k x loc
+    | _ -> instr
+    end
+| Set(dv,CastE(dt,Lval sv),loc) when isOblivInt dt ->
+    begin match unrollType dt,unrollType (typeOfLval sv) with
+    | TInt(dk,da), TInt(sk,sa) when hasOblivAttr sa ->
         if isSigned sk then
           setIntExtend "__obliv_c__setSignExtend" dv dk sv sk loc
         else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
@@ -649,9 +651,12 @@ let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list =
         [setIfThenElse v curCond v2 v loc]
       else setUsingTmp v (Lval v2) loc
   | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> setUsingTmp v x loc
-  | Set(v,(CastE(TInt(k,a),x) as xf),loc) when isOblivSimple (typeOfLval v) ->
+  | Set(v,(CastE(t,x) as xf),loc) when isOblivInt t && isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then setUsingTmp v xf loc
-      else [condSetKnownInt curCond v k x loc]
+      else begin match unrollType t with
+           | TInt(k,_) -> [condSetKnownInt curCond v k x loc]
+           | _ -> [instr]
+           end
   | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
       let callinstr lvo' = Call(lvo',exp,mkAddrOf curCond::args,loc) in
       begin match lvo with
