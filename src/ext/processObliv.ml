@@ -544,6 +544,17 @@ let setIfThenElse dest c ts fs loc =
              ; mkAddrOf c ] in
   Call(None,func,args,loc)
 
+let condAssign c dest src loc = 
+  let fargTypes = ["cond",TPtr(TVoid [constAttr],[]),[]
+                  ;"dest",TPtr(TVoid [],[]),[]
+                  ;"src" ,TPtr(TVoid [constAttr],[]),[]
+                  ;"size",!typeOfSizeOf,[]
+  ] in
+  let func = voidFunc "__obliv_c__condAssign" fargTypes in
+  let args = [ mkAddrOf c; mkAddrOf dest; mkAddrOf src
+             ; xoBitsSizeOf (typeOfLval dest) ] in
+  Call(None,func,args,loc)
+
 let zeroSet (dest:varinfo) loc = 
   let fargTypes = ["s",TPtr(TVoid [],[]),[]
                   ;"c",TInt(IInt,[]),[]
@@ -648,7 +659,7 @@ let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list =
       [codegenUncondInstr instr]
   | Set(v,Lval(v2),loc) when isOblivSimple (typeOfLval v) -> 
       if isOblivSimple (typeOfLval v2) then
-        [setIfThenElse v curCond v2 v loc]
+        [condAssign curCond v v2 loc]
       else setUsingTmp v (Lval v2) loc
   | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> setUsingTmp v x loc
   | Set(v,(CastE(t,x) as xf),loc) when isOblivInt t && isOblivSimple (typeOfLval v) ->
