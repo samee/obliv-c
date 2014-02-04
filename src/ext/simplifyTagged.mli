@@ -4,7 +4,7 @@ val splitStructs : bool ref
 (* Attribute that identifies a singly-assigned, newly created temporary *)
 val simplifyTempTok : string
 val simplifyTemp : Cil.attribute
-val makeSimplifyTemp : Cil.fundec -> Cil.typ -> Cil.varinfo
+val makeSimplifyTemp : ?name:string -> Cil.fundec -> Cil.typ -> Cil.varinfo
 
 val typeEqual : Cil.typ -> Cil.typ -> bool
 

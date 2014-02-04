@@ -688,16 +688,17 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
   inherit nopCilVisitor
 
   method vstmt s = 
-    let tmpVar t = SimplifyTagged.makeSimplifyTemp curFunc t in
+    let tmpVar ?name t = SimplifyTagged.makeSimplifyTemp ?name curFunc t in
     let isDeepVar v = dt#curDepth() = dt#varDepth v in
     match s.skind with
     | Instr ilist -> 
         let nestedGen = codegenInstr curCond tmpVar isDeepVar in
         ChangeTo (mkStmt (Instr (mapcat nestedGen ilist)))
     | If(c,tb,fb,loc) when isOblivBlock tb ->
-        let cv = var (tmpVar oblivBoolType) in
-        let ct = var (tmpVar oblivBoolType) in
-        let cf = var (tmpVar oblivBoolType) in
+        let cond = "__obliv_c__cond" in
+        let cv = var (tmpVar ~name:cond oblivBoolType) in
+        let ct = var (tmpVar ~name:cond oblivBoolType) in
+        let cf = var (tmpVar ~name:cond oblivBoolType) in
         let visitSubBlock cond blk = 
           visitCilBlock (new codegenVisitor curFunc dt cond) blk in
         let cs = mkStmt (Instr (List.map codegenUncondInstr
