@@ -12,6 +12,7 @@
 
 void protocolUseStdio(ProtocolDesc*);
 void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount);
+void protocolAddSizeCheck(ProtocolDesc* pd);
 int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port,
                           int sockCount);
 int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount);
