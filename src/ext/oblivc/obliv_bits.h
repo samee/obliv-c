@@ -163,6 +163,8 @@ void __obliv_c__setNotEqual (void* dest
                             ,size_t size);
 void __obliv_c__setLogicalNot (void* dest,const void* op,size_t size);
 
+void __obliv_c__condAssign (const void* cond, void* dest, const void* src, 
+                            size_t size);
 // Conditionals (TODO other operators) that may be faster at times
 static inline 
 void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size

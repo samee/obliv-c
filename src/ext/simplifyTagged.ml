@@ -120,7 +120,7 @@ let noStringConstantsBasics = ref false
 let simplifyTempTok = "simplifyTemp"
 let simplifyTemp = Attr(simplifyTempTok,[])
 
-let makeSimplifyTemp f t = makeTempVar f (typeAddAttributes [simplifyTemp] t)
+let makeSimplifyTemp ?name f t = makeTempVar ?name f (typeAddAttributes [simplifyTemp] t)
 
 (* Not yet needed *)
 let typeEqual t1 t2 = 

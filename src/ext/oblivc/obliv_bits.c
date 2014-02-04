@@ -1012,6 +1012,12 @@ void __obliv_c__ifThenElse (void* vdest, const void* vtsrc
   }
 }
 
+void __obliv_c__condAssign (const void* cond,void* dest, const void* src, 
+                            size_t size)
+{
+  __obliv_c__ifThenElse (dest,src,dest,size,cond);
+}
+
 // ltOut and ltIn may alias here
 void __obliv_c__setLessThanUnit (OblivBit* ltOut
                                 ,const OblivBit* op1, const OblivBit* op2

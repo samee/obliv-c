@@ -544,6 +544,17 @@ let setIfThenElse dest c ts fs loc =
              ; mkAddrOf c ] in
   Call(None,func,args,loc)
 
+let condAssign c dest src loc = 
+  let fargTypes = ["cond",TPtr(TVoid [constAttr],[]),[]
+                  ;"dest",TPtr(TVoid [],[]),[]
+                  ;"src" ,TPtr(TVoid [constAttr],[]),[]
+                  ;"size",!typeOfSizeOf,[]
+  ] in
+  let func = voidFunc "__obliv_c__condAssign" fargTypes in
+  let args = [ mkAddrOf c; mkAddrOf dest; mkAddrOf src
+             ; xoBitsSizeOf (typeOfLval dest) ] in
+  Call(None,func,args,loc)
+
 let zeroSet (dest:varinfo) loc = 
   let fargTypes = ["s",TPtr(TVoid [],[]),[]
                   ;"c",TInt(IInt,[]),[]
@@ -607,12 +618,14 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         end
     | _ -> instr
     end
-| Set(v,CastE(TInt(k,a) as dt,x),loc) 
-    when isOblivSimple dt && not (isOblivSimple (typeOf x)) ->
-      setKnownInt v k x loc
-| Set(dv,CastE(TInt(dk,da),Lval sv),loc) when hasOblivAttr da ->
-    begin match typeOfLval sv with
-    | TInt(sk,sa) when hasOblivAttr sa ->
+| Set(v,CastE(dt,x),loc) when isOblivSimple dt && not (isOblivSimple (typeOf x)) ->
+    begin match unrollType dt with 
+    | TInt(k,_) -> setKnownInt v k x loc
+    | _ -> instr
+    end
+| Set(dv,CastE(dt,Lval sv),loc) when isOblivInt dt ->
+    begin match unrollType dt,unrollType (typeOfLval sv) with
+    | TInt(dk,da), TInt(sk,sa) when hasOblivAttr sa ->
         if isSigned sk then
           setIntExtend "__obliv_c__setSignExtend" dv dk sv sk loc
         else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
@@ -646,12 +659,15 @@ let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list =
       [codegenUncondInstr instr]
   | Set(v,Lval(v2),loc) when isOblivSimple (typeOfLval v) -> 
       if isOblivSimple (typeOfLval v2) then
-        [setIfThenElse v curCond v2 v loc]
+        [condAssign curCond v v2 loc]
       else setUsingTmp v (Lval v2) loc
   | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> setUsingTmp v x loc
-  | Set(v,(CastE(TInt(k,a),x) as xf),loc) when isOblivSimple (typeOfLval v) ->
+  | Set(v,(CastE(t,x) as xf),loc) when isOblivInt t && isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then setUsingTmp v xf loc
-      else [condSetKnownInt curCond v k x loc]
+      else begin match unrollType t with
+           | TInt(k,_) -> [condSetKnownInt curCond v k x loc]
+           | _ -> [instr]
+           end
   | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
       let callinstr lvo' = Call(lvo',exp,mkAddrOf curCond::args,loc) in
       begin match lvo with
@@ -683,16 +699,17 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
   inherit nopCilVisitor
 
   method vstmt s = 
-    let tmpVar t = SimplifyTagged.makeSimplifyTemp curFunc t in
+    let tmpVar ?name t = SimplifyTagged.makeSimplifyTemp ?name curFunc t in
     let isDeepVar v = dt#curDepth() = dt#varDepth v in
     match s.skind with
     | Instr ilist -> 
         let nestedGen = codegenInstr curCond tmpVar isDeepVar in
         ChangeTo (mkStmt (Instr (mapcat nestedGen ilist)))
     | If(c,tb,fb,loc) when isOblivBlock tb ->
-        let cv = var (tmpVar oblivBoolType) in
-        let ct = var (tmpVar oblivBoolType) in
-        let cf = var (tmpVar oblivBoolType) in
+        let cond = "__obliv_c__cond" in
+        let cv = var (tmpVar ~name:cond oblivBoolType) in
+        let ct = var (tmpVar ~name:cond oblivBoolType) in
+        let cf = var (tmpVar ~name:cond oblivBoolType) in
         let visitSubBlock cond blk = 
           visitCilBlock (new codegenVisitor curFunc dt cond) blk in
         let cs = mkStmt (Instr (List.map codegenUncondInstr

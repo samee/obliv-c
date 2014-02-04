@@ -2424,6 +2424,10 @@ and isOblivFunc t = match unrollType t with
 | TFun(_,_,_,a) -> hasOblivAttr a
 | _ -> false
 
+and isOblivInt t = match unrollType t with
+| TInt(_,a) -> hasOblivAttr a
+| _ -> false
+
 and isOblivSimple t = match unrollType t with
 | TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
 | _ -> false
