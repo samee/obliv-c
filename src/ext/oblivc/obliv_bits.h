@@ -17,6 +17,7 @@ typedef struct OblivBit {
     // a struct for each protocol we support goes here
     bool knownValue;
     struct {
+      // FIXME Couldn't generator just XOR R with this on a NOT?
       // generator: w is label for 0 value if inverted == false, 1 otherwise
       // evaluator: w is current label
       yao_key_t w;
