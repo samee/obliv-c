@@ -176,6 +176,7 @@ void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size
   __obliv_c__ifThenElse(dest,ov,dest,size,cond);
 }
 
+// TODO condIncr, condDecr
 void __obliv_c__condAdd(const void* c,void* dest
                        ,const void* x,size_t size);
 
