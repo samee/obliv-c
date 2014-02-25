@@ -67,12 +67,16 @@ struct tcp2PTransport
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { int res = write(((struct tcp2PTransport*)pt)->cursock,s,n); 
   if(res<0) perror("TCP write error: ");
+  if(res!=n) fprintf(stderr,"TCP write error: only %d bytes of %zd written\n",
+                            res,n);
   return res;
 }
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { int res = read(((struct tcp2PTransport*)pt)->cursock,s,n); 
   if(res<0) perror("TCP read error: ");
+  if(res!=n) fprintf(stderr,"TCP read error: only %d bytes of %zd read\n",
+                            res,n);
   return res;
 }
 
