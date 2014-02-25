@@ -73,12 +73,12 @@ static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 }
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
-{ int res;
+{ int res,n2=0;
   do
-  { res = read(((struct tcp2PTransport*)pt)->cursock,s,n); 
+  { res = read(((struct tcp2PTransport*)pt)->cursock,n2+(char*)s,n-n2); 
     if(res<0) { perror("TCP read error: "); return res; }
-    n-=res;
-  } while(n>0);
+    n2+=res;
+  } while(n>n2);
   return res;
 }
 
