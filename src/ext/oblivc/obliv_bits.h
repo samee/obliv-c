@@ -56,6 +56,7 @@ void __obliv_c__flipBit(OblivBit* dest); // Avoids a struct copy
 // Therefore actions in if(ocCurrentParty()==me) {...} must not touch obliv data
 //   This is not checked by the compiler in any way; you have been warned
 int ocCurrentParty();
+int ocCurrentPartyDefault(ProtocolDesc* pd);
 
 // Bitvector functions (these functions also work if dest and source point
 //   to the same object).

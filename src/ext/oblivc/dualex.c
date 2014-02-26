@@ -41,6 +41,16 @@ typedef struct {
   void* startargs;
 } DualexThreadArgs;
 
+void showKey(const char* sdata,unsigned len)
+{ int i,j;
+  const unsigned char* data = (const unsigned char*)sdata;
+  for(i=0;i<len;i+=16)
+  { for(j=0;j<16 && i+j<len;++j)
+      fprintf(stderr,"%2x ",data[i+j]);
+    fprintf(stderr,"\n");
+  }
+}
+
 bool dualexGenrRevealOblivBits(ProtocolDesc* pdb, 
     widest_t* dest,const OblivBit* o,size_t n,int party)
 {
@@ -61,7 +71,7 @@ bool dualexGenrRevealOblivBits(ProtocolDesc* pdb,
   { OblivBit t;
     __obliv_c__copyBit(&t,&o[i]);
     for(j=0;j<YAO_KEY_BYTES;++j) 
-      t.yao.w[j]^=(o[i].yao.inverted!=(destx&(1<<j))?R[j]:z[j]);
+      t.yao.w[j]^=((o[i].yao.inverted!=(bool)(destx&(1<<i)))?R[j]:z[j]);
     gcry_md_write(pd->threadhash,t.yao.w,YAO_KEY_BYTES);
   }
   return res;
@@ -93,15 +103,21 @@ void dualexFeedOblivInputs(ProtocolDesc* pdb,OblivInputs* oi,size_t n,int party)
   pd->yFeedOblivInputs(pdb,oi,n,party);
 }
 
+int flipParty(ProtocolDesc* pd) { return 3-pd->thisParty; }
+
 void* dualexThread(void* varg)
 { DualexThreadArgs* arg = varg;
   DualexHalfPD* pd = arg->pd;
   setupYaoProtocol(&pd->ypd);
+
+  if(pd->thisThread==2) pd->ypd.currentParty = flipParty;
+
   pd->yFeedOblivInputs = pd->ypd.feedOblivInputs;
   if(pd->ypd.thisParty==1) ((YaoProtocolDesc*)pd->ypd.extra)->sender = 
     npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,&pd->ypd,2));
   else ((YaoProtocolDesc*)pd->ypd.extra)->recver =
     npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,&pd->ypd,1));
+  
   pd->ypd.feedOblivInputs = dualexFeedOblivInputs;
   // In this function, pd->ypd.thisParty == 1 always means generator
   pd->ypd.revealOblivBits = (pd->ypd.thisParty==1
