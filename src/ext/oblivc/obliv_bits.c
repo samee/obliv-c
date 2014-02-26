@@ -65,10 +65,22 @@ struct tcp2PTransport
 };
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
-  { return write(((struct tcp2PTransport*)pt)->cursock,s,n); }
+{ int res = write(((struct tcp2PTransport*)pt)->cursock,s,n); 
+  if(res<0) perror("TCP write error: ");
+  if(res!=n) fprintf(stderr,"TCP write error: only %d bytes of %zd written\n",
+                            res,n);
+  return res;
+}
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
-  { return read(((struct tcp2PTransport*)pt)->cursock,s,n); }
+{ int res,n2=0;
+  do
+  { res = read(((struct tcp2PTransport*)pt)->cursock,n2+(char*)s,n-n2); 
+    if(res<0) { perror("TCP read error: "); return res; }
+    n2+=res;
+  } while(n>n2);
+  return res;
+}
 
 static void tcp2PCleanup(ProtocolTransport* pt)
 { struct tcp2PTransport* t = CAST(pt);
