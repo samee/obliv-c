@@ -1,0 +1,34 @@
+#include<stdio.h>
+#include<obliv.oh>
+
+#include "highest.h"
+
+void readValues(obliv int* dest, int n, const int* src,int party)
+{
+  OblivInputs specs[MAXN];
+  int i;
+  for(i=0;i<n;++i) setupOblivInt(specs+i,dest+i,src[i]);
+  feedOblivInputs(specs,n,party);
+}
+
+void highest(void* args){
+     protocolIO *io = args;
+     int n1, n2;
+     int i, j;
+     obliv int i1[MAXN], i2[MAXN];
+     n1 = ocBroadcastInt(1, io->n);
+     n2 = ocBroadcastInt(2, io->n);
+     readValues(i1, n1, io->i, 1);
+     readValues(i2, n2, io->i, 2);
+     //runs the actual algorithm of higher value
+     obliv int high = i1[0];
+     for(i=0; i<n1; i++){
+     	obliv if(i1[i] > high)
+	      high = i1[i];
+     }
+     for(j =0; j<n2; j++){
+     	   obliv if(i2[j] > high)
+	   	 high = i2[j];
+     }
+     revealOblivInt(&io->res,high,0);
+}
