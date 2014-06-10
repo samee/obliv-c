@@ -1,0 +1,96 @@
+#include<stdio.h>
+#include<stdlib.h>
+#include<obliv.oh>
+
+#include "mutual.h"
+
+typedef obliv bool obool;
+
+obool oblivStrCmp(obliv char* s1, obliv char* s2) obliv{
+      //return true;
+      obliv bool afternull = false;
+      int i;
+      obool ob = true;
+      //return ob;
+      for( i = 0; i < MAXL; i++) {
+         obliv 
+	 if (afternull) {
+	   ;
+         } else {
+	   obliv char c = s1[i];
+	   obliv if (c != s2[i]) {
+	     ob = false;
+	   } else {
+	     obliv if (c == '\0') {
+	       afternull = true;
+	     }
+	   }
+	 }
+      }
+      
+      //return ob;
+      //ob = true;	
+      return ob;    
+}
+
+void addString(obliv char* src, obliv char* dest) obliv{
+     int i;
+     for(i=0; i<MAXL; i++)
+        dest[i]=src[i];
+}
+
+void readString(obliv char* dest, int n, const char* src,int party)
+{
+  OblivInputs specs[MAXN];
+  int i;
+  //for(i=0;i<n;++i) setupOblivChar(specs+i,dest+i,src[i]);
+  feedOblivInputs(specs,n,party);
+}
+void mutualFriends(void* args){
+     protocolIO *io = args;
+     int size1, size2;
+     int i, j;
+     obool match[MAXN];
+     obliv char friends1[MAXN][MAXL]; 
+     obliv char friends2[MAXN][MAXL];
+     obliv char commonFriends[MAXN][MAXL];
+     obliv int commonSize;
+     size1 = ocBroadcastInt(1, io->size);
+     size2 = ocBroadcastInt(2, io->size);
+     for(i=0;i<size1;i++){
+	for( j=0;j<MAXL;j++){
+	     friends1[i][j] = feedOblivChar(io->mine[i][j], 1);
+	}
+     }
+     for(i=0; i<MAXN; i++)
+     	match[i] = false;
+     for(i=0; i<size2; i++)
+        for(j=0; j<MAXL; j++)
+	   friends2[i][j] = feedOblivChar(io->mine[i][j], 2);
+     
+     for( i=0; i<size1;i++){
+     	for(j=0; j<size2;j++){
+	 obliv if(match[j]==false)
+          obliv if(oblivStrCmp(friends1[i], friends2[j])){
+            commonSize++;
+	    //match[j]=true;
+	    addString(friends1[i], commonFriends[i]);
+      }}
+     }
+     j=0;
+     
+     bool pubMatch[MAXN];
+     for(i=0;i<MAXN;i++)
+	//revealOblivBool(&pubMatch[i], match[i], 0);
+
+     for(i=0; i<MAXN; i++)     
+        if(pubMatch[i]==true){
+	 //addString(friends2[i], commonFriends[j]); 
+	 j++;  
+     }
+     revealOblivInt(&io->commonSize, commonSize, 0);
+     for(i=0; i<MAXN; i++){
+        for(j=0; j<MAXL; j++){
+	  revealOblivChar(&io->common[i][j],commonFriends[i][j],0); 
+     }}
+}    
