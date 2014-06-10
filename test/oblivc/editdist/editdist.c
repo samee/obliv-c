@@ -17,7 +17,7 @@ const char* mySide()
 double wallClock()
 {
   struct timespec t;
-  clock_gettime(CLOCK_REALTIME,&t);
+  //clock_gettime(CLOCK_REALTIME,&t);
   return t.tv_sec+1e-9*t.tv_nsec;
 }
 
