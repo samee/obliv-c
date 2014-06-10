@@ -4,12 +4,10 @@
 
 typedef struct protocolIO
 {
-  int i[100];
+  int i[MAXN];
   int n;
   int res;
   
 } protocolIO;
 
 void highest(void* args);
-
-const char* mySide();
