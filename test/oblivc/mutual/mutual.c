@@ -73,8 +73,8 @@ int main(int argc,char *argv[])
   setCurrentParty(&pd,currentParty);
   setCurrentParty(&pd,currentParty);
   lap = wallClock();
-  execYaoProtocol(&pd,mutualFriends,&io);
-  //execDebugProtocol(&pd,mutualFriends, &io);
+  //execYaoProtocol(&pd,mutualFriends,&io);
+  execDebugProtocol(&pd,sortMutual, &io);
   fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);
   fprintf(stderr,"Gate Count: %u\n",yaoGateCount());
   cleanupProtocol(&pd);

@@ -138,13 +138,7 @@ void sortMutual(void* args){
     }
     k = greatestPowerOfTwoLessThan(k);
   }
-  /* for( i=0; i<size1;i++){ */
-  /*   for(j=0; j<size2;j++){ */
-  /* 	obliv if(oblivStrCmp(friends[i], friends[size1+j])){ */
-  /* 	  commonSize++; */
-  /* 	  addString(friends[i], commonFriends[i]); */
-  /* 	}} */
-  /* } */
+
   for(i = 0; i < totalSize-1; i++){
     obliv if(oblivStrCmp(friends[i], friends[i + 1])==0){
 	commonSize++;

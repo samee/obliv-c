@@ -16,3 +16,5 @@ const char* mySide();
 
 void mutualFriends(void* args);
 
+void sortMutual(void* args);
+
