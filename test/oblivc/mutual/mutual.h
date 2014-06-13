@@ -2,7 +2,7 @@
 //the maximum length of a name
 #define MAXL 10
 //the maximum number of friends
-#define MAXN 45
+#define MAXN 60
 
 typedef char* string;
 typedef struct protocolIO{
@@ -17,4 +17,3 @@ const char* mySide();
 void mutualFriends(void* args);
 
 void sortMutual(void* args);
-
