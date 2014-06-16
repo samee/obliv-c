@@ -1,0 +1,34 @@
+#include<stdio.h>
+#include<obliv.oh>
+
+#include "average.h"
+
+void readValues(obliv int* dest, int n, const int* src,int party)
+{
+  OblivInputs specs[MAXN];
+  int i;
+  for(i=0;i<n;++i) setupOblivInt(specs+i,dest+i,src[i]);
+  feedOblivInputs(specs,n,party);
+}
+
+void highest(void* args){
+     protocolIO *io = args;
+     int n1, n2;
+     int i, j;
+     obliv int sum1 = 0;
+     obliv int sum2 = 0;
+     obliv int i1[MAXN], i2[MAXN];
+     n1 = ocBroadcastInt(1, io->n);
+     n2 = ocBroadcastInt(2, io->n);
+     readValues(i1, n1, io->i, 1);
+     readValues(i2, n2, io->i, 2);
+     //runs the actual algorithm to find average
+     for(i=0; i<n1; i++){
+     	sum1 = i1[i] + sum1;
+     }
+     for(j =0; j<n2; j++){
+     	sum2 = i2[j] + sum2;
+     }
+     obliv int average = (sum1 + sum2)/(n1+n2);
+     revealOblivInt(&io->res,average,0);
+}

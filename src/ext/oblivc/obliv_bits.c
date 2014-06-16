@@ -65,10 +65,22 @@ struct tcp2PTransport
 };
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
-  { return write(((struct tcp2PTransport*)pt)->cursock,s,n); }
+{ int res = write(((struct tcp2PTransport*)pt)->cursock,s,n); 
+  if(res<0) perror("TCP write error: ");
+  if(res!=n) fprintf(stderr,"TCP write error: only %d bytes of %zd written\n",
+                            res,n);
+  return res;
+}
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
-  { return read(((struct tcp2PTransport*)pt)->cursock,s,n); }
+{ int res,n2=0;
+  do
+  { res = read(((struct tcp2PTransport*)pt)->cursock,n2+(char*)s,n-n2); 
+    if(res<0) { perror("TCP read error: "); return res; }
+    n2+=res;
+  } while(n>n2);
+  return res;
+}
 
 static void tcp2PCleanup(ProtocolTransport* pt)
 { struct tcp2PTransport* t = CAST(pt);
@@ -172,8 +184,8 @@ static int sizeCheckSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { int sent = osend(&((SizeCheckTransportAdapter*)pt)->pd,dest,s,n);
   if(sent==n) return n;
   else 
-  { fprintf(stderr,"Was going to send %lu bytes to %d, sent %d\n",
-                   n,dest,sent);
+  { fprintf(stderr,"Was going to send bytes to %d, sent %d\n",
+                   dest,sent);
     if(sent<0) fprintf(stderr,"That means %s\n",strerror(sent));
     exit(-1);
   }
@@ -183,8 +195,8 @@ static int sizeCheckRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { int recv = orecv(&((SizeCheckTransportAdapter*)pt)->pd,src,s,n);
   if(recv==n) return n;
   else 
-  { fprintf(stderr,"Was going to recv %lu bytes from %d, received %d\n",
-                    n,src,recv);
+  { fprintf(stderr,"Was going to recv bytes from %d, received %d\n",
+                  src,recv);
     if(recv<0) fprintf(stderr,"That means %s\n",strerror(recv));
     exit(-1);
   }

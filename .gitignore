@@ -391,6 +391,12 @@
 /test/small2/merge-ar
 /test/small2/libmerge.a
 
+#mutual
+/test/oblivc/mutual/*.oc.*
+/test/oblivc/mutual/*.txt
+
+*.oc.*
+
 
 # /ocamlutil
 /ocamlutil/perfcount.c

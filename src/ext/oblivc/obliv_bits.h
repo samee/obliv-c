@@ -1,6 +1,6 @@
 #ifndef OBLIV_BITS_H
 #define OBLIV_BITS_H
-void* memset(void* s, int c, unsigned long n); // Hack, had to declare memset
+//void* memset(void* s, int c, unsigned long n); // Hack, had to declare memset
 #include<stddef.h> // size_t
 //#include<stdlib.h> // memset to zero
 #include<stdbool.h>
@@ -176,6 +176,7 @@ void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size
   __obliv_c__ifThenElse(dest,ov,dest,size,cond);
 }
 
+// TODO condIncr, condDecr
 void __obliv_c__condAdd(const void* c,void* dest
                        ,const void* x,size_t size);
 
