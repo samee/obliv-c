@@ -393,6 +393,9 @@
 
 #mutual
 /test/oblivc/mutual/*.oc.*
+/test/oblivc/mutual/*.txt
+
+*.oc.*
 
 
 # /ocamlutil
