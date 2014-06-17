@@ -130,12 +130,12 @@ int main(int argc,char *argv[])
   lap = wallClock();
   //execYaoProtocol(&pd,mutualFriends, &io);
   //execDebugProtocol(&pd,mutualFriends, &io);
-    execYaoProtocol(&pd,sortMutual, &io);
+  execYaoProtocol(&pd,sortMutual, &io);
   //execDebugProtocol(&pd,sortMutual, &io);
   fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);
   fprintf(stderr,"Gate Count: %u\n",yaoGateCount());
   cleanupProtocol(&pd);
-  fprintf(stderr, "Result: %d %c\n", io.commonSize, io.common[0][0]);
+  fprintf(stderr, "Result: %d\n", io.commonSize);
   for(i=0; i<MAXN; i++)
     if(io.common[i][0]!='\0')
       fprintf(stderr, "%s", io.common[i]);
