@@ -8,6 +8,7 @@ typedef obliv bool obool;
 
 typedef obliv int oint;
 
+
 int greatestPowerOfTwoLessThan(int n){
   int k = 1;
   while(k < n)
@@ -16,46 +17,32 @@ int greatestPowerOfTwoLessThan(int n){
 }
 
 oint oblivStrCmp(obliv char* s1, obliv char* s2) obliv {
-  //return true;
   obliv bool afternull = false;
   int i;
   oint ob = 0;
-  //return ob;
   for( i = 0; i < MAXL; i++) {
     obliv if (afternull) {
       ;
     } else {
       obliv char c = s1[i];
       obliv if (c != s2[i]) {
-	obliv if(c < s2[i])
-	  ob = -1;
-	else
+	obliv if(c < s2[i]){
 	  ob = 1;
+	  afternull = true;
+	}
+	else{
+	  ob = -1;
+	  afternull = true;
+	}
       } else {
 	obliv if (c == '\0') {
 	  afternull = true;
 	}
       }
     }
-  }
-      
-  //return ob;
-  //ob = true;	
+  }	
   return ob;    
 }
-
-/* oint oblivStrCmp2(obliv char * s1, obliv char * s2) obliv{ */
-/*   int i; */
-/*   for(i = 0; i < MAXL; i++){ */
-/*     obliv if(*s1 == *s2){ */
-/*     obliv if(*s1==0) */
-/*       //return 0; */
-/*     // s1++; */
-/*     //s2++; */
-/*     } */
-/*   } */
-/*   return *(unsigned char *) s1 - *(unsigned char *) s2; */
-/* } */
 
 void addString(obliv char* src, obliv char* dest) obliv{
      int i;
@@ -63,11 +50,17 @@ void addString(obliv char* src, obliv char* dest) obliv{
         dest[i]=src[i];
 }
 
+void swap(obliv char list[MAXN][MAXL], int i, int j) obliv{
+    obliv char temp[MAXL];
+    addString(list[i], temp);
+    addString(list[j], list[i]);
+    addString(temp, list[j]);
+}
+
 void readString(obliv char* dest, int n, const char* src,int party)
 {
   OblivInputs specs[MAXN];
   int i;
-  //for(i=0;i<n;++i) setupOblivChar(specs+i,dest+i,src[i]);
   feedOblivInputs(specs,n,party);
 }
 
@@ -102,6 +95,7 @@ void mutualFriends(void* args){
       revealOblivChar(&io->common[i][j],commonFriends[i][j],0); 
   }    
 
+//must be given two lists that are sorted
 void sortMutual(void* args){
   protocolIO *io = args;
   int size1, size2;
@@ -111,28 +105,26 @@ void sortMutual(void* args){
   obliv char friends[2 * MAXN][MAXL]; 
   obliv char commonFriends[2 * MAXN][MAXL];
   obliv int commonSize;
-  for(i=0;i<size1;i++){
-    for( j=0;j<MAXL;j++){
+
+  //places the two lists into one list
+  //because they are sorted, the resulting list in bitonic
+  for(i=0;i<size1;i++)
+    for( j=0;j<MAXL;j++)
       friends[size1 -1 -i][j] = feedOblivChar(io->mine[i][j], 1);
-    }
-  }
-  int k = size2 + size1 - 1;
   for(i=0; i < size2; i++)
     for(j=0; j<MAXL; j++)
       friends[size1 + i][j] = feedOblivChar(io->mine[i][j], 2);
+  
   int totalSize = size1 + size2;
   int k = greatestPowerOfTwoLessThan(totalSize);
-  //bitonicSort(friends, totalSize, k);
+  
+  //bitonically sorting the list
   while(k>0){
     for(i=0; i<totalSize; i++){
       if(i + k >= totalSize)
 	break;
       obliv if(oblivStrCmp(friends[i], friends[i+k])==1){
-      //obliv if(true){
-	obliv char temp[MAXL];
-	addString(friends[i], temp);
-	addString(friends[i+k], friends[i]);
-	addString(temp, friends[i+k]);
+	swap(friends, i, i+k);
       }
     }
     k = greatestPowerOfTwoLessThan(k);
@@ -147,15 +139,11 @@ void sortMutual(void* args){
 
   //shuffling
   srand(time(NULL));
-  int r1;
-  int r2;
+  int r1, r2;
   for(i = 0; i<MAXN; i++){
     r1 = rand() % MAXN;
     r2 = rand() % MAXN;
-    obliv char temp[MAXL];
-    addString(commonFriends[r1], temp);
-    addString(commonFriends[r2], commonFriends[r1]);
-    addString(temp, commonFriends[r2]);
+    swap(commonFriends, r1, r2);
   }
   revealOblivInt(&io->commonSize, commonSize, 0);
   for(i=0; i<MAXN; i++)

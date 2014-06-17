@@ -30,7 +30,7 @@ void merge(char arr[MAXN][MAXL], int l, int m, int r)
     k = l;
     while (i < n1 && j < n2)
     {
-        if (strcmp(L[i],R[j]) == -1)
+        if (strcmp(L[i],R[j]) < 0)
         {
             strcpy(arr[k], L[i]);
             i++;
@@ -66,7 +66,7 @@ void mergeSort(char arr[MAXN][MAXL], int l, int r)
 {
     if (l < r)
     {
-        int m = l+(r-l)/2; //Same as (l+r)/2, but avoids overflow for large l and h
+      int m = (l+r) / 2; //Same as (l+r)/2, but avoids overflow for large l and h
         mergeSort(arr, l, m);
         mergeSort(arr, m+1, r);
         merge(arr, l, m, r);
@@ -113,27 +113,31 @@ int main(int argc,char *argv[])
   while(fgets(buf[i], MAXL, infile)!=NULL){
     strcpy(io.mine[i], buf[i]);
     i++;
-    //buf[i] = malloc(20*sizeof(char));
   }
   io.size = i;
+
   mergeSort(io.mine, 0, io.size-1);
+
   fprintf(stderr,"Result: %d\n", io.size);
   
   fclose(infile);
+
   //standard setup
   protocolUseStdio(&pd);
   currentParty = (argv[1][0]=='1'?1:2);
   setCurrentParty(&pd,currentParty);
   setCurrentParty(&pd,currentParty);
   lap = wallClock();
-  //execYaoProtocol(&pd,mutualFriends,&io);
-  execDebugProtocol(&pd,sortMutual, &io);
-  //fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);
-  //fprintf(stderr,"Gate Count: %u\n",yaoGateCount());
+  //execYaoProtocol(&pd,mutualFriends, &io);
+  //execDebugProtocol(&pd,mutualFriends, &io);
+    execYaoProtocol(&pd,sortMutual, &io);
+  //execDebugProtocol(&pd,sortMutual, &io);
+  fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);
+  fprintf(stderr,"Gate Count: %u\n",yaoGateCount());
   cleanupProtocol(&pd);
   fprintf(stderr, "Result: %d %c\n", io.commonSize, io.common[0][0]);
   for(i=0; i<MAXN; i++)
-    //if(io.common[i][0]!='\0')
+    if(io.common[i][0]!='\0')
       fprintf(stderr, "%s", io.common[i]);
   return 0;
 }
