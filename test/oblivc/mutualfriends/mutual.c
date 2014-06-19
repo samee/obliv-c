@@ -115,7 +115,6 @@ int main(int argc,char *argv[])
   while(fgets(buf[i], MAXL, infile)!=NULL){
     strcpy(io.mine[i], buf[i]);
     i++;
-    //buf[i] = malloc(20*sizeof(char));
   }
   io.size = i;
   mergeSort(io.mine, 0, io.size-1);
@@ -133,14 +132,13 @@ int main(int argc,char *argv[])
   execYaoProtocol(&pd,sortMutual, &io);
   //execDebugProtocol(&pd,sortMutual, &io);
   fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);
-  //fprintf(stderr,"Gate Count: %u\n",yaoGateCount());
+  fprintf(stderr,"Gate Count: %u\n",yaoGateCount());
   cleanupProtocol(&pd);
   
-//  fprintf(stderr, "Result: %d %c\n", io.commonSize, io.common[0][0]);
   fprintf(stderr, "Result: %d\n", io.commonSize);
   for(i=0; i<MAXN; i++){
       if(io.common[i][0]!='\0')
-      fprintf(stderr, "%s", io.common[i]);
+	fprintf(stderr, "%s", io.common[i]);
   }
   return 0;
 }

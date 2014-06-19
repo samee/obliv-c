@@ -2,9 +2,9 @@
 
 //#prama once
 //the maximum length of a name
-#define MAXL 20
+#define MAXL 10
 //the maximum number of friends
-#define MAXN 400
+#define MAXN 40
 
 typedef char* string;
 typedef struct protocolIO{
