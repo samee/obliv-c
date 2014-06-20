@@ -2,15 +2,15 @@
 
 //#prama once
 //the maximum length of a name
-#define MAXL 10
+#define MAXL 11
 //the maximum number of friends
-#define MAXN 40
+#define MAXN 512
 
 typedef char* string;
 typedef struct protocolIO{
   char mine[MAXN][MAXL];
   int size;
-  char common[MAXN][MAXL];
+  char common[2*MAXN][MAXL];
   int commonSize;
 }protocolIO;
 

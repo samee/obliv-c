@@ -118,8 +118,8 @@ int main(int argc,char *argv[])
   }
   io.size = i;
   mergeSort(io.mine, 0, io.size-1);
-  fprintf(stderr,"Result: %d\n", io.size);
-  
+  fprintf(stderr,"Size: %d\n", io.size);
+
   fclose(infile);
   //standard setup
   protocolUseStdio(&pd);
@@ -136,9 +136,10 @@ int main(int argc,char *argv[])
   cleanupProtocol(&pd);
   
   fprintf(stderr, "Result: %d\n", io.commonSize);
-  for(i=0; i<MAXN; i++){
-      if(io.common[i][0]!='\0')
-	fprintf(stderr, "%s", io.common[i]);
+  for(i=0; i<2*MAXN; i++){
+    if(io.common[i][0]!='\0')
+      //	fprintf(stderr, "%s", io.common[i]);
+	;
   }
   return 0;
 }
