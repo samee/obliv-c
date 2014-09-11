@@ -27,7 +27,7 @@ OcCommitter* ocSendCommit(ProtocolDesc* pd,BCipherRandomGen* gen,
 void ocRevealCommit(OcCommitter* com);
 
 typedef struct {
-  char hash[COMMIT_HASH_BYTES]; 
+  unsigned char hash[COMMIT_HASH_BYTES]; 
   ProtocolDesc* pd;
   int srcParty;
 } OcCommitment;

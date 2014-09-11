@@ -35,6 +35,7 @@ struct ProtocolDesc {
     struct { unsigned mulCount,xorCount; } debug;
   };
 
+  int (*currentParty)(ProtocolDesc*);
   void (*feedOblivInputs)(ProtocolDesc*,OblivInputs*,size_t,int);
   // Return value is true if the write was actually done
   bool (*revealOblivBits)(ProtocolDesc*,widest_t*,const OblivBit*,size_t,int);

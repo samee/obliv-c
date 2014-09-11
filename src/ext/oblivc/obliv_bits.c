@@ -549,6 +549,7 @@ void setupYaoProtocol(ProtocolDesc* pd)
   pd->extra = ypd;
   pd->partyCount = 2;
   ypd->nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
+  pd->currentParty = ocCurrentPartyDefault;
   pd->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
   pd->revealOblivBits = (me==1?yaoGenrRevealOblivBits:yaoEvalRevealOblivBits);
   pd->setBitAnd = yaoSetBitAnd;
@@ -686,13 +687,14 @@ bool dbgProtoRevealOblivBits
 static void broadcastBits(int source,void* p,size_t n)
 {
   int i;
-  if(currentProto->thisParty!=source) orecv(currentProto,source,p,n);
+  if(ocCurrentParty()!=source) orecv(currentProto,source,p,n);
   else for(i=1;i<=currentProto->partyCount;++i) if(i!=source)
       osend(currentProto,i,p,n);
 }
 
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
+  pd->currentParty = ocCurrentPartyDefault;
   pd->feedOblivInputs = dbgProtoFeedOblivInputs;
   pd->revealOblivBits = dbgProtoRevealOblivBits;
   pd->setBitAnd = dbgProtoSetBitAnd;
@@ -710,7 +712,9 @@ bool __obliv_c__revealOblivBits (widest_t* dest, const OblivBit* src
                                 ,size_t size, int party)
   { return currentProto->revealOblivBits(currentProto,dest,src,size,party); }
 
-int ocCurrentParty() { return currentProto->thisParty; }
+int ocCurrentParty() { return currentProto->currentParty(currentProto); }
+int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
+
 ProtocolDesc* ocCurrentProto() { return currentProto; }
 
 void __obliv_c__setSignedKnown
