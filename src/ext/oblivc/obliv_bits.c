@@ -566,7 +566,7 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
 
   bool pa = yaoKeyLsb(a->yao.w), pb = yaoKeyLsb(b->yao.w);
   yao_key_t row,t,wg,we,wa1,wb1;
-  const char *wa0 = a->yao.w, *wb0 = a->yao.w;
+  const char *wa0 = a->yao.w, *wb0 = b->yao.w;
 
   yaoKeyCopy(wa1,wa0); yaoKeyXor(wa1,ypd->R);
   yaoKeyCopy(wb1,wb0); yaoKeyXor(wb1,ypd->R);
@@ -588,10 +588,20 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   osend(pd,2,row,YAO_KEY_BYTES);
   ypd->gcount++;
 
+  // r may alias a and b, so modify at the end
   yaoKeyCopy(r->yao.w,wg);
   yaoKeyXor (r->yao.w,we);
+
   r->yao.inverted = false; r->unknown = true;
 }
+
+void yaoGenerateAndPair(ProtocolDesc* pd, OblivBit* r, 
+                        const OblivBit* a, const OblivBit* b)
+  { yaoGenerateHalfGatePair(pd,r,0,0,0,a,b); }
+
+void yaoGenerateOrPair(ProtocolDesc* pd, OblivBit* r,
+                       const OblivBit* a, const OblivBit* b)
+  { yaoGenerateHalfGatePair(pd,r,1,1,1,a,b); }
 
 void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
     const OblivBit* a, const OblivBit* b)
@@ -608,8 +618,10 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   yaoKeyXor(row,a->yao.w);
   yaoKeyCondXor(we,yaoKeyLsb(b->yao.w),t,row);
 
+  // r may alias a and b, so modify at the end
   yaoKeyCopy(r->yao.w,wg);
   yaoKeyXor (r->yao.w,we);
+
   r->unknown = true;
 }
 
@@ -618,18 +630,23 @@ unsigned yaoGateCount() // returns half-gate count for half-gate scheme
 
 /* execYaoProtocol is divided into 2 parts which are reused by other
    protocols such as DualEx */
-void setupYaoProtocol(ProtocolDesc* pd)
+void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
 {
   YaoProtocolDesc* ypd = malloc(sizeof(YaoProtocolDesc));
   int me = pd->thisParty;
   pd->extra = ypd;
   pd->partyCount = 2;
-  ypd->nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
   pd->currentParty = ocCurrentPartyDefault;
   pd->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
   pd->revealOblivBits = (me==1?yaoGenrRevealOblivBits:yaoEvalRevealOblivBits);
-  pd->setBitAnd = yaoSetBitAnd;
-  pd->setBitOr  = yaoSetBitOr;
+  if(halfgates)
+  { pd->setBitAnd = (me==1?yaoGenerateAndPair:yaoEvaluateHalfGatePair);
+    pd->setBitOr  = (me==1?yaoGenerateOrPair :yaoEvaluateHalfGatePair);
+  }else
+  { ypd->nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
+    pd->setBitAnd = yaoSetBitAnd;
+    pd->setBitOr  = yaoSetBitOr;
+  }
   pd->setBitXor = yaoSetBitXor;
   pd->setBitNot = yaoSetBitNot;
   pd->flipBit   = yaoFlipBit;
@@ -669,7 +686,14 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
-  setupYaoProtocol(pd);
+  setupYaoProtocol(pd,true);
+  mainYaoProtocol(pd,start,arg);
+  free(pd->extra);
+}
+
+void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)
+{
+  setupYaoProtocol(pd,false);
   mainYaoProtocol(pd,start,arg);
   free(pd->extra);
 }

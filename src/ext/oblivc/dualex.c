@@ -15,7 +15,7 @@ inline static ProtocolTransport*
   { return trans->subtransport(trans,newChannel); }
 
 // Yao protocol functions to be reused here
-extern void setupYaoProtocol(ProtocolDesc* pd);
+extern void setupYaoProtocol(ProtocolDesc* pd,bool halfgates);
 extern void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 extern bool yaoGenrRevealOblivBits(ProtocolDesc* pd,
                 widest_t* dest,const OblivBit* o,size_t n,int party);
@@ -108,7 +108,7 @@ int flipParty(ProtocolDesc* pd) { return 3-pd->thisParty; }
 void* dualexThread(void* varg)
 { DualexThreadArgs* arg = varg;
   DualexHalfPD* pd = arg->pd;
-  setupYaoProtocol(&pd->ypd);
+  setupYaoProtocol(&pd->ypd,true);
 
   if(pd->thisThread==2) pd->ypd.currentParty = flipParty;
 
