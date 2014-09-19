@@ -22,8 +22,7 @@ typedef struct OblivBit OblivBit;
 //   Add a new entry in OblivBit union
 //   Assign proper hooks to these callbacks in ProtocolDesc
 
-// One extra bit for truth-table permutation
-#define YAO_KEY_BITS 81
+#define YAO_KEY_BITS 80
 #define YAO_KEY_BYTES ((YAO_KEY_BITS+7)/8)
 typedef char yao_key_t[YAO_KEY_BYTES];
 
