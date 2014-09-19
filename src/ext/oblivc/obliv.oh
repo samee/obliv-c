@@ -31,11 +31,10 @@ bool revealOblivShort(short* dest, obliv short src,int party);
 bool revealOblivLong(long* dest, obliv long src,int party);
 bool revealOblivLLong(long long* dest, obliv long long src,int party);
 
-// TODO make convention consistent with feed
-bool ocBroadcastBool(int source,bool v);
-char ocBroadcastChar(int source,char v);
-int ocBroadcastInt(int source,int v);
-short ocBroadcastShort(int source,short v);
-long ocBroadcastLong(int source,long v);
-long long ocBroadcastLLong(int source,long long v);
+bool ocBroadcastBool(bool v,int source);
+char ocBroadcastChar(char v,int source);
+int ocBroadcastInt(int v,int source);
+short ocBroadcastShort(short v,int source);
+long ocBroadcastLong(long v,int source);
+long long ocBroadcastLLong(long long v,int source);
 #endif

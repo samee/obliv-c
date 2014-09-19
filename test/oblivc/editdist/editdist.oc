@@ -30,8 +30,8 @@ void editDistance(void* args)
   obliv char s1[MAXN], s2[MAXN];
   obliv int dp[MAXN+1][MAXN+1];
 
-  n1 = ocBroadcastInt(1,io->n);
-  n2 = ocBroadcastInt(2,io->n);
+  n1 = ocBroadcastInt(io->n,1);
+  n2 = ocBroadcastInt(io->n,2);
   readString(s1,n1,io->s,1);
   readString(s2,n2,io->s,2);
   // These really only work with single threaded protocols
