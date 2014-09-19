@@ -319,6 +319,15 @@ void yaoKeyXor(yao_key_t d, const yao_key_t s)
 { int i;
   for(i=0;i<YAO_KEY_BYTES;++i) d[i]^=s[i];
 }
+// d = H(a,k), used by half gate scheme
+void yaoSetHalfMask(yao_key_t d,const yao_key_t a,uint64_t k)
+{
+  char buf[YAO_KEY_BYTES+8], dest[20]; // dest length = DIGEST length
+  memcpy(buf,a,YAO_KEY_BYTES);
+  memcpy(buf+YAO_KEY_BYTES,&k,sizeof(k));
+  gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
+  memcpy(d,dest,YAO_KEY_BYTES);
+}
 // XXX do I need i when it is already encoded in lsb(a)||lsb(b)
 void yaoSetHashMask(yao_key_t d,const yao_key_t a,const yao_key_t b,
     uint64_t k,int i)
@@ -537,7 +546,74 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   r->unknown = true;
 }
 
-unsigned yaoGateCount() 
+// dest = src + cond * ypd->R. Who knows if this creates timing channels
+void yaoKeyCondXor(yao_key_t dest, bool cond,
+                   const yao_key_t a, const yao_key_t b)
+{
+  char cmask = (cond?0xff:0);
+  int i;
+  for(i=0;i<YAO_KEY_BYTES;++i)
+    dest[i] = a[i] ^ (cmask & b[i]);
+}
+
+// Computes r = (a xor ac)(b xor bc) xor rc
+void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
+    bool ac, bool bc, bool rc, const OblivBit* a, const OblivBit* b)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  if(a->yao.inverted) ac=!ac;
+  if(b->yao.inverted) bc=!bc;
+
+  bool pa = yaoKeyLsb(a->yao.w), pb = yaoKeyLsb(b->yao.w);
+  yao_key_t row,t,wg,we,wa1,wb1;
+  const char *wa0 = a->yao.w, *wb0 = a->yao.w;
+
+  yaoKeyCopy(wa1,wa0); yaoKeyXor(wa1,ypd->R);
+  yaoKeyCopy(wb1,wb0); yaoKeyXor(wb1,ypd->R);
+
+  yaoSetHalfMask(row,wa0,ypd->gcount);
+  yaoSetHalfMask(t  ,wa1,ypd->gcount);
+  yaoKeyCopy(wg,(pa?t:row));
+  yaoKeyXor (row,t);
+  yaoKeyCondXor(row,(pb!=bc),row,ypd->R);
+  osend(pd,2,row,YAO_KEY_BYTES);
+  yaoKeyCondXor(wg,((pa!=ac)&&(pb!=bc))!=rc,wg,ypd->R);
+  ypd->gcount++;
+
+  yaoSetHalfMask(row,wb0,ypd->gcount);
+  yaoSetHalfMask(t  ,wb1,ypd->gcount);
+  yaoKeyCopy(we,(pb?t:row));
+  yaoKeyXor (row,t);
+  yaoKeyXor (row,(ac?wa1:wa0));
+  osend(pd,2,row,YAO_KEY_BYTES);
+  ypd->gcount++;
+
+  yaoKeyCopy(r->yao.w,wg);
+  yaoKeyXor (r->yao.w,we);
+  r->yao.inverted = false; r->unknown = true;
+}
+
+void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
+    const OblivBit* a, const OblivBit* b)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  yao_key_t row,t,wg,we;
+
+  yaoSetHalfMask(t,a->yao.w,ypd->gcount++);
+  orecv(pd,1,row,YAO_KEY_BYTES);
+  yaoKeyCondXor(wg,yaoKeyLsb(a->yao.w),t,row);
+
+  yaoSetHalfMask(t,b->yao.w,ypd->gcount++);
+  orecv(pd,1,row,YAO_KEY_BYTES);
+  yaoKeyXor(row,a->yao.w);
+  yaoKeyCondXor(we,yaoKeyLsb(b->yao.w),t,row);
+
+  yaoKeyCopy(r->yao.w,wg);
+  yaoKeyXor (r->yao.w,we);
+  r->unknown = true;
+}
+
+unsigned yaoGateCount() // returns half-gate count for half-gate scheme
   { return ((YaoProtocolDesc*)currentProto->extra)->gcount; }
 
 /* execYaoProtocol is divided into 2 parts which are reused by other
