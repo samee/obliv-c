@@ -339,8 +339,8 @@ void yaoKeyDouble(yao_key_t d)
 }
 
 // Remove old SHA routines TODO
-// d = H(a,k), used by half gate scheme
 #ifdef DISABLE_FIXED_KEY
+// d = H(a,k), used by half gate scheme
 void yaoSetHalfMask(YaoProtocolDesc* ypd,
                     yao_key_t d,const yao_key_t a,uint64_t k)
 {
@@ -350,7 +350,21 @@ void yaoSetHalfMask(YaoProtocolDesc* ypd,
   gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
   memcpy(d,dest,YAO_KEY_BYTES);
 }
+// XXX do I need i when it is already encoded in lsb(a)||lsb(b)
+void yaoSetHashMask(YaoProtocolDesc* ypd,
+                    yao_key_t d,const yao_key_t a,const yao_key_t b,
+                    uint64_t k,int i)
+{
+  char buf[2*YAO_KEY_BYTES+8], dest[20];  // dest length == DIGEST length
+  k=((k<<2)|i);
+  memcpy(buf,a,YAO_KEY_BYTES);
+  memcpy(buf+YAO_KEY_BYTES,b,YAO_KEY_BYTES);
+  memcpy(buf+2*YAO_KEY_BYTES,&k,8);
+  gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
+  memcpy(d,dest,YAO_KEY_BYTES);
+}
 #else
+// d = H(a,k), used by half gate scheme
 void yaoSetHalfMask(YaoProtocolDesc* ypd,
                     yao_key_t d,const yao_key_t a,uint64_t k)
 {
@@ -365,20 +379,25 @@ void yaoSetHalfMask(YaoProtocolDesc* ypd,
   yaoKeyCopy(d,obuf);
   yaoKeyXor(d,buf);
 }
+void yaoSetHashMask(YaoProtocolDesc* ypd,
+                    yao_key_t d,const yao_key_t a,const yao_key_t b,
+                    uint64_t k,int ii)
+{
+  char  buf[FIXED_KEY_BLOCKLEN];
+  char obuf[FIXED_KEY_BLOCKLEN];
+  int i;
+  k=4*k+ii;
+  assert(YAO_KEY_BYTES<=FIXED_KEY_BLOCKLEN);
+  for(i=YAO_KEY_BYTES;i<FIXED_KEY_BLOCKLEN;++i) buf[i]=0;
+  yaoKeyCopy(buf,a); yaoKeyDouble(buf);
+  yaoKeyXor (buf,b); yaoKeyDouble(buf);
+  for(i=0;i<sizeof(k);++i) buf[i]^=((k>>8*i)&0xff);
+  gcry_cipher_encrypt(ypd->fixedKeyCipher,obuf,sizeof(obuf),buf,sizeof(buf));
+  yaoKeyCopy(d,obuf);
+  yaoKeyXor(d,buf);
+}
 #endif
 
-// XXX do I need i when it is already encoded in lsb(a)||lsb(b)
-void yaoSetHashMask(yao_key_t d,const yao_key_t a,const yao_key_t b,
-    uint64_t k,int i)
-{
-  char buf[2*YAO_KEY_BYTES+8], dest[20];  // dest length == DIGEST length
-  k=((k<<2)|i);
-  memcpy(buf,a,YAO_KEY_BYTES);
-  memcpy(buf+YAO_KEY_BYTES,b,YAO_KEY_BYTES);
-  memcpy(buf+2*YAO_KEY_BYTES,&k,8);
-  gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
-  memcpy(d,dest,YAO_KEY_BYTES);
-}
 void yaoKeyNewPair(YaoProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
 {
   unsigned* ic = &pd->icount;
@@ -546,13 +565,13 @@ void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   if(yaoKeyLsb(wb)) { im^=1; yaoKeyXor(wb,R); }
 
   // Create labels for new wire in wc
-  yaoSetHashMask(wc,wa,wb,k,0);
+  yaoSetHashMask(ypd,wc,wa,wb,k,0);
   if(ttable&(1<<im)) yaoKeyXor(wc,R);
 
   for(i=1;i<4;++i) // skip 0, because GRR
   { yaoKeyXor(wb,R);
     if(i==2) yaoKeyXor(wa,R);
-    yaoSetHashMask(wt,wa,wb,k,i);
+    yaoSetHashMask(ypd,wt,wa,wb,k,i);
     yaoKeyXor(wt,wc);
     if(ttable&(1<<(i^im))) yaoKeyXor(wt,R);
     osend(pd,2,wt,YAO_KEY_BYTES);
@@ -568,6 +587,7 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   const OblivBit* a, const OblivBit* b)
 {
   int i=0,j;
+  YaoProtocolDesc* ypd = pd->extra;
   yao_key_t w,t;
   yaoKeyZero(t);
   if(yaoKeyLsb(a->yao.w)) i^=2;
@@ -578,7 +598,7 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   { orecv(pd,1,t,sizeof(yao_key_t));
     if(i==j) yaoKeyCopy(w,t);
   }
-  yaoSetHashMask(t,a->yao.w,b->yao.w,((YaoProtocolDesc*)pd->extra)->gcount++,i);
+  yaoSetHashMask(ypd,t,a->yao.w,b->yao.w,ypd->gcount++,i);
   yaoKeyXor(w,t);
   // r may alias a and b, so modify at the end
   yaoKeyCopy(r->yao.w,w);
