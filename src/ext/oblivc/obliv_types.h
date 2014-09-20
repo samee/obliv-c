@@ -68,6 +68,7 @@ typedef struct YaoProtocolDesc {
   void (*nonFreeGate)(struct ProtocolDesc*,OblivBit*,char,
       const OblivBit*,const OblivBit*);
   union { OTsender sender; OTrecver recver; };
+  gcry_cipher_hd_t fixedKeyCipher;
 } YaoProtocolDesc;
 
 typedef struct ProtocolTransport ProtocolTransport;

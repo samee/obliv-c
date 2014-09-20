@@ -319,8 +319,30 @@ void yaoKeyXor(yao_key_t d, const yao_key_t s)
 { int i;
   for(i=0;i<YAO_KEY_BYTES;++i) d[i]^=s[i];
 }
+
+const char yaoFixedKey[] = "\x61\x7e\x8d\xa2\xa0\x51\x1e\x96"
+                           "\x5e\x41\xc2\x9b\x15\x3f\xc7\x7a";
+const int yaoFixedKeyAlgo = GCRY_CIPHER_AES128;
+#define FIXED_KEY_BLOCKLEN 16
+
+// Finite field doubling: used in fixed key garbling
+void yaoKeyDouble(yao_key_t d)
+{
+  char carry = 0, next;
+  int i;
+  for(i=0;i<YAO_KEY_BYTES;++i)
+  { next = (d[i]&0x80);
+    d[i] = ((d[i]<<1)|carry);
+    carry = next;
+  }
+  d[0] ^= 0x03;
+}
+
+// Remove old SHA routines TODO
 // d = H(a,k), used by half gate scheme
-void yaoSetHalfMask(yao_key_t d,const yao_key_t a,uint64_t k)
+#ifdef DISABLE_FIXED_KEY
+void yaoSetHalfMask(YaoProtocolDesc* ypd,
+                    yao_key_t d,const yao_key_t a,uint64_t k)
 {
   char buf[YAO_KEY_BYTES+8], dest[20]; // dest length = DIGEST length
   memcpy(buf,a,YAO_KEY_BYTES);
@@ -328,6 +350,23 @@ void yaoSetHalfMask(yao_key_t d,const yao_key_t a,uint64_t k)
   gcry_md_hash_buffer(GCRY_MD_SHA1,dest,buf,sizeof(buf));
   memcpy(d,dest,YAO_KEY_BYTES);
 }
+#else
+void yaoSetHalfMask(YaoProtocolDesc* ypd,
+                    yao_key_t d,const yao_key_t a,uint64_t k)
+{
+  char  buf[FIXED_KEY_BLOCKLEN];
+  char obuf[FIXED_KEY_BLOCKLEN]; // buf length >= YAO_KEY_BYTES
+  int i;
+  assert(YAO_KEY_BYTES<=FIXED_KEY_BLOCKLEN);
+  for(i=YAO_KEY_BYTES;i<FIXED_KEY_BLOCKLEN;++i) buf[i]=0;
+  yaoKeyCopy(buf,a); yaoKeyDouble(buf);
+  for(i=0;i<sizeof(k);++i) buf[i]^=((k>>8*i)&0xff);
+  gcry_cipher_encrypt(ypd->fixedKeyCipher,obuf,sizeof(obuf),buf,sizeof(buf));
+  yaoKeyCopy(d,obuf);
+  yaoKeyXor(d,buf);
+}
+#endif
+
 // XXX do I need i when it is already encoded in lsb(a)||lsb(b)
 void yaoSetHashMask(yao_key_t d,const yao_key_t a,const yao_key_t b,
     uint64_t k,int i)
@@ -571,8 +610,8 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   yaoKeyCopy(wa1,wa0); yaoKeyXor(wa1,ypd->R);
   yaoKeyCopy(wb1,wb0); yaoKeyXor(wb1,ypd->R);
 
-  yaoSetHalfMask(row,wa0,ypd->gcount);
-  yaoSetHalfMask(t  ,wa1,ypd->gcount);
+  yaoSetHalfMask(ypd,row,wa0,ypd->gcount);
+  yaoSetHalfMask(ypd,t  ,wa1,ypd->gcount);
   yaoKeyCopy(wg,(pa?t:row));
   yaoKeyXor (row,t);
   yaoKeyCondXor(row,(pb!=bc),row,ypd->R);
@@ -580,8 +619,8 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   yaoKeyCondXor(wg,((pa!=ac)&&(pb!=bc))!=rc,wg,ypd->R);
   ypd->gcount++;
 
-  yaoSetHalfMask(row,wb0,ypd->gcount);
-  yaoSetHalfMask(t  ,wb1,ypd->gcount);
+  yaoSetHalfMask(ypd,row,wb0,ypd->gcount);
+  yaoSetHalfMask(ypd,t  ,wb1,ypd->gcount);
   yaoKeyCopy(we,(pb?t:row));
   yaoKeyXor (row,t);
   yaoKeyXor (row,(ac?wa1:wa0));
@@ -609,11 +648,11 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   YaoProtocolDesc* ypd = pd->extra;
   yao_key_t row,t,wg,we;
 
-  yaoSetHalfMask(t,a->yao.w,ypd->gcount++);
+  yaoSetHalfMask(ypd,t,a->yao.w,ypd->gcount++);
   orecv(pd,1,row,YAO_KEY_BYTES);
   yaoKeyCondXor(wg,yaoKeyLsb(a->yao.w),t,row);
 
-  yaoSetHalfMask(t,b->yao.w,ypd->gcount++);
+  yaoSetHalfMask(ypd,t,b->yao.w,ypd->gcount++);
   orecv(pd,1,row,YAO_KEY_BYTES);
   yaoKeyXor(row,a->yao.w);
   yaoKeyCondXor(we,yaoKeyLsb(b->yao.w),t,row);
@@ -653,7 +692,10 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
 
   if(pd->thisParty==1) ypd->sender.sender=NULL;
   else ypd->recver.recver=NULL;
+
   dhRandomInit();
+  gcry_cipher_open(&ypd->fixedKeyCipher,yaoFixedKeyAlgo,GCRY_CIPHER_MODE_ECB,0);
+  gcry_cipher_setkey(ypd->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
 }
 void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
@@ -684,11 +726,18 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   else ypd->recver.release(ypd->recver.recver);
 }
 
+void cleanupYaoProtocol(ProtocolDesc* pd)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  gcry_cipher_close(ypd->fixedKeyCipher);
+  free(ypd);
+}
+
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   setupYaoProtocol(pd,true);
   mainYaoProtocol(pd,start,arg);
-  free(pd->extra);
+  cleanupYaoProtocol(pd);
 }
 
 void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)

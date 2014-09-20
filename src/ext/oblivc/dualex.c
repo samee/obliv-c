@@ -17,6 +17,7 @@ inline static ProtocolTransport*
 // Yao protocol functions to be reused here
 extern void setupYaoProtocol(ProtocolDesc* pd,bool halfgates);
 extern void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
+extern void cleanupYaoProtocol(ProtocolDesc* pd);
 extern bool yaoGenrRevealOblivBits(ProtocolDesc* pd,
                 widest_t* dest,const OblivBit* o,size_t n,int party);
 extern bool yaoEvalRevealOblivBits(ProtocolDesc* pd,
@@ -123,7 +124,7 @@ void* dualexThread(void* varg)
   pd->ypd.revealOblivBits = (pd->ypd.thisParty==1
                             ?dualexGenrRevealOblivBits:dualexEvalRevealOblivBits);
   mainYaoProtocol(&pd->ypd,arg->start,arg->startargs);
-  free(arg->pd->ypd.extra);
+  cleanupYaoProtocol(&arg->pd->ypd);
   return NULL;
 }
 
