@@ -338,7 +338,7 @@ void yaoKeyDouble(yao_key_t d)
   d[0] ^= 0x03;
 }
 
-// Remove old SHA routines TODO
+// Remove old SHA routines?
 #ifdef DISABLE_FIXED_KEY
 // d = H(a,k), used by half gate scheme
 void yaoSetHalfMask(YaoProtocolDesc* ypd,
