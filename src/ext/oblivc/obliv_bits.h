@@ -9,6 +9,8 @@ void* memset(void* s, int c, unsigned long n); // Hack, had to declare memset
 // import common types
 #include<obliv_types.h>
 
+void ocSetCurrentProto(ProtocolDesc* pd);
+
 typedef struct OblivBit {
   bool unknown; // Will be default initialized with memset(0), 
                 //   so this field is 'unknown' rather than 'known'

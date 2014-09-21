@@ -885,6 +885,7 @@ int ocCurrentParty() { return currentProto->currentParty(currentProto); }
 int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
 
 ProtocolDesc* ocCurrentProto() { return currentProto; }
+void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)
