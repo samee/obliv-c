@@ -5,11 +5,14 @@ COMPILE_ONLY=0
 CCARGS=""
 CILLYARGS=""
 OCSRC=()
+GCRYPT="-lgcrypt"
 
 while [ $# -ge 1 ]; do
   if [ "$1" = "-c" ]; then
     COMPILE_ONLY=1
     CCARGS+="-c "
+  elif [ "$1" = "-static-gcrypt" ]; then
+    GCRYPT="/usr/lib/x86_64-linux-gnu/libgcrypt.a -lgpg-error"
   elif [ "${1%.oc}" != "$1" ]; then
     OCSRC+=($1)
     CCARGS+="$1.cil.c "
@@ -37,4 +40,4 @@ for src in ${OCSRC[*]}; do
   $OCCPATH/bin/cilobliv $src -I $OCLIB $CILLYARGS || exit
 done
 
-gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/obj/x86_LINUX -lgcrypt -pthread
+gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/obj/x86_LINUX $GCRYPT -pthread
