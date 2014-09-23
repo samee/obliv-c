@@ -27,5 +27,6 @@ void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg);
 bool execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 
 unsigned yaoGateCount(void);
+int tcp2PBytesSent(ProtocolDesc* pd);
 
 #endif // OBLIV_H

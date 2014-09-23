@@ -55,27 +55,41 @@ static struct stdioTransport stdioTransport
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
 
-
+//#define PROFILE_NETWORK
 // TCP connections for 2-Party protocols. Ignorse src/dest parameters
 //   since there is only one remote
-struct tcp2PTransport
+typedef struct tcp2PTransport
 { ProtocolTransport cb;
   int* socks; // size = cb.maxChannels
   int cursock;
-};
+#ifdef PROFILE_NETWORK
+  size_t bytes;
+#endif
+} tcp2PTransport;
+
+size_t tcp2PBytesSent(ProtocolDesc* pd) 
+#ifdef PROFILE_NETWORK
+  { return ((tcp2PTransport*)(pd->trans))->bytes; }
+#else
+  { return 0; }
+#endif
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
-{ int res = write(((struct tcp2PTransport*)pt)->cursock,s,n); 
+{ struct tcp2PTransport* tcpt = CAST(pt);
+  int res = write(tcpt->cursock,s,n); 
   if(res<0) perror("TCP write error: ");
   if(res!=n) fprintf(stderr,"TCP write error: only %d bytes of %zd written\n",
                             res,n);
+#ifdef PROFILE_NETWORK
+  tcpt->bytes += n;
+#endif
   return res;
 }
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { int res,n2=0;
   do
-  { res = read(((struct tcp2PTransport*)pt)->cursock,n2+(char*)s,n-n2); 
+  { res = read(((tcp2PTransport*)pt)->cursock,n2+(char*)s,n-n2); 
     if(res<0) { perror("TCP read error: "); return res; }
     n2+=res;
   } while(n>n2);
@@ -105,14 +119,21 @@ static ProtocolTransport* tcp2PSubtransport(ProtocolTransport* pt,int c)
   return &tres->cb;
 }
 
-static const struct tcp2PTransport tcp2PTransport
-  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, NULL, 0};
+#ifdef PROFILE_NETWORK
+static const tcp2PTransport tcp2PTransportTemplate
+  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, 
+     NULL, 0, 0};
+#else
+static const tcp2PTransport tcp2PTransportTemplate
+  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, 
+     NULL, 0};
+#endif
 
 void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
 {
   struct tcp2PTransport* trans;
   trans = malloc(sizeof(*trans));
-  *trans = tcp2PTransport;
+  *trans = tcp2PTransportTemplate;
   trans->socks = malloc(sizeof(int)*sockCount);
   memcpy(trans->socks,socks,sizeof(int)*sockCount);
   trans->cb.maxChannels = sockCount;
@@ -339,6 +360,7 @@ void yaoKeyDouble(yao_key_t d)
 }
 
 // Remove old SHA routines?
+#define DISABLE_FIXED_KEY
 #ifdef DISABLE_FIXED_KEY
 // d = H(a,k), used by half gate scheme
 void yaoSetHalfMask(YaoProtocolDesc* ypd,
