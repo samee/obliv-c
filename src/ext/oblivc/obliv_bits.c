@@ -420,6 +420,7 @@ void yaoSetHashMask(YaoProtocolDesc* ypd,
 }
 #endif
 
+// Why am I using SHA1 as a PRG? Not necessarily safe. TODO change to AES
 void yaoKeyNewPair(YaoProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
 {
   unsigned* ic = &pd->icount;
@@ -514,13 +515,10 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
     char *buf = malloc(bc*YAO_KEY_BYTES), **dest = malloc(bc*sizeof(char*));
     bool* sel = malloc(bc*sizeof(bool));
     int bp=0,i;
-    // XXX we are currently using NPOT, so it can be used with any protocol
-    //   later on if we change it (to use e.g. passive-secure OT-extension)
-    //   we might have to use different functions for each protocol
     for(;hasBit(&it);nextBit(&it))
     { OblivBit* o = curDestBit(&it);
       dest[bp]=o->yao.w;
-      sel[bp]=curBit(&it);
+      sel[bp]=o->yao.value=curBit(&it);
       o->unknown = true; // Known to me, but not to both parties
       ypd->icount++;
       ++bp;
