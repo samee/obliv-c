@@ -24,6 +24,10 @@ typedef struct OblivBit OblivBit;
 
 #define YAO_KEY_BITS 80
 #define YAO_KEY_BYTES ((YAO_KEY_BITS+7)/8)
+#if YAO_KEY_BITS!=(YAO_KEY_BYTES*8)
+#error "Yao key size needs to be a multiple of 8 bits"
+#endif
+
 typedef char yao_key_t[YAO_KEY_BYTES];
 
 struct ProtocolDesc {

@@ -741,7 +741,6 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   YaoProtocolDesc* ypd = pd->extra;
   int me = pd->thisParty;
-  int tailind,tailpos;
   ypd->gcount = ypd->icount = ypd->ocount = 0;
   if(me==1)
   {
@@ -749,10 +748,6 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     gcry_randomize(ypd->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
     ypd->R[0] |= 1;   // flipper bit
 
-    tailind=YAO_KEY_BYTES-1;
-    tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
-    ypd->R[tailind] &= (1<<tailpos)-1;
-    ypd->I[tailind] &= (1<<tailpos)-1;
     if(ypd->sender.sender==NULL)
       ypd->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
   }else 
