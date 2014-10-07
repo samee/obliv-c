@@ -741,6 +741,7 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   YaoProtocolDesc* ypd = pd->extra;
   int me = pd->thisParty;
+  bool ownOT=false;
   ypd->gcount = ypd->icount = ypd->ocount = 0;
   if(me==1)
   {
@@ -749,16 +750,21 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     ypd->R[0] |= 1;   // flipper bit
 
     if(ypd->sender.sender==NULL)
+    { ownOT=true;
       ypd->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
+    }
   }else 
     if(ypd->recver.recver==NULL)
+    { ownOT=true;
       ypd->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,1));
+    }
 
   currentProto = pd;
   start(arg);
 
-  if(me==1) ypd->sender.release(ypd->sender.sender);
-  else ypd->recver.release(ypd->recver.recver);
+  if(ownOT)
+    if(me==1) otSenderRelease(&ypd->sender);
+    else otRecverRelease(&ypd->recver);
 }
 
 void cleanupYaoProtocol(ProtocolDesc* pd)

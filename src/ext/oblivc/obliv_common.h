@@ -18,6 +18,11 @@ static inline int osend(ProtocolDesc* pd,int d,const void* p,size_t n)
 void dhRandomInit(void);
 void dhRandomFinalize(void);
 
+static inline void otSenderRelease(OTsender* sender)
+  { sender->release(sender->sender); }
+static inline void otRecverRelease(OTrecver* recver)
+  { recver->release(recver->recver); }
+
 struct NpotSender* npotSenderNew(int nmax,ProtocolDesc* pd,int destParty);
 void npotSenderRelease(struct NpotSender* s);
 OTsender npotSenderAbstract(struct NpotSender* s);

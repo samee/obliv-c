@@ -110,20 +110,24 @@ void* dualexThread(void* varg)
 { DualexThreadArgs* arg = varg;
   DualexHalfPD* pd = arg->pd;
   setupYaoProtocol(&pd->ypd,true);
+  YaoProtocolDesc* yxtra = pd->ypd.extra;
+  int role = pd->ypd.thisParty;
 
   if(pd->thisThread==2) pd->ypd.currentParty = flipParty;
 
   pd->yFeedOblivInputs = pd->ypd.feedOblivInputs;
-  if(pd->ypd.thisParty==1) ((YaoProtocolDesc*)pd->ypd.extra)->sender = 
+  if(role==1) yxtra->sender =
     npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,&pd->ypd,2));
-  else ((YaoProtocolDesc*)pd->ypd.extra)->recver =
+  else yxtra->recver =
     npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,&pd->ypd,1));
   
   pd->ypd.feedOblivInputs = dualexFeedOblivInputs;
   // In this function, pd->ypd.thisParty == 1 always means generator
-  pd->ypd.revealOblivBits = (pd->ypd.thisParty==1
-                            ?dualexGenrRevealOblivBits:dualexEvalRevealOblivBits);
+  pd->ypd.revealOblivBits = (role==1?dualexGenrRevealOblivBits
+                                    :dualexEvalRevealOblivBits);
   mainYaoProtocol(&pd->ypd,arg->start,arg->startargs);
+  if(role==1) otSenderRelease(&yxtra->sender);
+  else otRecverRelease(&yxtra->recver);
   cleanupYaoProtocol(&arg->pd->ypd);
   return NULL;
 }
