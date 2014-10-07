@@ -65,6 +65,14 @@ typedef struct {
   void (*release)(void*);
 } OTrecver;
 
+/* Somehow I have settled on this "allocation-on-initialization"
+   convention that I never planned. It simplifies user code a bit
+   (i.e. user does not have to upcast every time execProtocol
+   or protocolUseStdio is used). On the other hand, downcasts
+   require several pointer lookups in the place of a single,
+   simple cast. This should have been avoidable, without affecting
+   user code. TODO
+*/
 typedef struct YaoProtocolDesc {
   yao_key_t R,I; // LSB of R needs to be 1
   uint64_t gcount;
@@ -73,6 +81,7 @@ typedef struct YaoProtocolDesc {
       const OblivBit*,const OblivBit*);
   union { OTsender sender; OTrecver recver; };
   gcry_cipher_hd_t fixedKeyCipher;
+  void* extra;
 } YaoProtocolDesc;
 
 typedef struct ProtocolTransport ProtocolTransport;
