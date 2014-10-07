@@ -52,6 +52,6 @@ void honestOTExtSend1Of2(struct HonestOTExtSender* s,
 OTsender honestOTExtSenderAbstract(struct HonestOTExtSender* s);
 
 // Overrides ypd so that we are not using semi-honest OT
-void yaoUseNpot(YaoProtocolDesc* ypd,ProtocolDesc* transport,int me);
-void yaoReleaseOt(YaoProtocolDesc* ypd,int me); // Used with yaoUseNpot
+void yaoUseNpot(ProtocolDesc* pd,int me);
+void yaoReleaseOt(ProtocolDesc* pd,int me); // Used with yaoUseNpot
 #endif

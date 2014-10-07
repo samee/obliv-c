@@ -110,20 +110,19 @@ void* dualexThread(void* varg)
 { DualexThreadArgs* arg = varg;
   DualexHalfPD* pd = arg->pd;
   setupYaoProtocol(&pd->ypd,true);
-  YaoProtocolDesc* yxtra = pd->ypd.extra;
   int role = pd->ypd.thisParty;
 
   if(pd->thisThread==2) pd->ypd.currentParty = flipParty;
 
   pd->yFeedOblivInputs = pd->ypd.feedOblivInputs;
-  yaoUseNpot(yxtra,&pd->ypd,role);
+  yaoUseNpot(&pd->ypd,role);
   
   pd->ypd.feedOblivInputs = dualexFeedOblivInputs;
   // In this function, pd->ypd.thisParty == 1 always means generator
   pd->ypd.revealOblivBits = (role==1?dualexGenrRevealOblivBits
                                     :dualexEvalRevealOblivBits);
   mainYaoProtocol(&pd->ypd,arg->start,arg->startargs);
-  yaoReleaseOt(yxtra,role);
+  yaoReleaseOt(&pd->ypd,role);
   cleanupYaoProtocol(&arg->pd->ypd);
   return NULL;
 }
