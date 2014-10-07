@@ -707,6 +707,19 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
 unsigned yaoGateCount() // returns half-gate count for half-gate scheme
   { return ((YaoProtocolDesc*)currentProto->extra)->gcount; }
 
+// FIXME don't like this convention: OT should have used transport
+// objects directly, instead of being wrapped in ProtocolDesc
+void yaoUseNpot(YaoProtocolDesc* ypd,ProtocolDesc* transport,int me)
+{ if(me==1) ypd->sender =
+    npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,transport,2));
+  else ypd->recver =
+    npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,transport,1));
+}
+// Used with yaoUseNpot
+void yaoReleaseOt(YaoProtocolDesc* ypd,int me)
+{ if(me==1) otSenderRelease(&ypd->sender);
+  else otRecverRelease(&ypd->recver);
+}
 /* execYaoProtocol is divided into 2 parts which are reused by other
    protocols such as DualEx */
 void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
@@ -763,8 +776,9 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   start(arg);
 
   if(ownOT)
-    if(me==1) otSenderRelease(&ypd->sender);
+  { if(me==1) otSenderRelease(&ypd->sender);
     else otRecverRelease(&ypd->recver);
+  }
 }
 
 void cleanupYaoProtocol(ProtocolDesc* pd)

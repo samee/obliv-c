@@ -116,18 +116,14 @@ void* dualexThread(void* varg)
   if(pd->thisThread==2) pd->ypd.currentParty = flipParty;
 
   pd->yFeedOblivInputs = pd->ypd.feedOblivInputs;
-  if(role==1) yxtra->sender =
-    npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,&pd->ypd,2));
-  else yxtra->recver =
-    npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,&pd->ypd,1));
+  yaoUseNpot(yxtra,&pd->ypd,role);
   
   pd->ypd.feedOblivInputs = dualexFeedOblivInputs;
   // In this function, pd->ypd.thisParty == 1 always means generator
   pd->ypd.revealOblivBits = (role==1?dualexGenrRevealOblivBits
                                     :dualexEvalRevealOblivBits);
   mainYaoProtocol(&pd->ypd,arg->start,arg->startargs);
-  if(role==1) otSenderRelease(&yxtra->sender);
-  else otRecverRelease(&yxtra->recver);
+  yaoReleaseOt(yxtra,role);
   cleanupYaoProtocol(&arg->pd->ypd);
   return NULL;
 }
