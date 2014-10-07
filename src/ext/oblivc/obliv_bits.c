@@ -752,7 +752,11 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   gcry_cipher_open(&ypd->fixedKeyCipher,yaoFixedKeyAlgo,GCRY_CIPHER_MODE_ECB,0);
   gcry_cipher_setkey(ypd->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
 }
-void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+
+// point_and_permute should always be true.
+// It is false only in the NP protocol, where evaluator knows everything
+void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
+                     protocol_run start, void* arg)
 {
   YaoProtocolDesc* ypd = pd->extra;
   int me = pd->thisParty;
@@ -762,7 +766,7 @@ void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   {
     gcry_randomize(ypd->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
     gcry_randomize(ypd->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
-    ypd->R[0] |= 1;   // flipper bit
+    if(point_and_permute) ypd->R[0] |= 1;   // flipper bit
 
     if(ypd->sender.sender==NULL)
     { ownOT=true;
@@ -793,14 +797,14 @@ void cleanupYaoProtocol(ProtocolDesc* pd)
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   setupYaoProtocol(pd,true);
-  mainYaoProtocol(pd,start,arg);
+  mainYaoProtocol(pd,true,start,arg);
   cleanupYaoProtocol(pd);
 }
 
 void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   setupYaoProtocol(pd,false);
-  mainYaoProtocol(pd,start,arg);
+  mainYaoProtocol(pd,true,start,arg);
   free(pd->extra);
 }
 
