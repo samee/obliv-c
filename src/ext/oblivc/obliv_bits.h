@@ -23,8 +23,10 @@ typedef struct OblivBit {
       // generator: w is label for 0 value if inverted == false, 1 otherwise
       // evaluator: w is current label
       yao_key_t w;
-      bool value;    // used only by the prover in np protocol
-      bool inverted; // inverted: generator use only
+      union {
+        bool value;    // used only by the prover in np protocol
+        bool inverted; // inverted: generator use only
+      };
     } yao;
   };
 } OblivBit;
