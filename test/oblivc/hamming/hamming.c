@@ -1,0 +1,35 @@
+#include<stdio.h>
+#include<obliv.h>
+
+#include"hamming.h"
+
+
+int main(int argc,char *argv[])
+{
+  ProtocolDesc pd;
+  protocolIO io;
+  if(argc<4)
+  { if(argc<2) fprintf(stderr,"Port number missing\n");
+    else if(argc<3) fprintf(stderr,"Party missing\n");
+    else fprintf(stderr,"string missing\n");
+    fprintf(stderr,"Usage: %s <port> <1|2> <string>\n",argv[0]);
+    return 1;
+  }
+
+  io.s = argv[3];
+  io.n = strlen(argv[3]);
+  if(io.n>MAXN) 
+  { fprintf(stderr,"string too big\n");
+    return 1;
+  }
+
+  protocolUseStdio(&pd);
+  //if(argv[2][0]=='1') protocolAcceptTcp2P(&pd,argv[1],1);
+  //else protocolConnectTcp2P(&pd,"jamuna.cs.virginia.edu",argv[1],1);
+
+  setCurrentParty(&pd,(argv[2][0]=='1'?1:2));
+  execYaoProtocol(&pd,hammingDistance,&io);
+  fprintf(stderr,"Result: %d\n",io.res);
+  cleanupProtocol(&pd);
+  return 0;
+}
