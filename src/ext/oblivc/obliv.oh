@@ -3,6 +3,7 @@
 
 struct ProtocolDesc* ocCurrentProto(void);
 int ocCurrentParty(void);
+bool inDebugProto(void);
 
 void setupOblivBool(OblivInputs* spec, obliv bool* dest, bool v);
 void setupOblivChar(OblivInputs* spec, obliv char* dest, char v);

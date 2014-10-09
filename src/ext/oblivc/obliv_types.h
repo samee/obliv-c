@@ -50,7 +50,14 @@ struct ProtocolDesc {
   void (*flipBit  )(ProtocolDesc*,OblivBit*); // Sometimes avoids a struct copy
 
   void* extra;  // protocol-specific information
+                // First field should be char protoType
 };
+
+#define OC_DYN_EXTRA_FUN(fname,Type1,Type2,type2Id)    \
+  Type2* fname(Type1* s1)                              \
+  { if(*(char*)s1->extra==(type2Id)) return s1->extra; \
+    else return NULL;                                  \
+  }
 
 #define NPOT_BATCH_SIZE 7
 typedef struct {
@@ -74,6 +81,7 @@ typedef struct {
    user code. TODO
 */
 typedef struct YaoProtocolDesc {
+  char protoType;
   yao_key_t R,I; // LSB of R needs to be 1
   uint64_t gcount;
   unsigned icount, ocount;
@@ -83,6 +91,10 @@ typedef struct YaoProtocolDesc {
   gcry_cipher_hd_t fixedKeyCipher;
   void* extra;
 } YaoProtocolDesc;
+
+#define OC_PD_TYPE_YAO 1
+static inline OC_DYN_EXTRA_FUN(protoYaoProtocolDesc,ProtocolDesc,
+                               YaoProtocolDesc,OC_PD_TYPE_YAO)
 
 typedef struct ProtocolTransport ProtocolTransport;
 

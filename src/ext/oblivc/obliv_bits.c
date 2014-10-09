@@ -455,25 +455,12 @@ void yaoFlipBit(ProtocolDesc* pd,OblivBit* r)
 void yaoSetBitNot(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
   { *r = *a; yaoFlipBit(pd,r); }
 
-// Java-style iterator over bits in OblivInput array, assumes all sizes > 0
-typedef struct { int i,j; OblivInputs* oi; size_t n; } OIBitSrc;
-static bool hasBit (OIBitSrc* s) { return s->i<s->n; }
-static bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1<<s->j); }
-static OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
-static void nextBit(OIBitSrc* s) 
-  { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
-static int bitCount(OIBitSrc* s) 
-{ int res=0,i;
-  for(i=0;i<s->n;++i) res+=s->oi[i].size;
-  return res;
-}
-
 void yaoGenrFeedOblivInputs(ProtocolDesc* pd
                            ,OblivInputs* oi,size_t n,int src)
 { 
   YaoProtocolDesc* ypd = pd->extra;
   yao_key_t w0,w1;
-  OIBitSrc it = {0,0,oi,n};
+  OIBitSrc it = oiBitSrc(oi,n);
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
     yaoKeyNewPair(ypd,w0,w1);
@@ -503,7 +490,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
 }
 void yaoEvalFeedOblivInputs(ProtocolDesc* pd
                            ,OblivInputs* oi,size_t n,int src)
-{ OIBitSrc it = {0,0,oi,n};
+{ OIBitSrc it = oiBitSrc(oi,n);
   YaoProtocolDesc* ypd = pd->extra;
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
@@ -729,6 +716,8 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   YaoProtocolDesc* ypd = malloc(sizeof(YaoProtocolDesc));
   int me = pd->thisParty;
   pd->extra = ypd;
+  ypd->protoType = OC_PD_TYPE_YAO;
+  ypd->extra = NULL;
   pd->partyCount = 2;
   pd->currentParty = ocCurrentPartyDefault;
   pd->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
@@ -913,6 +902,7 @@ void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pd->setBitNot = dbgProtoSetBitNot;
   pd->flipBit   = dbgProtoFlipBit;
   pd->partyCount= 2;
+  pd->extra = NULL;
   currentProto = pd;
   currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
   start(arg);
@@ -927,6 +917,8 @@ int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
 
 ProtocolDesc* ocCurrentProto() { return currentProto; }
 void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
+
+bool inDebugProto(void) { return ocCurrentProto()->extra==NULL; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)
