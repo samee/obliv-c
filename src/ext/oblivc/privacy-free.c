@@ -105,11 +105,12 @@ bool ocNpGetBroadcast1()
   { return ocNpProtoGetBroadcast1(ocCurrentProto()); }
 
 void npGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
-{ if(src!=2 && !(src==1 && ocNpProtoGetBroadcast1(pd)))
+{
+  if(src!=2 && !(src==1 && ocNpProtoGetBroadcast1(pd)))
   { fprintf(stderr,"Error: feedObliv src must be 2 in np protocol\n"); 
     return; 
   }
-  if(src==2) yaoGenrFeedOblivInputs(pd->extra,oi,n,src); 
+  if(src==2) yaoGenrFeedOblivInputs(pd,oi,n,src);
   else // broadcast value, no privacy
   { OIBitSrc it = oiBitSrc(oi,n);
     for(;hasBit(&it);nextBit(&it))
@@ -128,7 +129,7 @@ void npEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
   { fprintf(stderr,"Error: feedObliv src must be 2 in np protocol\n"); 
     return; 
   }
-  if(src==2) yaoEvalFeedOblivInputs(pd->extra,oi,n,src); 
+  if(src==2) yaoEvalFeedOblivInputs(pd,oi,n,src);
   else
   { OIBitSrc it = oiBitSrc(oi,n);
     for(;hasBit(&it);nextBit(&it))
@@ -181,6 +182,7 @@ bool npEvalRevealOblivBits
   if(party == 0) osend(pd,1,&flipflags,bc);
   for(i=0;i<n;++i) if(!o[i].unknown && o[i].knownValue)
     rv |= (1LL<<i);
+  rv|=flipflags;
   ypd->ocount+=n;
   *dest=rv;
   return true;
