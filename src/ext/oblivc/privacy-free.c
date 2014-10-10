@@ -73,7 +73,9 @@
 
 #include<bcrandom.h>
 #include<obliv_bits.h>
+#include<obliv_yao.h>
 #include<gcrypt.h>
+#include<stdio.h>
 
 typedef struct
 {
@@ -83,24 +85,27 @@ typedef struct
 } NpProtocolExtra;
 #define OC_YPD_TYPE_NP 3
 
-DYN_EXTRA_FUN(ypdNpProtocolExtra,YaoProtocolDesc,
-              NpProtocolExtra,OC_YPD_TYPE_NP)
-
-void npProtoSetBroadcast1(ProtocolDesc* pd,bool v)
-  { ypdNpProtocolExtra(protoYaoProtocolDesc(pd))->broadcast1=v; }
-bool npProtoGetBroadcast1()
-  { return ypdNpProtocolExtra(protoYaoProtocolDesc(pd))->broadcast1; }
-
+OC_DYN_EXTRA_FUN(ypdNpProtocolExtra,YaoProtocolDesc,
+                 NpProtocolExtra,OC_YPD_TYPE_NP)
 struct ProtocolDesc* ocCurrentProto(void); // copied from obliv.oh
-// These 2 definitions go into some *.oh file
-void npSetBroadcast1(bool v) 
-  { npProtoSetBroadcast1(ocCurrentProto(),v); }
-bool npGetBroadcast1()
-  { return npProtoGetBroadcast1(ocCurrentProto()); }
 
+void ocNpProtoSetBroadcast1(ProtocolDesc* pd,bool v)
+  { ypdNpProtocolExtra(protoYaoProtocolDesc(pd))->broadcast1=v; }
+bool ocNpProtoGetBroadcast1(ProtocolDesc* pd)
+  { return ypdNpProtocolExtra(protoYaoProtocolDesc(pd))->broadcast1; }
+bool ocInNpProto(void)
+{ YaoProtocolDesc* ypd = protoYaoProtocolDesc(ocCurrentProto());
+  return ypd && ypdNpProtocolExtra(ypd)!=NULL;
+}
+
+// These 2 are declared in obliv.oh
+void ocNpSetBroadcast1(bool v) 
+  { ocNpProtoSetBroadcast1(ocCurrentProto(),v); }
+bool ocNpGetBroadcast1()
+  { return ocNpProtoGetBroadcast1(ocCurrentProto()); }
 
 void npGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
-{ if(src!=2 && !(src==1 && npProtoGetBroadcast1(pd)))
+{ if(src!=2 && !(src==1 && ocNpProtoGetBroadcast1(pd)))
   { fprintf(stderr,"Error: feedObliv src must be 2 in np protocol\n"); 
     return; 
   }
@@ -110,7 +115,7 @@ void npGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
     for(;hasBit(&it);nextBit(&it))
     { bool v = curBit(&it);
       OblivBit* dest = curDestBit(&it);
-      osend(pd,2,v,sizeof(bool));
+      osend(pd,2,&v,sizeof(bool));
       dest->unknown = false;
       dest->knownValue = v;
     }
@@ -119,7 +124,7 @@ void npGenrFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
 
 void npEvalFeedOblivInputs(ProtocolDesc* pd,OblivInputs* oi,size_t n,int src)
 {
-  if(src!=2 && !(src==1 && npProtoGetBroadcast1(pd))) 
+  if(src!=2 && !(src==1 && ocNpProtoGetBroadcast1(pd))) 
   { fprintf(stderr,"Error: feedObliv src must be 2 in np protocol\n"); 
     return; 
   }
@@ -159,7 +164,7 @@ bool npGenrRevealOblivBits(ProtocolDesc* pd,
 }
 // Similar to yaoEvalRevealOblivBits. Refactor? TODO
 bool npEvalRevealOblivBits
-  (ProtocolDesc* pd,widest_t* dest,const OblivBit* src,size_t size,int party)
+  (ProtocolDesc* pd,widest_t* dest,const OblivBit* o,size_t n,int party)
 { 
   if(party!=0 && party!=2) 
   { fprintf(stderr,"Error: revealObliv cannot reveal "
@@ -198,7 +203,7 @@ void npGenerateGate(ProtocolDesc* pd, OblivBit* r,
   yaoKeyXor (row,t);
   yaoKeyXor (row,wa0);
   if(ac) yaoKeyXor(row,ypd->R);
-  send(pd,2,row,YAO_KEY_BYTES);
+  osend(pd,2,row,YAO_KEY_BYTES);
   if(rc) yaoKeyXor(wr ,ypd->R); // I could have just set inverted=true instead
   ypd->gcount++;
 
@@ -219,7 +224,7 @@ void npEvaluateGate(ProtocolDesc* pd, OblivBit* r,
   else 
   { yaoSetHalfMask(ypd,wr,b->yao.w,ypd->gcount);
     yaoKeyXor(wr,a->yao.w);
-    recv(pd,1,r->yao.w,YAO_KEY_BYTES);
+    orecv(pd,1,r->yao.w,YAO_KEY_BYTES);
     yaoKeyXor(r->yao.w,wr);
   }
 
@@ -244,19 +249,20 @@ void npSetBitXor (ProtocolDesc* pd, OblivBit* r,
                   const OblivBit* a, const OblivBit* b)
 {
   OblivBit t;
-  yaoKeyCopy(t->yao.w,a->yao.w);
-  yaoKeyXor (t->yao.w,b->yao.w);
-  t->inverted = (a->yao.inverted!=b->yao.inverted);
-  t->unknown=true;
+  yaoKeyCopy(t.yao.w,a->yao.w);
+  yaoKeyXor (t.yao.w,b->yao.w);
+  t.yao.inverted = (a->yao.inverted!=b->yao.inverted);
+  t.unknown=true;
   *r=t;
 }
 void npFlipBit(ProtocolDesc* pd, OblivBit* r)
-  { r->inverted=!r->inverted; }
+  { r->yao.inverted=!r->yao.inverted; }
 void npSetBitNot(ProtocolDesc* pd, OblivBit* r, const OblivBit* a)
   { *r=*a; npFlipBit(pd,r); }
 
 // XXX Just implements privacy-free garbling, still need to do verify
-bool execNpProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+static bool execNpProtocolAux(ProtocolDesc* pd, bool bcast1, 
+                              protocol_run start, void* arg)
 {
   int me = pd->thisParty;
   // XXX Hmm, much of setupYaoProtocol, mainYaoProtocol is redundant.
@@ -265,21 +271,26 @@ bool execNpProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   NpProtocolExtra* npx = malloc(sizeof(NpProtocolExtra));
   ypd->extra=npx;
   npx->protoType = OC_YPD_TYPE_NP;
-  npx->broadcast1 = false;
+  npx->broadcast1 = bcast1;
   // override protocol methods
-  pd->feedOblivInputs = (me==1?npGenrFeedOblivIputs:npEvalFeedOblivInputs);
-  pd->revealOblivBits = npRevealOblivBits;
+  pd->feedOblivInputs = (me==1?npGenrFeedOblivInputs:npEvalFeedOblivInputs);
+  pd->revealOblivBits = (me==1?npGenrRevealOblivBits:npEvalRevealOblivBits);
   pd->setBitAnd = (me==1?npGenerateAnd:npEvaluateAnd);
   pd->setBitOr  = (me==1?npGenerateOr :npEvaluateOr );
-  pd->setBitXor = npSetBitXor; //
-  pd->setBitNot = npSetBitNot; // Needs value propagation TODO
-  pd->flipBit   = npFlipBit;   // Also, npSetBitNot should have default
+  pd->setBitXor = npSetBitXor;
+  pd->setBitNot = npSetBitNot;
+  pd->flipBit   = npFlipBit;
 
   yaoUseNpot(pd,me);
-  mainYaoProtocol(pd,false,start,args);
-  yaoReleaseOt(ypd,me);
+  mainYaoProtocol(pd,false,start,arg);
+  yaoReleaseOt(pd,me);
   free(npx);
   cleanupYaoProtocol(pd);
 
   return true; // success = not cheating (arg may have other outs)
 }
+
+bool execNpProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+  { return execNpProtocolAux(pd,false,start,arg); }
+bool execNpProtocol_Bcast1(ProtocolDesc* pd, protocol_run start, void* arg)
+  { return execNpProtocolAux(pd,true,start,arg); }

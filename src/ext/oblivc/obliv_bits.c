@@ -1,6 +1,7 @@
 // TODO I need to fix some int sizes
 #include <obliv_common.h>
 #include <obliv_bits.h>
+#include <obliv_yao.h>
 #include <assert.h>
 #include <errno.h>      // libgcrypt needs ENOMEM definition
 #include <inttypes.h>
@@ -332,14 +333,6 @@ static void debugOblivBit(const OblivBit* o)
   }
 }
 */
-
-void yaoKeyCopy(yao_key_t d, const yao_key_t s) { memcpy(d,s,YAO_KEY_BYTES); }
-void yaoKeyZero(yao_key_t d) { memset(d,0,YAO_KEY_BYTES); }
-bool yaoKeyLsb(const yao_key_t k) { return k[0]&1; }
-void yaoKeyXor(yao_key_t d, const yao_key_t s)
-{ int i;
-  for(i=0;i<YAO_KEY_BYTES;++i) d[i]^=s[i];
-}
 
 const char yaoFixedKey[] = "\x61\x7e\x8d\xa2\xa0\x51\x1e\x96"
                            "\x5e\x41\xc2\x9b\x15\x3f\xc7\x7a";
@@ -918,7 +911,7 @@ int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
 ProtocolDesc* ocCurrentProto() { return currentProto; }
 void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
 
-bool inDebugProto(void) { return ocCurrentProto()->extra==NULL; }
+bool ocInDebugProto(void) { return ocCurrentProto()->extra==NULL; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)

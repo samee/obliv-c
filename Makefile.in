@@ -142,7 +142,7 @@ $(OBJDIR)/cilly$(EXE) : $(CILLY_MODULES:%=$(OBJDIR)/%.$(CMO))
 
 # ------ these lines were added for obliv-C runtime -----------
 OCSRCDIR = src/ext/oblivc
-OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils
+OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils privacy-free
 
 oblivruntime: $(OBJDIR)/libobliv.a
 	

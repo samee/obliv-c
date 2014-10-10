@@ -25,6 +25,8 @@ void execNetworkStressProtocol(ProtocolDesc* pd, int bytecount,
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg);
 bool execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
+bool execNpProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
+bool execNpProtocol_Bcast1(ProtocolDesc* pd, protocol_run start, void* arg);
 
 unsigned yaoGateCount(void);
 int tcp2PBytesSent(ProtocolDesc* pd);

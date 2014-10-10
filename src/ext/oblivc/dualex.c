@@ -7,26 +7,13 @@
 #include<obliv.h>
 #include<obliv_bits.h> // needed for OblivBit.*
 #include<obliv_common.h>
+#include<obliv_yao.h>
 
 // Create a temporary ProtocolTransport that uses only one of the 
 //   available channels. Becomes invalid when the parent transport is cleaned up
 inline static ProtocolTransport* 
   subtransport(ProtocolTransport* trans, int newChannel)
   { return trans->subtransport(trans,newChannel); }
-
-// Yao protocol functions to be reused here
-extern void setupYaoProtocol(ProtocolDesc* pd,bool halfgates);
-extern void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
-                            protocol_run start, void* arg);
-extern void cleanupYaoProtocol(ProtocolDesc* pd);
-extern bool yaoGenrRevealOblivBits(ProtocolDesc* pd,
-                widest_t* dest,const OblivBit* o,size_t n,int party);
-extern bool yaoEvalRevealOblivBits(ProtocolDesc* pd,
-                widest_t* dest,const OblivBit* o,size_t n,int party);
-extern void yaoGenrFeedOblivInputs(ProtocolDesc* pd
-               ,OblivInputs* oi,size_t n,int src);
-extern void yaoEvalFeedOblivInputs(ProtocolDesc* pd
-               ,OblivInputs* oi,size_t n,int src);
 
 // TODO merge these two structs, and fix confusing pd/ypd parameters
 typedef struct {
