@@ -597,6 +597,7 @@ OTrecver npotRecverAbstract(NpotRecver* r)
 typedef struct HonestOTExtSender
 { BCipherRandomGen *keyblock[OT_KEY_BITS];
   BCipherRandomGen *padder;
+  size_t nonce; // incremented sequentially
   bool S[OT_KEY_BITS];
   char spack[OT_KEY_BYTES]; // same as S, in packed bytes
   ProtocolDesc* pd;
@@ -606,6 +607,7 @@ typedef struct HonestOTExtSender
 typedef struct HonestOTExtRecver
 { BCipherRandomGen *keyblock0[OT_KEY_BITS], *keyblock1[OT_KEY_BITS];
   BCipherRandomGen *padder;
+  size_t nonce; // incremented sequentially
   ProtocolDesc* pd;
   int srcparty;
 } HonestOTExtRecver;
@@ -619,6 +621,7 @@ HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty)
   HonestOTExtSender* sender=malloc(sizeof(HonestOTExtSender));
   gcry_randomize(sender->spack,OT_KEY_BYTES,GCRY_STRONG_RANDOM);
   sender->pd=pd; sender->destparty=destparty;
+  sender->nonce=0;
   sender->padder=newBCipherRandomGen();
   for(i=0;i<OT_KEY_BITS;++i)  sender->S[i]=(sender->spack[i/8]&(1<<i%8));
 
@@ -648,6 +651,7 @@ HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty)
   gcry_randomize(keys0,BC_SEEDLEN*OT_KEY_BITS,GCRY_STRONG_RANDOM);
   gcry_randomize(keys1,BC_SEEDLEN*OT_KEY_BITS,GCRY_STRONG_RANDOM);
   recver->pd=pd; recver->srcparty=srcparty;
+  recver->nonce=0;
   recver->padder=newBCipherRandomGen();
 
   // Do the base OTs
@@ -709,9 +713,10 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   for(i=0;i<OT_KEY_BITS;++i)
   { randomizeBuffer(s->keyblock[i],pseudorandom,bytes);
     if(s->S[i]==0) for(j=0;j<n;++j) 
-      setBit(cryptokeys[j],i,getBit(pseudorandom,j));
+      setBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
     else for(j=0;j<n;++j) 
-      xorBit(cryptokeys[j],i,getBit(pseudorandom,j));
+      xorBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
+    s->nonce++;
   }
   for(i=0;i<n;++i)
   { bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt0+i*len,len);
@@ -749,7 +754,7 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   for(i=0;i<n;++i) 
   { orecv(r->pd,r->srcparty,cipher0,len);
     orecv(r->pd,r->srcparty,cipher1,len);
-    bcipherCrypt(r->padder,cryptokeys0[i],i,dest+i*len,
+    bcipherCrypt(r->padder,cryptokeys0[i],r->nonce++,dest+i*len,
         (sel[i]?cipher1:cipher0),len);
   }
   free(cryptokeys0);
