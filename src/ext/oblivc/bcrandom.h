@@ -8,7 +8,8 @@
 
 // Simply applies a block cipher in counter mode on zeroes
 typedef struct 
-{ gcry_cipher_hd_t cipher; unsigned char zeroes[BC_MAXBLEN];
+{ gcry_cipher_hd_t cipher;
+  unsigned char zeroes[BC_MAXBLEN], ctr[BC_MAXBLEN];
   size_t blen;
 } BCipherRandomGen;
 

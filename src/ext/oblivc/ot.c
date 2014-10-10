@@ -52,9 +52,10 @@ BCipherRandomGen* newBCipherRandomGen()
   gen->blen = gcry_cipher_get_algo_blklen(algo);
   assert(klen<=sizeof(key));
   assert(gen->blen<=sizeof(gen->zeroes));
+  assert(gen->blen>=sizeof(uint64_t)); // used in setctrFromIntBCipherRandomGen
   gcry_randomize(key,klen,GCRY_STRONG_RANDOM);
   gcry_cipher_setkey(cipher,key,klen);
-  for(i=0;i<gen->blen;++i) gen->zeroes[i]=0;
+  for(i=0;i<gen->blen;++i) gen->zeroes[i]=gen->ctr[i]=0;
   return gen;
 }
 void releaseBCipherRandomGen(BCipherRandomGen* gen) 
@@ -69,6 +70,13 @@ void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key)
 {
   gcry_cipher_reset(gen->cipher);
   gcry_cipher_setkey(gen->cipher,key,BC_SEEDLEN);
+}
+void setctrFromIntBCipherRandomGen(BCipherRandomGen* gen,uint64_t ctr)
+{
+  const int isz = sizeof(ctr);
+  memcpy(gen->ctr,&ctr,isz);
+  memcpy(gen->ctr+isz,gen->zeroes,gen->blen-isz);
+  gcry_cipher_setctr(gen->cipher,gen->ctr,gen->blen);
 }
 
 void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len)
@@ -676,11 +684,12 @@ void xorBit(char *dest,int ind,bool v) { dest[ind/8]^=(v<<ind%8); }
 
 // Same function for encypt and decrypt. One-time pad, so don't reuse keys
 // Overlapping buffers not supported
-void bcipherCrypt(BCipherRandomGen* gen,const char* key,
+void bcipherCrypt(BCipherRandomGen* gen,const char* key,int nonce,
                   char* dest,const char* src,int n)
 {
   int i;
   resetBCipherRandomGen(gen,key);
+  setctrFromIntBCipherRandomGen(gen,nonce);
   randomizeBuffer(gen,dest,n);
   for(i=0;i<n;++i) dest[i]^=src[i];
 }
@@ -705,10 +714,10 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
       xorBit(cryptokeys[j],i,getBit(pseudorandom,j));
   }
   for(i=0;i<n;++i)
-  { bcipherCrypt(s->padder,cryptokeys[i],cipher,opt0+i*len,len);
+  { bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt0+i*len,len);
     osend(s->pd,s->destparty,cipher,len);
     for(j=0;j<BC_SEEDLEN;++j) cryptokeys[i][j]^=s->spack[j];
-    bcipherCrypt(s->padder,cryptokeys[i],cipher,opt1+i*len,len);
+    bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt1+i*len,len);
     osend(s->pd,s->destparty,cipher,len);
   }
   free(cipher);
@@ -740,7 +749,7 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   for(i=0;i<n;++i) 
   { orecv(r->pd,r->srcparty,cipher0,len);
     orecv(r->pd,r->srcparty,cipher1,len);
-    bcipherCrypt(r->padder,cryptokeys0[i],dest+i*len,
+    bcipherCrypt(r->padder,cryptokeys0[i],i,dest+i*len,
         (sel[i]?cipher1:cipher0),len);
   }
   free(cryptokeys0);
