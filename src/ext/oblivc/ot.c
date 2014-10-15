@@ -17,7 +17,6 @@
 #define DHEltBits 192
 #define DHEltSerialBytes (((DHEltBits+7)/8+2)*2)
 static gcry_mpi_t DHModQ,DHModQMinus3; // minus 3?! This is just paranoia
-static gcry_ctx_t DHCurve;
 static gcry_mpi_point_t DHg;           // The group generator of order q
 // Generator is 2
 
@@ -101,11 +100,13 @@ static pthread_once_t dhRandomInitDone = PTHREAD_ONCE_INIT;
 static void dhRandomInitAux(void) 
 {
   gcryDefaultLibInit();
+  gcry_ctx_t DHCurve;
   gcry_mpi_ec_new(&DHCurve,NULL,DHCurveName);
   DHg = gcry_mpi_ec_get_point("g",DHCurve,1);
   DHModQ = gcry_mpi_ec_get_mpi("n",DHCurve,1);
   DHModQMinus3 = gcry_mpi_new(0);
   gcry_mpi_sub_ui(DHModQMinus3,DHModQ,3);
+  gcry_ctx_release(DHCurve);
 }
 
 void dhRandomInit(void) { pthread_once(&dhRandomInitDone,dhRandomInitAux); }
@@ -118,17 +119,17 @@ void dhRandomFinalize(void)
   gcry_mpi_release(DHModQ);
   gcry_mpi_release(DHModQMinus3);
   gcry_mpi_point_release(DHg);
-  gcry_ctx_release(DHCurve);
 }
 
 // x and y are just scratch memory that is used internally.
 // u gets serialized into buf
-static void dhSerialize(char* buf,gcry_mpi_point_t u,gcry_mpi_t x,gcry_mpi_t y)
+static void dhSerialize(char* buf,gcry_mpi_point_t u,
+    gcry_ctx_t ctx,gcry_mpi_t x,gcry_mpi_t y) // TODO manage these plumbings
 {
   size_t s;
   unsigned char *ubuf = CAST(buf);
   const int elts = DHEltSerialBytes/2;
-  gcry_mpi_ec_get_affine(x,y,u,DHCurve); // kinda expensive
+  gcry_mpi_ec_get_affine(x,y,u,ctx); // kinda expensive
   gcry_mpi_print(GCRYMPI_FMT_PGP,ubuf,elts,&s,x);
   while(s<elts) ubuf[s++]=0; ubuf+=elts;
   gcry_mpi_print(GCRYMPI_FMT_PGP,ubuf,elts,&s,y);
@@ -146,10 +147,10 @@ static void dhDeserialize(gcry_mpi_point_t* p, const char* buf)
 
 // Once again, x and y are scratch variables
 static void dhSend(gcry_mpi_point_t u,ProtocolDesc* pd,int party,
-                   gcry_mpi_t x, gcry_mpi_t y)
+                   gcry_ctx_t ctx,gcry_mpi_t x, gcry_mpi_t y)
 {
   char buf[DHEltSerialBytes];
-  dhSerialize(buf,u,x,y);
+  dhSerialize(buf,u,ctx,x,y);
   osend(pd,party,buf,DHEltSerialBytes);
 }
 // Allocates a new gcry_mpi_t, and returns it
@@ -190,7 +191,7 @@ static void xorBuffer(char* dest,const char* x,const char* y,size_t len)
 // adds an extra counter R 
 //   For 2-party, this could be slightly faster by shoving i inside R
 static void oneTimePad(char* dest,const char* src,size_t n,gcry_mpi_point_t k,
-    uint64_t R,int i,gcry_mpi_t x,gcry_mpi_t y)
+    uint64_t R,int i,gcry_ctx_t ctx,gcry_mpi_t x,gcry_mpi_t y)
 {
   char sb[DHEltSerialBytes+sizeof(R)+sizeof(i)];
   int sz=0;
@@ -198,7 +199,7 @@ static void oneTimePad(char* dest,const char* src,size_t n,gcry_mpi_point_t k,
   assert(n<=HASH_BYTES);
   memcpy(sb+sz,&R,sizeof(R)); sz+=sizeof(R); // careful,
   memcpy(sb+sz,&i,sizeof(i)); sz+=sizeof(i); //   endianness
-  dhSerialize(sb+sz,k,x,y); sz+=DHEltSerialBytes;
+  dhSerialize(sb+sz,k,ctx,x,y); sz+=DHEltSerialBytes;
   gcry_md_hash_buffer(GCRY_MD_SHA256, digest, sb, sz);
   xorBuffer(dest,src,digest,n);
 }
@@ -212,6 +213,7 @@ typedef struct NpotSender
   BCipherRandomGen* gen;
   ProtocolDesc* pd;
   int destParty;
+  gcry_ctx_t ctx; // This doesn't seem to be thread-safe
 } NpotSender;
 
 /* 
@@ -242,26 +244,27 @@ NpotSender* npotSenderNew(int nmax,ProtocolDesc* pd,int destParty)
   s = malloc(sizeof(NpotSender));
 
   s->gen = newBCipherRandomGen();
+  gcry_mpi_ec_new(&s->ctx,NULL,DHCurveName);
   s->r = dhRandomExp(s->gen);
   s->gr = gcry_mpi_point_new(0);
   s->scratchx = gcry_mpi_new(0);
   s->scratchy = gcry_mpi_new(0);
   s->scratchz = gcry_mpi_new(0);
-  gcry_mpi_ec_mul(s->gr,s->r,DHg,DHCurve);
+  gcry_mpi_ec_mul(s->gr,s->r,DHg,s->ctx);
   s->nmax = nmax;
   s->R = 0;
   s->pd = pd; s->destParty = destParty;
 
-  dhSend(s->gr,s->pd,s->destParty,s->scratchx,s->scratchy);
+  dhSend(s->gr,s->pd,s->destParty,s->ctx,s->scratchx,s->scratchy);
   s->Cr = malloc(sizeof(gcry_mpi_point_t)*(nmax-1));
   for(i=0;i<nmax-1;++i)
   {
     s->Cr[i] = gcry_mpi_point_new(0);
     gcry_mpi_release(s->scratchx);
     s->scratchx = dhRandomExp(s->gen);
-    gcry_mpi_ec_mul(s->Cr[i],s->scratchx,DHg,DHCurve);
-    dhSend(s->Cr[i],s->pd,s->destParty,s->scratchx,s->scratchy);
-    gcry_mpi_ec_mul(s->Cr[i],s->r,s->Cr[i],DHCurve);
+    gcry_mpi_ec_mul(s->Cr[i],s->scratchx,DHg,s->ctx);
+    dhSend(s->Cr[i],s->pd,s->destParty,s->ctx,s->scratchx,s->scratchy);
+    gcry_mpi_ec_mul(s->Cr[i],s->r,s->Cr[i],s->ctx);
   }
   return s;
 }
@@ -295,14 +298,14 @@ static void npotSend_roundSendData(NpotSender* s,NpotSenderState* q,
   PK0 = q->PK0;
 
   PKi = gcry_mpi_point_new(0);
-  gcry_mpi_ec_mul(PK0,s->r,PK0,DHCurve);
-  oneTimePad(buf,arr[0],len,PK0,s->R,0,s->scratchx,s->scratchy);
+  gcry_mpi_ec_mul(PK0,s->r,PK0,s->ctx);
+  oneTimePad(buf,arr[0],len,PK0,s->R,0,s->ctx,s->scratchx,s->scratchy);
   osend(s->pd,s->destParty,buf,len);
   gcry_mpi_point_neg(PK0,PK0,s->scratchx,s->scratchy,s->scratchz);
 
   for(i=1;i<n;++i)
-  { gcry_mpi_ec_add(PKi,PK0,s->Cr[i-1],DHCurve);
-    oneTimePad(buf,arr[i],len,PKi,s->R,i,s->scratchx,s->scratchy);
+  { gcry_mpi_ec_add(PKi,PK0,s->Cr[i-1],s->ctx);
+    oneTimePad(buf,arr[i],len,PKi,s->R,i,s->ctx,s->scratchx,s->scratchy);
     osend(s->pd,s->destParty,buf,len);
   }
   s->R++;
@@ -337,6 +340,7 @@ void npotSenderRelease(NpotSender* s)
   gcry_mpi_release(s->scratchy);
   gcry_mpi_release(s->scratchz);
   releaseBCipherRandomGen(s->gen);
+  gcry_ctx_release(s->ctx);
   free(s);
 }
 
@@ -349,6 +353,7 @@ typedef struct NpotRecver
   BCipherRandomGen* gen;
   ProtocolDesc* pd;
   int srcParty;
+  gcry_ctx_t ctx; // This doesn't seem to be thread-safe
 } NpotRecver;
 
 // nmax must match with that on the sender side
@@ -358,6 +363,7 @@ NpotRecver* npotRecverNew(int nmax,ProtocolDesc* pd,int srcParty)
   int i;
   NpotRecver* r;
   r = malloc(sizeof(NpotRecver));
+  gcry_mpi_ec_new(&r->ctx,NULL,DHCurveName);
   r->nmax = nmax;
   r->R = 0;
   r->gr = dhRecv(pd,srcParty);
@@ -386,14 +392,14 @@ static void npotRecv_roundSendKey(NpotRecver* r,NpotRecverState* q,int seli,
   q->k = dhRandomExp(r->gen);
   gk = gcry_mpi_point_new(0);
   PK0 = gcry_mpi_point_new(0);
-  gcry_mpi_ec_mul(gk,q->k,DHg,DHCurve);
+  gcry_mpi_ec_mul(gk,q->k,DHg,r->ctx);
   gcry_mpi_point_copy(PK0,gk,r->scratchx,r->scratchy,r->scratchz);
 
   if(seli==0) { i=0; p=&gk; }
   else { i=seli-1; p=&PK0; }
   gcry_mpi_point_neg(*p,gk,r->scratchx,r->scratchy,r->scratchz);
-  gcry_mpi_ec_add(*p,*p,r->C[i],DHCurve);
-  dhSend(PK0,r->pd,r->srcParty,r->scratchx,r->scratchy);
+  gcry_mpi_ec_add(*p,*p,r->C[i],r->ctx);
+  dhSend(PK0,r->pd,r->srcParty,r->ctx,r->scratchx,r->scratchy);
 
   gcry_mpi_point_release(gk);
   gcry_mpi_point_release(PK0);
@@ -406,9 +412,9 @@ static void npotRecv_roundRecvData(NpotRecver* r,NpotRecverState* q,char* dest,
   char selbuf[HASH_BYTES], dummybuf[HASH_BYTES];
   gcry_mpi_point_t gkr;
   gkr = gcry_mpi_point_new(0);
-  gcry_mpi_ec_mul(gkr,q->k,r->gr,DHCurve);
+  gcry_mpi_ec_mul(gkr,q->k,r->gr,r->ctx);
   for(i=0;i<q->n;++i) orecv(r->pd,r->srcParty,i==q->seli?selbuf:dummybuf,len);
-  oneTimePad(dest,selbuf,len,gkr,r->R,q->seli,r->scratchx,r->scratchy);
+  oneTimePad(dest,selbuf,len,gkr,r->R,q->seli,r->ctx,r->scratchx,r->scratchy);
   r->R++;
   gcry_mpi_point_release(gkr);
   gcry_mpi_release(q->k);
