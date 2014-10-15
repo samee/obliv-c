@@ -285,6 +285,10 @@ static bool execNpProtocolAux(ProtocolDesc* pd, bool bcast1,
 
   yaoUseNpot(pd,me);
   mainYaoProtocol(pd,false,start,arg);
+  // XXX Preserve everything in mainYaoProtocol
+  // Send out secrets: OTReveal, yao secrets
+  // Whacky transport: <details>
+  // Receiver threads out: <more>
   yaoReleaseOt(pd,me);
   free(npx);
   cleanupYaoProtocol(pd);
