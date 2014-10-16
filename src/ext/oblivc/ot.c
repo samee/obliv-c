@@ -765,17 +765,18 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   for(i=0;i<OT_KEY_BITS;++i)
   { randomizeBuffer(s->keyblock[i],pseudorandom,bytes);
     if(s->S[i]==0) for(j=0;j<n;++j) 
-      setBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
+      setBit(cryptokeys[j],i,getBit(pseudorandom,j));
     else for(j=0;j<n;++j) 
-      xorBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
-    s->nonce++;
+      xorBit(cryptokeys[j],i,getBit(pseudorandom,j));
   }
+  assert(OT_KEY_BITS%8==0);
   for(i=0;i<n;++i)
-  { bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt0+i*len,len);
+  { bcipherCrypt(s->padder,cryptokeys[i],s->nonce,cipher,opt0+i*len,len);
     osend(s->pd,s->destparty,cipher,len);
-    for(j=0;j<BC_SEEDLEN;++j) cryptokeys[i][j]^=s->spack[j];
-    bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt1+i*len,len);
+    for(j=0;j<OT_KEY_BYTES;++j) cryptokeys[i][j]^=s->spack[j];
+    bcipherCrypt(s->padder,cryptokeys[i],s->nonce,cipher,opt1+i*len,len);
     osend(s->pd,s->destparty,cipher,len);
+    s->nonce++;
   }
   free(cipher);
   free(pseudorandom);
@@ -797,9 +798,11 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
     for(j=0;j<n;++j) setBit(cryptokeys1[j],i,sel[j]^getBit(pseudorandom,j));
   }
   for(i=OT_KEY_BITS;i<8*BC_SEEDLEN;++i)
-    for(j=0;j<n;++j) setBit(cryptokeys0[j],i,0);
-    // Corresponding bits of cryptokeys1 remains garbage. They are ignored
-    // by the sender
+    for(j=0;j<n;++j)
+    { setBit(cryptokeys0[j],i,0);
+      setBit(cryptokeys1[j],i,0);
+    }
+
   for(i=0;i<BC_SEEDLEN;++i) for(j=0;j<n;++j) 
     cryptokeys1[j][i]^=cryptokeys0[j][i];
   osend(r->pd,r->srcparty,cryptokeys1,n*BC_SEEDLEN);
