@@ -15,6 +15,11 @@ static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
 static inline int osend(ProtocolDesc* pd,int d,const void* p,size_t n)
   { return pd->trans->send(pd->trans,d,p,n); }
 
+// Maybe these 5 lines should move to bcrandom.h
+#define DHCurveName "secp192r1"
+#define DHEltBits 192
+#define DHEltSerialBytes (((DHEltBits+7)/8+2)*2)
+
 void dhRandomInit(void);
 void dhRandomFinalize(void);
 

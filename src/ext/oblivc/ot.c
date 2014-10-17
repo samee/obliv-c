@@ -12,13 +12,8 @@
 
 // ---------------- Diffie Hellman Random Elt Generator ----------------------
 
-// Prime p, copied from RFC3526, 2048-bit group, ID 14
-#define DHCurveName "secp192r1"
-#define DHEltBits 192
-#define DHEltSerialBytes (((DHEltBits+7)/8+2)*2)
 static gcry_mpi_t DHModQ,DHModQMinus3; // minus 3?! This is just paranoia
 static gcry_mpi_point_t DHg;           // The group generator of order q
-// Generator is 2
 
 BCipherRandomGen* newBCipherRandomGen() 
 { 
@@ -79,7 +74,7 @@ void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len)
 }
 
 // allocates and returns a new DH element in range [2,p-2]
-static gcry_mpi_t dhRandomExp(BCipherRandomGen* gen)
+gcry_mpi_t dhRandomExp(BCipherRandomGen* gen)
 {
   char out[1+(DHEltBits+7)/8];
   const int outsize = sizeof(out)/sizeof(*out);
@@ -145,8 +140,10 @@ static void dhDeserialize(gcry_mpi_point_t* p, const char* buf)
   *p = gcry_mpi_point_snatch_set(NULL,x,y,gcry_mpi_set_ui(NULL,1));
 }
 
+// These names started out as static. Now that they are not, the names should
+// be properly prefixed to avoid name clashes TODO
 // Once again, x and y are scratch variables
-static void dhSend(gcry_mpi_point_t u,ProtocolDesc* pd,int party,
+void dhSend(gcry_mpi_point_t u,ProtocolDesc* pd,int party,
                    gcry_ctx_t ctx,gcry_mpi_t x, gcry_mpi_t y)
 {
   char buf[DHEltSerialBytes];
@@ -154,7 +151,7 @@ static void dhSend(gcry_mpi_point_t u,ProtocolDesc* pd,int party,
   osend(pd,party,buf,DHEltSerialBytes);
 }
 // Allocates a new gcry_mpi_t, and returns it
-static gcry_mpi_point_t dhRecv(ProtocolDesc* pd,int party)
+gcry_mpi_point_t dhRecv(ProtocolDesc* pd,int party)
 { char buf[DHEltSerialBytes];
   gcry_mpi_point_t x;
   orecv(pd,party,buf,DHEltSerialBytes);

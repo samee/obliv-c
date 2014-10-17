@@ -17,6 +17,7 @@ typedef struct
 BCipherRandomGen* newBCipherRandomGen();
 void releaseBCipherRandomGen(BCipherRandomGen* gen);
 void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len);
+gcry_mpi_t dhRandomExp(BCipherRandomGen* gen);
 
 // key is assumed to be BC_SEEDLEN bytes long
 void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key);
