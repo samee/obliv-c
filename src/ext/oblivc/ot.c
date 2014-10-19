@@ -15,62 +15,12 @@
 static gcry_mpi_t DHModQ,DHModQMinus3; // minus 3?! This is just paranoia
 static gcry_mpi_point_t DHg;           // The group generator of order q
 
-BCipherRandomGen* newBCipherRandomGen() 
-{ 
-  const int algo = GCRY_CIPHER_AES128; // change BC_SEEDLEN if this changes
-  size_t klen;
-  BCipherRandomGen* gen;
-  unsigned char key[16];
-  int i;
-  gcry_cipher_hd_t cipher;
-
-  gcryDefaultLibInit();
-  gen = malloc(sizeof(BCipherRandomGen)); 
-  gcry_cipher_open(&cipher,algo,GCRY_CIPHER_MODE_CTR,0);
-  gen->cipher = cipher;
-  klen = gcry_cipher_get_algo_keylen(algo);
-  assert(klen<=BC_SEEDLEN);
-  gen->blen = gcry_cipher_get_algo_blklen(algo);
-  assert(klen<=sizeof(key));
-  assert(gen->blen<=sizeof(gen->zeroes));
-  assert(gen->blen>=sizeof(uint64_t)); // used in setctrFromIntBCipherRandomGen
-  gcry_randomize(key,klen,GCRY_STRONG_RANDOM);
-  gcry_cipher_setkey(cipher,key,klen);
-  for(i=0;i<gen->blen;++i) gen->zeroes[i]=gen->ctr[i]=0;
-  return gen;
-}
-void releaseBCipherRandomGen(BCipherRandomGen* gen) 
-{ 
-  if(gen==NULL) return;
-  gcry_cipher_close(gen->cipher);
-  free(gen); 
-}
-
-// key is assumed to be BC_SEEDLEN bytes long
-void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key)
-{
-  gcry_cipher_reset(gen->cipher);
-  gcry_cipher_setkey(gen->cipher,key,BC_SEEDLEN);
-}
 void setctrFromIntBCipherRandomGen(BCipherRandomGen* gen,uint64_t ctr)
 {
   const int isz = sizeof(ctr);
   memcpy(gen->ctr,&ctr,isz);
   memcpy(gen->ctr+isz,gen->zeroes,gen->blen-isz);
   gcry_cipher_setctr(gen->cipher,gen->ctr,gen->blen);
-}
-
-void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len)
-{ unsigned char lastout[BC_MAXBLEN];
-  int i;
-  const size_t blen = gen->blen;
-  for(i=0;i+blen<=len;i+=blen)
-    gcry_cipher_encrypt(gen->cipher,(unsigned char*)dest+i,blen,
-        gen->zeroes,blen);
-  if(i<len)
-  { gcry_cipher_encrypt(gen->cipher,lastout,blen,gen->zeroes,blen);
-    memcpy(dest+i,lastout,len-i); // discard last few bits
-  }
 }
 
 // allocates and returns a new DH element in range [2,p-2]
@@ -94,8 +44,8 @@ static pthread_once_t dhRandomInitDone = PTHREAD_ONCE_INIT;
 // Needs to be invoked before any other functions here
 static void dhRandomInitAux(void) 
 {
-  gcryDefaultLibInit();
   gcry_ctx_t DHCurve;
+  gcryDefaultLibInit();
   gcry_mpi_ec_new(&DHCurve,NULL,DHCurveName);
   DHg = gcry_mpi_ec_get_point("g",DHCurve,1);
   DHModQ = gcry_mpi_ec_get_mpi("n",DHCurve,1);
@@ -160,13 +110,13 @@ gcry_mpi_point_t dhRecv(ProtocolDesc* pd,int party)
 }
 
 /*
-static void dhDebug(gcry_mpi_t x)
+void dhDebug(gcry_mpi_t x)
 {
   unsigned char buff[520];
   gcry_mpi_print(GCRYMPI_FMT_HEX,buff,520,NULL,x);
   fprintf(stderr,"%s\n",buff);
 }
-static void dhDebugPoint(gcry_mpi_point_t g)
+void dhDebugPoint(gcry_mpi_point_t g)
 {
   gcry_mpi_t gx,gy;
   gx = gcry_mpi_new(0);
