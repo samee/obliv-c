@@ -17,65 +17,9 @@
 
 // ---------------- Diffie Hellman Random Elt Generator ----------------------
 
-// Yuck, custom DH code. Some day, I'll switch to using a sane ECC
-// implementation
+static gcry_mpi_t DHModQ,DHModQMinus3; // minus 3?! This is just paranoia
+static gcry_mpi_point_t DHg;           // The group generator of order q
 
-// Prime p, copied from RFC3526, 2048-bit group, ID 14
-#define DHEltBits 2048
-#define DHEltSerialBytes ((DHEltBits+7)/8+2)
-static const char DHModPString[] 
-= "FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD1"
-  "29024E088A67CC74020BBEA63B139B22514A08798E3404DD"
-  "EF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245"
-  "E485B576625E7EC6F44C42E9A637ED6B0BFF5CB6F406B7ED"
-  "EE386BFB5A899FA5AE9F24117C4B1FE649286651ECE45B3D"
-  "C2007CB8A163BF0598DA48361C55D39A69163FA8FD24CF5F"
-  "83655D23DCA3AD961C62F356208552BB9ED529077096966D"
-  "670C354E4ABC9804F1746C08CA18217C32905E462E36CE3B"
-  "E39E772C180E86039B2783A2EC07A28FB5C55DF06F4C52C9"
-  "DE2BCBF6955817183995497CEA956AE515D2261898FA0510"
-  "15728E5A8AACAA68FFFFFFFFFFFFFFFF";
-static gcry_mpi_t DHModP,DHModPMinus3;
-static gcry_mpi_t gcryMpiZero, gcryMpiOne;
-// Generator is 2
-
-BCipherRandomGen* newBCipherRandomGen() 
-{ 
-  const int algo = GCRY_CIPHER_AES128; // change BC_SEEDLEN if this changes
-  size_t klen;
-  BCipherRandomGen* gen;
-  unsigned char key[16];
-  int i;
-  gcry_cipher_hd_t cipher;
-
-  gcryDefaultLibInit();
-  gen = malloc(sizeof(BCipherRandomGen)); 
-  gcry_cipher_open(&cipher,algo,GCRY_CIPHER_MODE_CTR,0);
-  gen->cipher = cipher;
-  klen = gcry_cipher_get_algo_keylen(algo);
-  assert(klen<=BC_SEEDLEN);
-  gen->blen = gcry_cipher_get_algo_blklen(algo);
-  assert(klen<=sizeof(key));
-  assert(gen->blen<=sizeof(gen->zeroes));
-  assert(gen->blen>=sizeof(uint64_t)); // used in setctrFromIntBCipherRandomGen
-  gcry_randomize(key,klen,GCRY_STRONG_RANDOM);
-  gcry_cipher_setkey(cipher,key,klen);
-  for(i=0;i<gen->blen;++i) gen->zeroes[i]=gen->ctr[i]=0;
-  return gen;
-}
-void releaseBCipherRandomGen(BCipherRandomGen* gen) 
-{ 
-  if(gen==NULL) return;
-  gcry_cipher_close(gen->cipher);
-  free(gen); 
-}
-
-// key is assumed to be BC_SEEDLEN bytes long
-void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key)
-{
-  gcry_cipher_reset(gen->cipher);
-  gcry_cipher_setkey(gen->cipher,key,BC_SEEDLEN);
-}
 void setctrFromIntBCipherRandomGen(BCipherRandomGen* gen,uint64_t ctr)
 {
   const int isz = sizeof(ctr);
@@ -84,21 +28,8 @@ void setctrFromIntBCipherRandomGen(BCipherRandomGen* gen,uint64_t ctr)
   gcry_cipher_setctr(gen->cipher,gen->ctr,gen->blen);
 }
 
-void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len)
-{ unsigned char lastout[BC_MAXBLEN];
-  int i;
-  const size_t blen = gen->blen;
-  for(i=0;i+blen<=len;i+=blen)
-    gcry_cipher_encrypt(gen->cipher,(unsigned char*)dest+i,blen,
-        gen->zeroes,blen);
-  if(i<len)
-  { gcry_cipher_encrypt(gen->cipher,lastout,blen,gen->zeroes,blen);
-    memcpy(dest+i,lastout,len-i); // discard last few bits
-  }
-}
-
 // allocates and returns a new DH element in range [2,p-2]
-static gcry_mpi_t dhRandomElt(BCipherRandomGen* gen)
+gcry_mpi_t dhRandomExp(BCipherRandomGen* gen)
 {
   char out[1+(DHEltBits+7)/8];
   const int outsize = sizeof(out)/sizeof(*out);
@@ -108,7 +39,7 @@ static gcry_mpi_t dhRandomElt(BCipherRandomGen* gen)
   do
   { randomizeBuffer(gen,out+1,outsize-1);
     gcry_mpi_scan(&x,GCRYMPI_FMT_STD,out,outsize,NULL);
-    islarge = gcry_mpi_cmp(x,DHModPMinus3);
+    islarge = gcry_mpi_cmp(x,DHModQMinus3);
   } while(islarge>=0);
   gcry_mpi_add_ui(x,x,2);
   return x;
@@ -118,12 +49,14 @@ static pthread_once_t dhRandomInitDone = PTHREAD_ONCE_INIT;
 // Needs to be invoked before any other functions here
 static void dhRandomInitAux(void) 
 {
+  gcry_ctx_t DHCurve;
   gcryDefaultLibInit();
-  gcryMpiZero = gcry_mpi_set_ui(NULL,0);
-  gcryMpiOne  = gcry_mpi_set_ui(NULL,1);
-  gcry_mpi_scan(&DHModP,GCRYMPI_FMT_HEX,DHModPString,0,NULL);
-  DHModPMinus3 = gcry_mpi_new(0);
-  gcry_mpi_sub_ui(DHModPMinus3,DHModP,3);
+  gcry_mpi_ec_new(&DHCurve,NULL,DHCurveName);
+  DHg = gcry_mpi_ec_get_point("g",DHCurve,1);
+  DHModQ = gcry_mpi_ec_get_mpi("n",DHCurve,1);
+  DHModQMinus3 = gcry_mpi_new(0);
+  gcry_mpi_sub_ui(DHModQMinus3,DHModQ,3);
+  gcry_ctx_release(DHCurve);
 }
 
 void dhRandomInit(void) { pthread_once(&dhRandomInitDone,dhRandomInitAux); }
@@ -133,45 +66,71 @@ void dhRandomInit(void) { pthread_once(&dhRandomInitDone,dhRandomInitAux); }
 void dhRandomFinalize(void)
 {
   // if(!dhRandomInitDone) return;
-  gcry_mpi_release(DHModP);
-  gcry_mpi_release(DHModPMinus3);
-  gcry_mpi_release(gcryMpiZero);
-  gcry_mpi_release(gcryMpiOne);
+  gcry_mpi_release(DHModQ);
+  gcry_mpi_release(DHModQMinus3);
+  gcry_mpi_point_release(DHg);
 }
 
-static void dhSerialize(char* buf,gcry_mpi_t x)
+// x and y are just scratch memory that is used internally.
+// u gets serialized into buf
+static void dhSerialize(char* buf,gcry_mpi_point_t u,
+    gcry_ctx_t ctx,gcry_mpi_t x,gcry_mpi_t y) // TODO manage these plumbings
 {
-  size_t i;
-  gcry_mpi_print(GCRYMPI_FMT_PGP,(unsigned char*)buf,DHEltSerialBytes,&i,x);
-  while(i<DHEltSerialBytes) buf[i++]=0;
+  size_t s;
+  unsigned char *ubuf = CAST(buf);
+  const int elts = DHEltSerialBytes/2;
+  gcry_mpi_ec_get_affine(x,y,u,ctx); // kinda expensive
+  gcry_mpi_print(GCRYMPI_FMT_PGP,ubuf,elts,&s,x);
+  while(s<elts) ubuf[s++]=0; ubuf+=elts;
+  gcry_mpi_print(GCRYMPI_FMT_PGP,ubuf,elts,&s,y);
+  while(s<elts) ubuf[s++]=0;
 }
 
-static void dhDeserialize(gcry_mpi_t* p, const char* buf)
+static void dhDeserialize(gcry_mpi_point_t* p, const char* buf)
 {
-  gcry_mpi_scan(p,GCRYMPI_FMT_PGP,buf,DHEltSerialBytes,NULL);
+  const int elts = DHEltSerialBytes/2;
+  gcry_mpi_t x,y;
+  gcry_mpi_scan(&x,GCRYMPI_FMT_PGP,buf,elts,NULL);
+  gcry_mpi_scan(&y,GCRYMPI_FMT_PGP,buf+elts,elts,NULL);
+  *p = gcry_mpi_point_snatch_set(NULL,x,y,gcry_mpi_set_ui(NULL,1));
 }
 
-static void dhSend(gcry_mpi_t x,ProtocolDesc* pd,int party)
+// These names started out as static. Now that they are not, the names should
+// be properly prefixed to avoid name clashes TODO
+// Once again, x and y are scratch variables
+void dhSend(gcry_mpi_point_t u,ProtocolDesc* pd,int party,
+                   gcry_ctx_t ctx,gcry_mpi_t x, gcry_mpi_t y)
 {
   char buf[DHEltSerialBytes];
-  dhSerialize(buf,x);
+  dhSerialize(buf,u,ctx,x,y);
   osend(pd,party,buf,DHEltSerialBytes);
 }
 // Allocates a new gcry_mpi_t, and returns it
-static gcry_mpi_t dhRecv(ProtocolDesc* pd,int party)
+gcry_mpi_point_t dhRecv(ProtocolDesc* pd,int party)
 { char buf[DHEltSerialBytes];
-  gcry_mpi_t x;
+  gcry_mpi_point_t x;
   orecv(pd,party,buf,DHEltSerialBytes);
   dhDeserialize(&x,buf);
   return x;
 }
 
 /*
-static void dhDebug(gcry_mpi_t x)
+void dhDebug(gcry_mpi_t x)
 {
   unsigned char buff[520];
   gcry_mpi_print(GCRYMPI_FMT_HEX,buff,520,NULL,x);
   fprintf(stderr,"%s\n",buff);
+}
+void dhDebugPoint(gcry_mpi_point_t g)
+{
+  gcry_mpi_t gx,gy;
+  gx = gcry_mpi_new(0);
+  gy = gcry_mpi_new(0);
+  gcry_mpi_ec_get_affine(gx,gy,g,DHCurve);
+  fprintf(stderr,"  x = "); dhDebug(gx);
+  fprintf(stderr,"  y = "); dhDebug(gy);
+  gcry_mpi_release(gx);
+  gcry_mpi_release(gy);
 }
 */
 
@@ -183,8 +142,8 @@ static void xorBuffer(char* dest,const char* x,const char* y,size_t len)
 #define HASH_BYTES 32
 // adds an extra counter R 
 //   For 2-party, this could be slightly faster by shoving i inside R
-static void oneTimePad(char* dest,const char* src,size_t n,gcry_mpi_t k,
-    uint64_t R,int i)
+static void oneTimePad(char* dest,const char* src,size_t n,gcry_mpi_point_t k,
+    uint64_t R,int i,gcry_ctx_t ctx,gcry_mpi_t x,gcry_mpi_t y)
 {
   char sb[DHEltSerialBytes+sizeof(R)+sizeof(i)];
   int sz=0;
@@ -192,18 +151,21 @@ static void oneTimePad(char* dest,const char* src,size_t n,gcry_mpi_t k,
   assert(n<=HASH_BYTES);
   memcpy(sb+sz,&R,sizeof(R)); sz+=sizeof(R); // careful,
   memcpy(sb+sz,&i,sizeof(i)); sz+=sizeof(i); //   endianness
-  dhSerialize(sb+sz,k); sz+=DHEltSerialBytes;
+  dhSerialize(sb+sz,k,ctx,x,y); sz+=DHEltSerialBytes;
   gcry_md_hash_buffer(GCRY_MD_SHA256, digest, sb, sz);
   xorBuffer(dest,src,digest,n);
 }
 
 typedef struct NpotSender
-{ gcry_mpi_t r,gr,*Cr;
+{ gcry_mpi_point_t gr,*Cr;
+  gcry_mpi_t r;
+  gcry_mpi_t scratchx,scratchy,scratchz;
   uint64_t R;
   int nmax;
   BCipherRandomGen* gen;
   ProtocolDesc* pd;
   int destParty;
+  gcry_ctx_t ctx; // This doesn't seem to be thread-safe
 } NpotSender;
 
 /* 
@@ -234,50 +196,73 @@ NpotSender* npotSenderNew(int nmax,ProtocolDesc* pd,int destParty)
   s = malloc(sizeof(NpotSender));
 
   s->gen = newBCipherRandomGen();
-  s->r = dhRandomElt(s->gen);
-  s->gr = gcry_mpi_set_ui(NULL,2);
-  gcry_mpi_powm(s->gr,s->gr,s->r,DHModP);
+  gcry_mpi_ec_new(&s->ctx,NULL,DHCurveName);
+  s->r = dhRandomExp(s->gen);
+  s->gr = gcry_mpi_point_new(0);
+  s->scratchx = gcry_mpi_new(0);
+  s->scratchy = gcry_mpi_new(0);
+  s->scratchz = gcry_mpi_new(0);
+  gcry_mpi_ec_mul(s->gr,s->r,DHg,s->ctx);
   s->nmax = nmax;
   s->R = 0;
   s->pd = pd; s->destParty = destParty;
 
-  dhSend(s->gr,s->pd,s->destParty);
-  s->Cr = malloc(sizeof(gcry_mpi_t)*(nmax-1));
+  dhSend(s->gr,s->pd,s->destParty,s->ctx,s->scratchx,s->scratchy);
+  s->Cr = malloc(sizeof(gcry_mpi_point_t)*(nmax-1));
   for(i=0;i<nmax-1;++i)
-  { s->Cr[i] = dhRandomElt(s->gen);
-    dhSend(s->Cr[i],s->pd,s->destParty);
-    gcry_mpi_powm(s->Cr[i],s->Cr[i],s->r,DHModP);
+  {
+    s->Cr[i] = gcry_mpi_point_new(0);
+    gcry_mpi_release(s->scratchx);
+    s->scratchx = dhRandomExp(s->gen);
+    gcry_mpi_ec_mul(s->Cr[i],s->scratchx,DHg,s->ctx);
+    dhSend(s->Cr[i],s->pd,s->destParty,s->ctx,s->scratchx,s->scratchy);
+    gcry_mpi_ec_mul(s->Cr[i],s->r,s->Cr[i],s->ctx);
   }
   return s;
 }
 
-typedef struct { gcry_mpi_t PK0; } NpotSenderState;
+typedef struct { gcry_mpi_point_t PK0; } NpotSenderState;
 
 static void npotSend_roundRecvKey(NpotSender* s,NpotSenderState* q)
   { q->PK0 = dhRecv(s->pd,s->destParty); }
 
+// x,y,z are scratch
+static void gcry_mpi_point_copy(gcry_mpi_point_t w, gcry_mpi_point_t v,
+      gcry_mpi_t x,gcry_mpi_t y,gcry_mpi_t z)
+{
+  gcry_mpi_point_get(x,y,z,v);
+  gcry_mpi_point_set(w,x,y,z);
+}
+// x,y,z are scratch
+static void gcry_mpi_point_neg(gcry_mpi_point_t w,gcry_mpi_point_t v,
+    gcry_mpi_t x,gcry_mpi_t y,gcry_mpi_t z)
+{
+  gcry_mpi_point_get(x,y,z,v);
+  gcry_mpi_neg(y,y);
+  gcry_mpi_point_set(w,x,y,z);
+}
 static void npotSend_roundSendData(NpotSender* s,NpotSenderState* q,
     char** arr,int n,int len)
 {
   int i;
   char buf[HASH_BYTES];
-  gcry_mpi_t PK0,PKi;
+  gcry_mpi_point_t PK0,PKi;
   PK0 = q->PK0;
 
-  PKi = gcry_mpi_new(DHEltSerialBytes);
-  gcry_mpi_powm(PK0,PK0,s->r,DHModP);
-  oneTimePad(buf,arr[0],len,PK0,s->R,0);
+  PKi = gcry_mpi_point_new(0);
+  gcry_mpi_ec_mul(PK0,s->r,PK0,s->ctx);
+  oneTimePad(buf,arr[0],len,PK0,s->R,0,s->ctx,s->scratchx,s->scratchy);
   osend(s->pd,s->destParty,buf,len);
-  gcry_mpi_invm(PK0,PK0,DHModP);
+  gcry_mpi_point_neg(PK0,PK0,s->scratchx,s->scratchy,s->scratchz);
 
   for(i=1;i<n;++i)
-  { gcry_mpi_mulm(PKi,PK0,s->Cr[i-1],DHModP);
-    oneTimePad(buf,arr[i],len,PKi,s->R,i);
+  { gcry_mpi_ec_add(PKi,PK0,s->Cr[i-1],s->ctx);
+    oneTimePad(buf,arr[i],len,PKi,s->R,i,s->ctx,s->scratchx,s->scratchy);
     osend(s->pd,s->destParty,buf,len);
   }
   s->R++;
-  gcry_mpi_release(PK0);
-  gcry_mpi_release(PKi);
+  gcry_mpi_point_release(PK0);
+  gcry_mpi_point_release(PKi);
 }
 
 /*
@@ -300,21 +285,27 @@ void npotSenderRelease(NpotSender* s)
   int i;
   if(!s) return;
   gcry_mpi_release(s->r);
-  gcry_mpi_release(s->gr);
-  for(i=0;i<s->nmax-1;++i) gcry_mpi_release(s->Cr[i]);
+  gcry_mpi_point_release(s->gr);
+  for(i=0;i<s->nmax-1;++i) gcry_mpi_point_release(s->Cr[i]);
   free(s->Cr);
+  gcry_mpi_release(s->scratchx);
+  gcry_mpi_release(s->scratchy);
+  gcry_mpi_release(s->scratchz);
   releaseBCipherRandomGen(s->gen);
+  gcry_ctx_release(s->ctx);
   free(s);
 }
 
 typedef struct NpotRecver
 {
-  gcry_mpi_t gr,*C;
+  gcry_mpi_point_t gr,*C;
+  gcry_mpi_t scratchx,scratchy,scratchz;
   int nmax;
   uint64_t R;
   BCipherRandomGen* gen;
   ProtocolDesc* pd;
   int srcParty;
+  gcry_ctx_t ctx; // This doesn't seem to be thread-safe
 } NpotRecver;
 
 // nmax must match with that on the sender side
@@ -324,10 +315,14 @@ NpotRecver* npotRecverNew(int nmax,ProtocolDesc* pd,int srcParty)
   int i;
   NpotRecver* r;
   r = malloc(sizeof(NpotRecver));
+  gcry_mpi_ec_new(&r->ctx,NULL,DHCurveName);
   r->nmax = nmax;
   r->R = 0;
   r->gr = dhRecv(pd,srcParty);
-  r->C = malloc(sizeof(gcry_mpi_t)*(nmax-1));
+  r->scratchx = gcry_mpi_new(0);
+  r->scratchy = gcry_mpi_new(0);
+  r->scratchz = gcry_mpi_new(0);
+  r->C = malloc(sizeof(gcry_mpi_point_t)*(nmax-1));
   r->pd = pd; r->srcParty = srcParty;
   for(i=0;i<nmax-1;++i) r->C[i]=dhRecv(pd,srcParty);
   r->gen = newBCipherRandomGen();
@@ -342,23 +337,24 @@ typedef struct {
 static void npotRecv_roundSendKey(NpotRecver* r,NpotRecverState* q,int seli,
     int n)
 {
-  gcry_mpi_t gk,PK0,*p;
+  gcry_mpi_point_t gk,PK0,*p;
   int i;
   q->seli=seli;
   q->n=n;
-  q->k = dhRandomElt(r->gen);
-  gk = gcry_mpi_set_ui(NULL,2);
-  gcry_mpi_powm(gk,gk,q->k,DHModP);
-  PK0 = gcry_mpi_copy(gk);
+  q->k = dhRandomExp(r->gen);
+  gk = gcry_mpi_point_new(0);
+  PK0 = gcry_mpi_point_new(0);
+  gcry_mpi_ec_mul(gk,q->k,DHg,r->ctx);
+  gcry_mpi_point_copy(PK0,gk,r->scratchx,r->scratchy,r->scratchz);
 
   if(seli==0) { i=0; p=&gk; }
   else { i=seli-1; p=&PK0; }
-  gcry_mpi_invm(*p,gk,DHModP);
-  gcry_mpi_mulm(*p,*p,r->C[i],DHModP);
-  dhSend(PK0,r->pd,r->srcParty);
+  gcry_mpi_point_neg(*p,gk,r->scratchx,r->scratchy,r->scratchz);
+  gcry_mpi_ec_add(*p,*p,r->C[i],r->ctx);
+  dhSend(PK0,r->pd,r->srcParty,r->ctx,r->scratchx,r->scratchy);
 
-  gcry_mpi_release(gk);
-  gcry_mpi_release(PK0);
+  gcry_mpi_point_release(gk);
+  gcry_mpi_point_release(PK0);
 }
 
 static void npotRecv_roundRecvData(NpotRecver* r,NpotRecverState* q,char* dest,
@@ -366,13 +362,13 @@ static void npotRecv_roundRecvData(NpotRecver* r,NpotRecverState* q,char* dest,
 {
   int i;
   char selbuf[HASH_BYTES], dummybuf[HASH_BYTES];
-  gcry_mpi_t gkr;
-  gkr = gcry_mpi_new(DHEltSerialBytes);
-  gcry_mpi_powm(gkr,r->gr,q->k,DHModP);
+  gcry_mpi_point_t gkr;
+  gkr = gcry_mpi_point_new(0);
+  gcry_mpi_ec_mul(gkr,q->k,r->gr,r->ctx);
   for(i=0;i<q->n;++i) orecv(r->pd,r->srcParty,i==q->seli?selbuf:dummybuf,len);
-  oneTimePad(dest,selbuf,len,gkr,r->R,q->seli);
+  oneTimePad(dest,selbuf,len,gkr,r->R,q->seli,r->ctx,r->scratchx,r->scratchy);
   r->R++;
-  gcry_mpi_release(gkr);
+  gcry_mpi_point_release(gkr);
   gcry_mpi_release(q->k);
 }
 
@@ -389,9 +385,12 @@ void npotRecverRelease(NpotRecver* r)
   int i;
   if(!r) return;
   releaseBCipherRandomGen(r->gen);
-  gcry_mpi_release(r->gr);
-  for(i=0;i<r->nmax-1;++i) gcry_mpi_release(r->C[i]);
+  gcry_mpi_point_release(r->gr);
+  for(i=0;i<r->nmax-1;++i) gcry_mpi_point_release(r->C[i]);
   free(r->C);
+  gcry_mpi_release(r->scratchx);
+  gcry_mpi_release(r->scratchy);
+  gcry_mpi_release(r->scratchz);
   free(r);
 }
 
@@ -735,10 +734,9 @@ void honestOTExtSend1Of2RecvCryptokey(HonestOTExtSender* s,char (*cryptokeys)[BC
   for(i=0;i<OT_KEY_BITS;++i)
   { randomizeBuffer(s->keyblock[i],pseudorandom,bytes);
     if(s->S[i]==0) for(j=0;j<n;++j) 
-	  setBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
+      setBit(cryptokeys[j],i,getBit(pseudorandom,j));
     else for(j=0;j<n;++j) 
-	  xorBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
-    s->nonce++;
+      xorBit(cryptokeys[j],i,getBit(pseudorandom,j));
   }
   free(pseudorandom);
 }
@@ -748,12 +746,14 @@ void honestOTExtSend1Of2SendMessages(HonestOTExtSender* s,const char* opt0,const
 {
   int i,j;
   char* cipher = malloc(len);
+  assert(OT_KEY_BITS%8==0);
   for(i=0;i<n;++i)
-  { bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt0+i*len,len);
+  { bcipherCrypt(s->padder,cryptokeys[i],s->nonce,cipher,opt0+i*len,len);
     osend(s->pd,s->destparty,cipher,len);
-    for(j=0;j<BC_SEEDLEN;++j) cryptokeys[i][j]^=s->spack[j];
-    bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt1+i*len,len);
+    for(j=0;j<OT_KEY_BYTES;++j) cryptokeys[i][j]^=s->spack[j];
+    bcipherCrypt(s->padder,cryptokeys[i],s->nonce,cipher,opt1+i*len,len);
     osend(s->pd,s->destparty,cipher,len);
+    s->nonce++;
   }
   free(cipher);
 }
@@ -783,9 +783,11 @@ void honestOTExtRecv1Of2SendCryptokey(HonestOTExtRecver* r,const bool* sel,
     for(j=0;j<n;++j) setBit(cryptokeys1[j],i,sel[j]^getBit(pseudorandom,j));
   }
   for(i=OT_KEY_BITS;i<8*BC_SEEDLEN;++i)
-    for(j=0;j<n;++j) setBit(cryptokeys0[j],i,0);
-    // Corresponding bits of cryptokeys1 remains garbage. They are ignored
-    // by the sender
+    for(j=0;j<n;++j)
+    { setBit(cryptokeys0[j],i,0);
+      setBit(cryptokeys1[j],i,0);
+    }
+
   for(i=0;i<BC_SEEDLEN;++i) for(j=0;j<n;++j) 
     cryptokeys1[j][i]^=cryptokeys0[j][i];
   osend(r->pd,r->srcparty,cryptokeys1,n*BC_SEEDLEN);

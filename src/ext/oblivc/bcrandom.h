@@ -13,10 +13,14 @@ typedef struct
   size_t blen;
 } BCipherRandomGen;
 
-// Confusingly, these are implemented in ot.c. 
 BCipherRandomGen* newBCipherRandomGen();
 void releaseBCipherRandomGen(BCipherRandomGen* gen);
-void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len);
-
 // key is assumed to be BC_SEEDLEN bytes long
 void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key);
+
+void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len);
+gcry_mpi_t dhRandomExp(BCipherRandomGen* gen);
+
+unsigned long long bcRandomInt(BCipherRandomGen* gen,unsigned long long max);
+void bcRandomShuffle(BCipherRandomGen* gen,unsigned arr[],size_t n);
+void bcRandomPermutation(BCipherRandomGen* gen,unsigned arr[],size_t n);
