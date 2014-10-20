@@ -5,10 +5,15 @@
 #include<stdbool.h>
 #include<stdint.h>
 #include<stdlib.h>
+#include<math.h>
+
+#include<time.h>
+#include<stdio.h>
 
 #include<bcrandom.h>
 #include<obliv_common.h>
 #include<obliv_types.h>
+#include<commitReveal.h>
 
 // ---------------- Diffie Hellman Random Elt Generator ----------------------
 
@@ -602,6 +607,7 @@ typedef struct HonestOTExtSender
   char spack[OT_KEY_BYTES]; // same as S, in packed bytes
   ProtocolDesc* pd;
   int destparty;
+  int multiplier;
 } HonestOTExtSender;
 
 typedef struct HonestOTExtRecver
@@ -610,67 +616,85 @@ typedef struct HonestOTExtRecver
   size_t nonce; // incremented sequentially
   ProtocolDesc* pd;
   int srcparty;
+  int multiplier;
 } HonestOTExtRecver;
 
 #define BATCH_SIZE 5
-// Base OT is done using npotSend1Of2
-HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty)
+
+HonestOTExtSender* honestOTExtSenderNewWithMltp(ProtocolDesc* pd,int destparty, int multiplier)
 {
   int i;
-  char keys[BC_SEEDLEN*OT_KEY_BITS];
+  char keys[BC_SEEDLEN*(multiplier*OT_KEY_BITS)];
   HonestOTExtSender* sender=malloc(sizeof(HonestOTExtSender));
-  gcry_randomize(sender->spack,OT_KEY_BYTES,GCRY_STRONG_RANDOM);
+  gcry_randomize(sender->spack,multiplier*OT_KEY_BYTES,GCRY_STRONG_RANDOM);
   sender->pd=pd; sender->destparty=destparty;
   sender->nonce=0;
   sender->padder=newBCipherRandomGen();
-  for(i=0;i<OT_KEY_BITS;++i)  sender->S[i]=(sender->spack[i/8]&(1<<i%8));
+  sender->multiplier=multiplier;
+  for(i=0;i<multiplier*OT_KEY_BITS;++i)  sender->S[i]=(sender->spack[i/8]&(1<<i%8));
 
   // Do the base OTs
   NpotRecver* ot=npotRecverNew(1<<BATCH_SIZE,pd,destparty);
-  npotRecv1Of2(ot,keys,sender->S,OT_KEY_BITS,BC_SEEDLEN,BATCH_SIZE);
+  npotRecv1Of2(ot,keys,sender->S,multiplier*OT_KEY_BITS,BC_SEEDLEN,BATCH_SIZE);
   npotRecverRelease(ot);
 
   // Initialize pseudorandom generators
-  for(i=0;i<OT_KEY_BITS;++i)
+  for(i=0;i<multiplier*OT_KEY_BITS;++i)
   { sender->keyblock[i]=newBCipherRandomGen();
     resetBCipherRandomGen(sender->keyblock[i],keys+i*BC_SEEDLEN);
   }
   return sender;
+
 }
+// Base OT is done using npotSend1Of2
+HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty)
+{
+	return honestOTExtSenderNewWithMltp(pd, destparty, 1);
+}
+
 void honestOTExtSenderRelease(HonestOTExtSender* sender)
 { int i;
-  for(i=0;i<OT_KEY_BITS;++i) releaseBCipherRandomGen(sender->keyblock[i]);
+  for(i=0;i<sender->multiplier*OT_KEY_BITS;++i) 
+	  releaseBCipherRandomGen(sender->keyblock[i]);
   releaseBCipherRandomGen(sender->padder);
   free(sender);
 }
 
-HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty)
-{ int i;
-  char keys0[BC_SEEDLEN*OT_KEY_BITS], keys1[BC_SEEDLEN*OT_KEY_BITS];
-  HonestOTExtRecver* recver = malloc(sizeof(HonestOTExtRecver));
-  gcry_randomize(keys0,BC_SEEDLEN*OT_KEY_BITS,GCRY_STRONG_RANDOM);
-  gcry_randomize(keys1,BC_SEEDLEN*OT_KEY_BITS,GCRY_STRONG_RANDOM);
-  recver->pd=pd; recver->srcparty=srcparty;
-  recver->nonce=0;
-  recver->padder=newBCipherRandomGen();
+HonestOTExtRecver* honestOTExtRecverNewWithMltp(ProtocolDesc* pd,int srcparty, int multiplier)
+{ 
+	int i;
+	char keys0[BC_SEEDLEN*multiplier*OT_KEY_BITS], keys1[BC_SEEDLEN*multiplier*OT_KEY_BITS];
+	HonestOTExtRecver* recver = malloc(sizeof(HonestOTExtRecver));
+	gcry_randomize(keys0,BC_SEEDLEN*multiplier*OT_KEY_BITS,GCRY_STRONG_RANDOM);
+	gcry_randomize(keys1,BC_SEEDLEN*multiplier*OT_KEY_BITS,GCRY_STRONG_RANDOM);
+	recver->pd=pd; recver->srcparty=srcparty;
+	recver->nonce=0;
+	recver->padder=newBCipherRandomGen();
+	recver->multiplier=multiplier;
 
-  // Do the base OTs
-  NpotSender* ot=npotSenderNew(1<<BATCH_SIZE,pd,srcparty);
-  npotSend1Of2(ot,keys0,keys1,OT_KEY_BITS,BC_SEEDLEN,BATCH_SIZE);
-  npotSenderRelease(ot);
+	// Do the base OTs
+	NpotSender* ot=npotSenderNew(1<<BATCH_SIZE,pd,srcparty);
+	npotSend1Of2(ot,keys0,keys1,multiplier*OT_KEY_BITS,BC_SEEDLEN,BATCH_SIZE);
+	npotSenderRelease(ot);
 
-  // Initialize pseudorandom generators
-  for(i=0;i<OT_KEY_BITS;++i)
-  { recver->keyblock0[i]=newBCipherRandomGen();
-    resetBCipherRandomGen(recver->keyblock0[i],keys0+i*BC_SEEDLEN);
-    recver->keyblock1[i]=newBCipherRandomGen();
-    resetBCipherRandomGen(recver->keyblock1[i],keys1+i*BC_SEEDLEN);
-  }
-  return recver;
+	// Initialize pseudorandom generators
+	for(i=0;i<multiplier*OT_KEY_BITS;++i)
+	{ recver->keyblock0[i]=newBCipherRandomGen();
+		resetBCipherRandomGen(recver->keyblock0[i],keys0+i*BC_SEEDLEN);
+		recver->keyblock1[i]=newBCipherRandomGen();
+		resetBCipherRandomGen(recver->keyblock1[i],keys1+i*BC_SEEDLEN);
+	}
+	return recver;
 }
+
+HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty)
+{
+	return honestOTExtRecverNewWithMltp(pd, srcparty, 1);
+}
+
 void honestOTExtRecverRelease(HonestOTExtRecver* recver)
 { int i;
-  for(i=0;i<OT_KEY_BITS;++i)
+  for(i=0;i<recver->multiplier*OT_KEY_BITS;++i)
   { releaseBCipherRandomGen(recver->keyblock0[i]);
     releaseBCipherRandomGen(recver->keyblock1[i]);
   }
@@ -698,14 +722,12 @@ void bcipherCrypt(BCipherRandomGen* gen,const char* key,int nonce,
   for(i=0;i<n;++i) dest[i]^=src[i];
 }
 
-void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
+void honestOTExtSend1Of2RecvCryptokey(HonestOTExtSender* s,char (*cryptokeys)[BC_SEEDLEN],
     int n,int len)
 {
   int i,j;
   const int bytes = (n+7)/8;
-  char (*cryptokeys)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN); // TODO structify
   char* pseudorandom = malloc(bytes);
-  char* cipher = malloc(len);
   orecv(s->pd,s->destparty,cryptokeys,n*BC_SEEDLEN);
   assert(OT_KEY_BITS<=8*BC_SEEDLEN);
   for(i=OT_KEY_BITS;i<8*BC_SEEDLEN;++i) for(j=0;j<n;++j)
@@ -713,11 +735,19 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   for(i=0;i<OT_KEY_BITS;++i)
   { randomizeBuffer(s->keyblock[i],pseudorandom,bytes);
     if(s->S[i]==0) for(j=0;j<n;++j) 
-      setBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
+	  setBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
     else for(j=0;j<n;++j) 
-      xorBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
+	  xorBit(cryptokeys[j],s->nonce,getBit(pseudorandom,j));
     s->nonce++;
   }
+  free(pseudorandom);
+}
+
+void honestOTExtSend1Of2SendMessages(HonestOTExtSender* s,const char* opt0,const char* opt1,
+    char (*cryptokeys)[BC_SEEDLEN],int n,int len)
+{
+  int i,j;
+  char* cipher = malloc(len);
   for(i=0;i<n;++i)
   { bcipherCrypt(s->padder,cryptokeys[i],i,cipher,opt0+i*len,len);
     osend(s->pd,s->destparty,cipher,len);
@@ -726,21 +756,29 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
     osend(s->pd,s->destparty,cipher,len);
   }
   free(cipher);
-  free(pseudorandom);
+}
+
+void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
+    int n,int len)
+{
+  char (*cryptokeys)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN); // TODO structify
+  honestOTExtSend1Of2RecvCryptokey(s,cryptokeys,n,len);
+  honestOTExtSend1Of2SendMessages(s,opt0,opt1,cryptokeys,n,len);
   free(cryptokeys);
 }
-void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
-    int n,int len)
+
+void honestOTExtRecv1Of2SendCryptokey(HonestOTExtRecver* r,const bool* sel,
+    char (*cryptokeys0)[BC_SEEDLEN],int n,int len)
 {
   int i,j;
   const int bytes = (n+7)/8;
-  char (*cryptokeys0)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN);
   char (*cryptokeys1)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN);
   char* pseudorandom = malloc(bytes);
-  char *cipher0 = malloc(len), *cipher1 = malloc(len);
+  char* new = malloc(bytes);
   for(i=0;i<OT_KEY_BITS;++i)
   { randomizeBuffer(r->keyblock0[i],pseudorandom,bytes);
     for(j=0;j<n;++j) setBit(cryptokeys0[j],i,getBit(pseudorandom,j));
+    for(j=0;j<n;++j) setBit(new,j,sel[j]^getBit(pseudorandom,j));
     randomizeBuffer(r->keyblock1[i],pseudorandom,bytes);
     for(j=0;j<n;++j) setBit(cryptokeys1[j],i,sel[j]^getBit(pseudorandom,j));
   }
@@ -751,17 +789,32 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   for(i=0;i<BC_SEEDLEN;++i) for(j=0;j<n;++j) 
     cryptokeys1[j][i]^=cryptokeys0[j][i];
   osend(r->pd,r->srcparty,cryptokeys1,n*BC_SEEDLEN);
+  free(cryptokeys1);
+  free(pseudorandom);
+}
+
+void honestOTExtRecv1Of2RecvMessages(HonestOTExtRecver* r,char* dest,const bool* sel,
+		char (*cryptokeys0)[BC_SEEDLEN],int n,int len)
+{
+  int i;
+  char *cipher0 = malloc(len), *cipher1 = malloc(len);
   for(i=0;i<n;++i) 
   { orecv(r->pd,r->srcparty,cipher0,len);
     orecv(r->pd,r->srcparty,cipher1,len);
     bcipherCrypt(r->padder,cryptokeys0[i],r->nonce++,dest+i*len,
         (sel[i]?cipher1:cipher0),len);
   }
-  free(cryptokeys0);
-  free(cryptokeys1);
-  free(pseudorandom);
   free(cipher0);
   free(cipher1);
+}
+
+void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len)
+{
+  char (*cryptokeys0)[BC_SEEDLEN] = malloc(n*BC_SEEDLEN);
+  honestOTExtRecv1Of2SendCryptokey(r,sel,cryptokeys0,n,len);
+  honestOTExtRecv1Of2RecvMessages(r,dest,sel,cryptokeys0,n,len);
+  free(cryptokeys0);
 }
 #undef BATCH_SIZE
 
@@ -777,4 +830,191 @@ OTsender honestOTExtSenderAbstract(HonestOTExtSender* s)
 OTrecver honestOTExtRecverAbstract(HonestOTExtRecver* r)
 { return (OTrecver){.recver=r, .recv=honestWrapperRecv, 
                     .release=(void(*)(void*))honestOTExtRecverRelease};
+}
+
+// --------------- OT-extension (assuming active adversary) ----------------
+#define BASE_OT_MULTIPLIER 1
+#define MULT_OT_KEY_BITS  (BASE_OT_MULTIPLIER*OT_KEY_BITS)
+#define MULT_OT_KEY_BYTES  (BASE_OT_MULTIPLIER*OT_KEY_BYTES)
+#define SECURITY_CONSTANT (2*OT_KEY_BITS+log(OT_KEY_BITS))
+
+typedef struct MaliciousOTExtSender
+{
+	HonestOTExtSender *honestSender;	
+	BCipherRandomGen *randomGen; // Used to jointly generate the random matrix
+} MaliciousOTExtSender;
+
+typedef struct MaliciousOTExtRecver
+{
+	HonestOTExtRecver *honestRecver;
+	BCipherRandomGen *randomGen; // Used to jointly generate the random matrix
+} MaliciousOTExtRecver;
+
+MaliciousOTExtSender* maliciousOTExtSenderNew(ProtocolDesc* pd,int destparty)
+{
+	MaliciousOTExtSender *sender = malloc(sizeof(MaliciousOTExtSender*));
+	sender->honestSender = honestOTExtSenderNewWithMltp(pd, destparty, BASE_OT_MULTIPLIER);
+	sender->randomGen = newBCipherRandomGen();
+	return sender;
+}
+
+void maliciousOTExtSenderRelease(MaliciousOTExtSender* sender)
+{
+	honestOTExtSenderRelease(sender->honestSender);
+	releaseBCipherRandomGen(sender->randomGen);
+	free(sender);	
+}
+
+MaliciousOTExtRecver* maliciousOTExtRecverNew(ProtocolDesc* pd,int srcparty)
+{
+	MaliciousOTExtRecver*recver = malloc(sizeof(MaliciousOTExtRecver*));
+	recver->honestRecver= honestOTExtRecverNewWithMltp(pd, srcparty, BASE_OT_MULTIPLIER);
+	recver->randomGen = newBCipherRandomGen();
+	return recver;
+}
+
+void maliciousOTExtRecverRelease(MaliciousOTExtRecver* recver)
+{
+	honestOTExtRecverRelease(recver->honestRecver);
+	releaseBCipherRandomGen(recver->randomGen);
+	free(recver);	
+}
+
+bool dotProduct(const char* src1, const char* src2, int bytes)
+{
+	bool sum=0;
+	int i;
+	for(i=0;i<bytes*8;++i) sum^=(getBit(src1, i)&getBit(src2, i));
+	return sum;
+}
+
+static clock_t begin;
+static clock_t end;
+static double total = 0;
+
+void homomorphicHash(char* dest, const char* src, const char* keyMatrix, int cryptokeyLenBytes)
+{
+	begin = clock();
+	int i;
+	char buff[OT_KEY_BYTES];  
+	for(i=0; i<OT_KEY_BYTES*8; i++) 
+	{
+		setBit(buff,i, dotProduct(src, keyMatrix+i*cryptokeyLenBytes, cryptokeyLenBytes));
+	}
+	memcpy(dest, buff, OT_KEY_BYTES);
+	end = clock();
+	total+=(double)(end-begin);
+}
+
+bool protocolDeviationCheckSender(MaliciousOTExtSender* s, char (*cryptokeys)[BC_SEEDLEN], 
+		BCipherRandomGen* gen, int cryptokeyLenBytes)
+{
+	int i, j;
+	char* hashFunctionMatrix = malloc(cryptokeyLenBytes*OT_KEY_BITS);
+	char* columnKey = malloc(cryptokeyLenBytes);
+	char columnKeyHash[OT_KEY_BYTES];
+	char key0Hash[OT_KEY_BYTES]; 
+	char firstRHash[OT_KEY_BYTES];
+	bool firstRHashSet = false;
+	bool rv = true;
+	rv &= ocRandomBytes(s->honestSender->pd, gen, hashFunctionMatrix, 
+			cryptokeyLenBytes*OT_KEY_BITS, s->honestSender->destparty);
+	for(i=0;i<MULT_OT_KEY_BITS;++i)
+	{
+		orecv(s->honestSender->pd,s->honestSender->destparty,key0Hash,OT_KEY_BYTES);
+		for(j=0;j<cryptokeyLenBytes*8;++j) setBit(columnKey,j,getBit(cryptokeys[j], i));
+		homomorphicHash(columnKeyHash, columnKey, hashFunctionMatrix, cryptokeyLenBytes);
+		if(s->honestSender->S[i]==0) rv &= (memcmp(columnKeyHash, key0Hash, OT_KEY_BYTES)==0);
+		else
+		{
+			for(j=0;j<OT_KEY_BYTES;j++) columnKeyHash[j]^=key0Hash[j];	
+			if(!firstRHashSet)
+			{
+				memcpy(firstRHash, columnKeyHash, OT_KEY_BYTES);	
+				firstRHashSet = true;
+			}
+			else rv &= (memcmp(columnKeyHash, firstRHash, OT_KEY_BYTES)==0);
+		}
+	}
+	free(hashFunctionMatrix);
+	free(columnKey);
+	fprintf(stderr, "total time: %lf\n", total/CLOCKS_PER_SEC);
+	return rv;
+}
+
+void protocolDeviationCheckRecver(MaliciousOTExtRecver* r, char (*cryptokeys0)[BC_SEEDLEN], 
+		BCipherRandomGen* gen, int cryptokeyLenBytes){
+	int i,j;
+	char* columnKey = malloc(cryptokeyLenBytes);
+	char columnKeyHash[OT_KEY_BYTES];
+	char* hashFunctionMatrix = malloc(cryptokeyLenBytes*OT_KEY_BITS);
+	ocRandomBytes(r->honestRecver->pd, gen, hashFunctionMatrix, 
+			cryptokeyLenBytes*OT_KEY_BITS, r->honestRecver->srcparty);
+	for(i=0;i<MULT_OT_KEY_BITS;++i)
+	{
+		for(j=0;j<cryptokeyLenBytes*8;++j) setBit(columnKey,j,getBit(cryptokeys0[j], i));
+		homomorphicHash(columnKeyHash, columnKey, hashFunctionMatrix, cryptokeyLenBytes);
+		osend(r->honestRecver->pd,r->honestRecver->srcparty,columnKeyHash,OT_KEY_BYTES);
+	}
+	free(columnKey);
+	free(hashFunctionMatrix);
+}
+
+bool maliciousOTExtSend1Of2(MaliciousOTExtSender* s,const char* opt0,const char* opt1,
+    int n,int len)
+{
+  int cryptokeyLenBytes = (n+SECURITY_CONSTANT+7)/8; 
+  int cryptokeyLenBits = cryptokeyLenBytes*8;
+  char (*cryptokeys)[BC_SEEDLEN] = malloc(cryptokeyLenBits*BC_SEEDLEN); // TODO structify
+  bool success = true;
+  honestOTExtSend1Of2RecvCryptokey(s->honestSender,cryptokeys,cryptokeyLenBits,len);
+  success = protocolDeviationCheckSender(s, cryptokeys, s->randomGen, cryptokeyLenBytes);
+  if(success)  honestOTExtSend1Of2SendMessages(s->honestSender,opt0,opt1,cryptokeys,n,len);
+  else // Send random strings instead
+  {
+	  char *opt0random = malloc(len);
+	  char *opt1random = malloc(len);
+	  randomizeBuffer(s->randomGen, opt0random, len);
+	  randomizeBuffer(s->randomGen, opt1random, len);
+	  honestOTExtSend1Of2SendMessages(s->honestSender,opt0random,opt1random,cryptokeys,n,len);
+	  free(opt0random);
+	  free(opt1random);
+  }
+  free(cryptokeys);
+  return success;
+}
+
+bool maliciousOTExtRecv1Of2(MaliciousOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len)
+{
+  int cryptokeyLenBytes = (n+SECURITY_CONSTANT+7)/8; 
+  int cryptokeyLenBits = cryptokeyLenBytes*8;
+  char (*cryptokeys0)[BC_SEEDLEN] = malloc(cryptokeyLenBits*BC_SEEDLEN);
+  char (*cryptokeys1)[BC_SEEDLEN] = malloc(cryptokeyLenBits*BC_SEEDLEN);
+  bool *extendedSel = malloc(cryptokeyLenBits);
+  randomizeBuffer(r->randomGen,(char *)extendedSel,cryptokeyLenBits);
+  int i;
+  for(i=0;i<cryptokeyLenBits;i++) extendedSel[i]%=2;
+  memcpy(extendedSel,sel,n);
+  honestOTExtRecv1Of2SendCryptokey(r->honestRecver,extendedSel,cryptokeys0,cryptokeyLenBits,len);
+  protocolDeviationCheckRecver(r, cryptokeys0, r->randomGen,cryptokeyLenBytes); 
+  honestOTExtRecv1Of2RecvMessages(r->honestRecver,dest,sel,cryptokeys0,n,len); 
+  free(cryptokeys0);
+  free(cryptokeys1);
+  /*return r->success;*/
+  return true;
+}
+
+void maliciousWrapperSend(void* s,const char* opt0,const char* opt1,
+    int n,int len) { maliciousOTExtSend1Of2(s,opt0,opt1,n,len); }
+void maliciousWrapperRecv(void* r,char* dest,const bool* sel,
+    int n,int len) { maliciousOTExtRecv1Of2(r,dest,sel,n,len); }
+
+OTsender maliciousOTExtSenderAbstract(MaliciousOTExtSender* s)
+{ return (OTsender){.sender=s, .send=maliciousWrapperSend, 
+                    .release=(void(*)(void*))maliciousOTExtSenderRelease};
+}
+OTrecver maliciousOTExtRecverAbstract(MaliciousOTExtRecver* r)
+{ return (OTrecver){.recver=r, .recv=maliciousWrapperRecv, 
+                    .release=(void(*)(void*))maliciousOTExtRecverRelease};
 }
