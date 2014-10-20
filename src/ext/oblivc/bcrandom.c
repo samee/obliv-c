@@ -1,12 +1,11 @@
 #include<assert.h>
 #include<bcrandom.h>
 
-BCipherRandomGen* newBCipherRandomGen()
+static const int algo = GCRY_CIPHER_AES128; // change BC_SEEDLEN if this changes
+
+static BCipherRandomGen* newBCipherRandomGenNoKey()
 {
-  const int algo = GCRY_CIPHER_AES128; // change BC_SEEDLEN if this changes
-  size_t klen;
   BCipherRandomGen* gen;
-  unsigned char key[16];
   int i;
   gcry_cipher_hd_t cipher;
 
@@ -14,15 +13,30 @@ BCipherRandomGen* newBCipherRandomGen()
   gen = malloc(sizeof(BCipherRandomGen));
   gcry_cipher_open(&cipher,algo,GCRY_CIPHER_MODE_CTR,0);
   gen->cipher = cipher;
-  klen = gcry_cipher_get_algo_keylen(algo);
-  assert(klen<=BC_SEEDLEN);
   gen->blen = gcry_cipher_get_algo_blklen(algo);
-  assert(klen<=sizeof(key));
   assert(gen->blen<=sizeof(gen->zeroes));
   assert(gen->blen>=sizeof(uint64_t)); // used in setctrFromIntBCipherRandomGen
-  gcry_randomize(key,klen,GCRY_STRONG_RANDOM);
-  gcry_cipher_setkey(cipher,key,klen);
   for(i=0;i<gen->blen;++i) gen->zeroes[i]=gen->ctr[i]=0;
+  return gen;
+}
+BCipherRandomGen* newBCipherRandomGen()
+{
+  unsigned char key[16];
+  BCipherRandomGen* gen = newBCipherRandomGenNoKey();
+  size_t klen = gcry_cipher_get_algo_keylen(algo);
+  assert(klen<=sizeof(key));
+  assert(klen<=BC_SEEDLEN);
+  gcry_randomize(key,klen,GCRY_STRONG_RANDOM);
+  gcry_cipher_setkey(gen->cipher,key,klen);
+  return gen;
+}
+// Assumes key is BC_SEEDLEN bytes long
+BCipherRandomGen* newBCipherRandomGenByKey(const char* key)
+{
+  BCipherRandomGen* gen = newBCipherRandomGenNoKey();
+  size_t klen = gcry_cipher_get_algo_keylen(algo);
+  assert(klen<=BC_SEEDLEN);
+  gcry_cipher_setkey(gen->cipher,key,klen);
   return gen;
 }
 void releaseBCipherRandomGen(BCipherRandomGen* gen)
@@ -50,6 +64,12 @@ void randomizeBuffer(BCipherRandomGen* gen,char* dest,size_t len)
   { gcry_cipher_encrypt(gen->cipher,lastout,blen,gen->zeroes,blen);
     memcpy(dest+i,lastout,len-i); // discard last few bits
   }
+}
+void randomizeBufferByKey(const char* key, char* dest,size_t len)
+{
+  BCipherRandomGen* gen = newBCipherRandomGenByKey(key);
+  randomizeBuffer(gen,dest,len);
+  releaseBCipherRandomGen(gen);
 }
 
 unsigned long long bcRandomInt(BCipherRandomGen* gen,unsigned long long max)
