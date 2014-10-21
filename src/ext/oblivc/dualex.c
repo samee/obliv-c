@@ -103,8 +103,9 @@ void* dualexThread(void* varg)
   if(pd->thisThread==2) pd->ypd.currentParty = flipParty;
 
   pd->yFeedOblivInputs = pd->ypd.feedOblivInputs;
-  yaoUseNpot(&pd->ypd,role);
-  
+  //yaoUseNpot(&pd->ypd,role);
+  yaoUseFullOTExt(&pd->ypd,role);
+
   pd->ypd.feedOblivInputs = dualexFeedOblivInputs;
   // In this function, pd->ypd.thisParty == 1 always means generator
   pd->ypd.revealOblivBits = (role==1?dualexGenrRevealOblivBits

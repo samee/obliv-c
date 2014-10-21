@@ -69,6 +69,7 @@ bool maliciousOTExtSend1Of2(struct MaliciousOTExtSender* s,
 OTsender maliciousOTExtSenderAbstract(struct MaliciousOTExtSender* s);
 
 // Overrides ypd so that we are not using semi-honest OT
+void yaoUseFullOTExt(ProtocolDesc* pd,int me);
 void yaoUseNpot(ProtocolDesc* pd,int me);
 void yaoReleaseOt(ProtocolDesc* pd,int me); // Used with yaoUseNpot
 #endif
