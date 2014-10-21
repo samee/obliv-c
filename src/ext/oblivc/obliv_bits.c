@@ -684,8 +684,13 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   r->unknown = true;
 }
 
-unsigned yaoGateCount() // returns half-gate count for half-gate scheme
-  { return ((YaoProtocolDesc*)currentProto->extra)->gcount; }
+unsigned yaoGateCount()
+{ int rv = ((YaoProtocolDesc*)currentProto->extra)->gcount;
+  if(currentProto->setBitAnd==yaoGenerateAndPair
+      || currentProto->setBitAnd==yaoEvaluateHalfGatePair) // halfgate
+    return rv/2;
+  else return rv;
+}
 
 // FIXME don't like this convention: OT should have used transport
 // objects directly, instead of being wrapped in ProtocolDesc

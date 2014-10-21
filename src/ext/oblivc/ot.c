@@ -707,14 +707,6 @@ void honestOTExtRecverRelease(HonestOTExtRecver* recver)
   free(recver);
 }
 
-// setBit(a,i,v) == xorBit(a,i,v^getBit(a,i));
-void setBit(char *dest,int ind,bool v)
-{ char mask = (1<<ind%8);
-  dest[ind/8] = (dest[ind/8]&~mask)+(v?mask:0);
-}
-bool getBit(const char* src,int ind) { return src[ind/8]&(1<<ind%8); }
-void xorBit(char *dest,int ind,bool v) { dest[ind/8]^=(v<<ind%8); }
-
 // Same function for encypt and decrypt. One-time pad, so don't reuse keys
 // Overlapping buffers not supported
 void bcipherCrypt(BCipherRandomGen* gen,const char* key,int nonce,

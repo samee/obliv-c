@@ -72,4 +72,15 @@ OTsender maliciousOTExtSenderAbstract(struct MaliciousOTExtSender* s);
 void yaoUseFullOTExt(ProtocolDesc* pd,int me);
 void yaoUseNpot(ProtocolDesc* pd,int me);
 void yaoReleaseOt(ProtocolDesc* pd,int me); // Used with yaoUseNpot
+
+// setBit(a,i,v) == xorBit(a,i,v^getBit(a,i));
+static inline void setBit(char *dest,int ind,bool v)
+{ char mask = (1<<ind%8);
+  dest[ind/8] = (dest[ind/8]&~mask)+(v?mask:0);
+}
+static inline bool getBit(const char* src,int ind) 
+  { return src[ind/8]&(1<<ind%8); }
+static inline void xorBit(char *dest,int ind,bool v) 
+  { dest[ind/8]^=(v<<ind%8); }
+
 #endif

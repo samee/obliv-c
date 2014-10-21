@@ -91,7 +91,7 @@ int main(int argc, char* argv[])
   protocolUseStdio(&pd);
   setCurrentParty(&pd,args.party);
   // assumes both parties have inputs of equal size and len
-  OcPsiResult* res = execPsiProtocol_DH(&pd,data,n,n,len);
+  OcPsiResult* res = execPsiProtocol_allPair(&pd,data,n,n,len);
   if(res->n==0) fprintf(stderr,"Nothing in common\n");
   else
   { fprintf(stderr,"# Elements in common = %d\n",res->n);

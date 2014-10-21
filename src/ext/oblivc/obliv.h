@@ -2,6 +2,7 @@
 #define OBLIV_H
 
 #include<obliv_types.h>
+#include<obliv_psi.h>
 
 // This header should only have functions directly used by the user,
 //   not functions that will appear in the generated C code.
