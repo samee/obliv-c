@@ -233,21 +233,21 @@ char* sendHashes(ProtocolDesc* pd, int destParty, BCipherRandomGen* gen,
 {
   const int k = HASHBYTES;
   const int blen = 8*len;
-  char *send0 = malloc(nu*blen*BC_SEEDLEN), *send1 = malloc(nu*blen*BC_SEEDLEN);
-  randomizeBuffer(gen,send0,nu*blen*BC_SEEDLEN);
-  randomizeBuffer(gen,send1,nu*blen*BC_SEEDLEN);
+  char *send0 = malloc(nu*blen*BC_SEEDLEN_DEFAULT), *send1 = malloc(nu*blen*BC_SEEDLEN_DEFAULT);
+  randomizeBuffer(gen,send0,nu*blen*BC_SEEDLEN_DEFAULT);
+  randomizeBuffer(gen,send1,nu*blen*BC_SEEDLEN_DEFAULT);
   OTsender sender 
     =  honestOTExtSenderAbstract(honestOTExtSenderNew(pd,destParty));
-  sender.send(sender.sender,send0,send1,nu*blen,BC_SEEDLEN);
+  sender.send(sender.sender,send0,send1,nu*blen,BC_SEEDLEN_DEFAULT);
   otSenderRelease(&sender);
 
   char *option0 = malloc(nu*blen*ni*k);
   char *option1 = malloc(nu*blen*ni*k);
   int i,j,l;
   for(i=0;i<nu;++i) for(j=0;j<blen;++j)
-  { randomizeBufferByKey(send0+(i*blen+j)*BC_SEEDLEN,
+  { randomizeBufferByKey(send0+(i*blen+j)*BC_SEEDLEN_DEFAULT,
       option0+(i*blen+j)*(ni*k),ni*k);
-    randomizeBufferByKey(send1+(i*blen+j)*BC_SEEDLEN,
+    randomizeBufferByKey(send1+(i*blen+j)*BC_SEEDLEN_DEFAULT,
       option1+(i*blen+j)*(ni*k),ni*k);
   }
   free(send0); free(send1);
@@ -265,19 +265,19 @@ char* recvHashes(ProtocolDesc* pd, int srcParty,
 {
   const int k = HASHBYTES;
   const int blen = 8*len;
-  char *recv = malloc(ni*blen*BC_SEEDLEN);
+  char *recv = malloc(ni*blen*BC_SEEDLEN_DEFAULT);
   bool *sel = malloc(ni*blen*sizeof(bool));
   unpackData(sel,datai,ni,len);
   OTrecver recver
     = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,srcParty));
-  recver.recv(recver.recver,recv,sel,ni*blen,BC_SEEDLEN);
+  recver.recv(recver.recver,recv,sel,ni*blen,BC_SEEDLEN_DEFAULT);
   otRecverRelease(&recver);
   free(sel);
 
   char *expanded = malloc(ni*blen*nu*k);
   int i,j,l;
   for(i=0;i<ni;++i) for(j=0;j<blen;++j)
-    randomizeBufferByKey(recv+(i*blen+j)*BC_SEEDLEN,
+    randomizeBufferByKey(recv+(i*blen+j)*BC_SEEDLEN_DEFAULT,
         expanded+(i*blen+j)*(nu*k),nu*k);
   free(recv);
   char* res = calloc(ni*nu,k);

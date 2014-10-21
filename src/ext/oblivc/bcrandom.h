@@ -4,17 +4,20 @@
 #include<obliv_common.h>
 
 #define BC_MAXBLEN 20 // internal constant (i.e. private)
-#define BC_SEEDLEN (128/8)
+#define BC_SEEDLEN_DEFAULT (128/8)
+#define BC_ALGO_DEFAULT GCRY_CIPHER_AES128
+#define BC_SEEDLEN_MAX (256/8)
 
 // Simply applies a block cipher in counter mode on zeroes
 typedef struct 
 { gcry_cipher_hd_t cipher;
   unsigned char zeroes[BC_MAXBLEN], ctr[BC_MAXBLEN];
-  size_t blen;
+  size_t blen,klen;
 } BCipherRandomGen;
 
 BCipherRandomGen* newBCipherRandomGen();
 BCipherRandomGen* newBCipherRandomGenByKey(const char* key);
+BCipherRandomGen* newBCipherRandomGenByAlgoKey(int algo,const char* key);
 void releaseBCipherRandomGen(BCipherRandomGen* gen);
 // key is assumed to be BC_SEEDLEN bytes long
 void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key);
