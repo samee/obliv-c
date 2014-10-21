@@ -852,7 +852,7 @@ MaliciousOTExtSender* maliciousOTExtSenderNew(ProtocolDesc* pd,int destparty)
 {
 	MaliciousOTExtSender *sender = malloc(sizeof(MaliciousOTExtSender*));
 	sender->honestSender = honestOTExtSenderNew_ofKeyBytes(pd, destparty, 
-                            GCRY_CIPHER_AES128,16); // XXX
+                            GCRY_CIPHER_AES256,20);
 	sender->randomGen = newBCipherRandomGen();
 	return sender;
 }
@@ -868,7 +868,7 @@ MaliciousOTExtRecver* maliciousOTExtRecverNew(ProtocolDesc* pd,int srcparty)
 {
 	MaliciousOTExtRecver*recver = malloc(sizeof(MaliciousOTExtRecver*));
 	recver->honestRecver= honestOTExtRecverNew_ofKeyBytes(pd, srcparty, 
-                            GCRY_CIPHER_AES128,16); // XXX
+                            GCRY_CIPHER_AES256,20);
 	recver->randomGen = newBCipherRandomGen();
 	return recver;
 }
