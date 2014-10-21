@@ -120,7 +120,6 @@ void gcryDefaultLibInit(void);
 
 #define HASH_ALGO GCRY_MD_SHA256
 #define HASH_LEN 32
-#include<obliv_psi.h>
 
 bool dualexEqualityCheck(ProtocolDesc* pd,gcry_md_hd_t h1,gcry_md_hd_t h2)
 {
@@ -128,10 +127,9 @@ bool dualexEqualityCheck(ProtocolDesc* pd,gcry_md_hd_t h1,gcry_md_hd_t h2)
   gcry_md_open(&h,HASH_ALGO,0);
   gcry_md_write(h,gcry_md_read(h1,0),HASH_LEN);
   gcry_md_write(h,gcry_md_read(h2,0),HASH_LEN);
-  char *hash = (char*)gcry_md_read(h,0);
-  OcPsiResult* psi = execPsiProtocol_DH(pd,&hash,1,1,HASH_LEN);
-  bool res = psi->n;
-  ocPsiResultRelease(psi);
+  BCipherRandomGen* gen = newBCipherRandomGen();
+  bool res = ocEqualityCheck(pd,gen,gcry_md_read(h,0),HASH_LEN,3-pd->thisParty);
+  releaseBCipherRandomGen(gen);  char *hash = (char*)gcry_md_read(h,0);
   gcry_md_close(h);
   return res;
 }
