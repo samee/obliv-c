@@ -61,3 +61,12 @@ bool ocEqualityCheck(ProtocolDesc* pd,BCipherRandomGen* gen,
    */
 bool ocRandomBytes(ProtocolDesc* pd,BCipherRandomGen* gen,
                    void* dest,int n,int party);
+
+/* Privacy guaranteed. But if adversary claims data unequal, we believe 
+   without proof. Claims of equality, on the other hand, are actually checked.
+   So when we obtain "false", it could either mean unequal, or mean that the
+   adversary is malicious and knows the true equality result --- this protocol
+   can't tell the difference.
+   */
+bool ocPrivateEqualityCheck_halfAuth(ProtocolDesc* pd,BCipherRandomGen* gen,
+    const void* data, int n,int party);

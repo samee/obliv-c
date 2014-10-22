@@ -128,8 +128,9 @@ bool dualexEqualityCheck(ProtocolDesc* pd,gcry_md_hd_t h1,gcry_md_hd_t h2)
   gcry_md_write(h,gcry_md_read(h1,0),HASH_LEN);
   gcry_md_write(h,gcry_md_read(h2,0),HASH_LEN);
   BCipherRandomGen* gen = newBCipherRandomGen();
-  bool res = ocEqualityCheck(pd,gen,gcry_md_read(h,0),HASH_LEN,3-pd->thisParty);
-  releaseBCipherRandomGen(gen);  char *hash = (char*)gcry_md_read(h,0);
+  bool res = ocPrivateEqualityCheck_halfAuth(pd,gen,
+      gcry_md_read(h,0),HASH_LEN,3-pd->thisParty);
+  releaseBCipherRandomGen(gen);
   gcry_md_close(h);
   return res;
 }

@@ -73,7 +73,7 @@ void dhRandomFinalize(void)
 
 // x and y are just scratch memory that is used internally.
 // u gets serialized into buf
-static void dhSerialize(char* buf,gcry_mpi_point_t u,
+void dhSerialize(char* buf,gcry_mpi_point_t u,
     gcry_ctx_t ctx,gcry_mpi_t x,gcry_mpi_t y) // TODO manage these plumbings
 {
   size_t s;
@@ -86,13 +86,14 @@ static void dhSerialize(char* buf,gcry_mpi_point_t u,
   while(s<elts) ubuf[s++]=0;
 }
 
-static void dhDeserialize(gcry_mpi_point_t* p, const char* buf)
+void dhDeserialize(gcry_mpi_point_t* p, const char* buf)
 {
   const int elts = DHEltSerialBytes/2;
   gcry_mpi_t x,y;
   gcry_mpi_scan(&x,GCRYMPI_FMT_PGP,buf,elts,NULL);
   gcry_mpi_scan(&y,GCRYMPI_FMT_PGP,buf+elts,elts,NULL);
   *p = gcry_mpi_point_snatch_set(NULL,x,y,gcry_mpi_set_ui(NULL,1));
+  // TODO maybe I should check if *p is on the curve?
 }
 
 // These names started out as static. Now that they are not, the names should
@@ -121,12 +122,12 @@ void dhDebug(gcry_mpi_t x)
   gcry_mpi_print(GCRYMPI_FMT_HEX,buff,520,NULL,x);
   fprintf(stderr,"%s\n",buff);
 }
-void dhDebugPoint(gcry_mpi_point_t g)
+void dhDebugPoint(gcry_mpi_point_t g,gcry_ctx_t ctx)
 {
   gcry_mpi_t gx,gy;
   gx = gcry_mpi_new(0);
   gy = gcry_mpi_new(0);
-  gcry_mpi_ec_get_affine(gx,gy,g,DHCurve);
+  gcry_mpi_ec_get_affine(gx,gy,g,ctx);
   fprintf(stderr,"  x = "); dhDebug(gx);
   fprintf(stderr,"  y = "); dhDebug(gy);
   gcry_mpi_release(gx);

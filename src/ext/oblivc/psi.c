@@ -132,7 +132,8 @@ void debugPoints(gcry_mpi_point_t* res,size_t n)
 // WARNING: This protocol provides absolutely no authenticity for inequality. 
 // It is possible for a malicious party to learn equality, while he convinces
 // the honest party that they were not really equal (but not the other way
-// around, so equality really means equal).
+// around, so equality really means equal). Actually, don't use it for anything
+// other than semi-honest adversaries
 // data: should have ni elements of len chars each
 // ni  : # elements in data (I, as in me)
 // nu  : # elements in data by the other person (U, as in you)
