@@ -727,7 +727,6 @@ void bcipherCrypt(BCipherRandomGen* gen,const char* key,int klen,int nonce,
   for(i=0;i<n;++i) dest[i]^=src[i];
 }
 
-// TODO do a malloc --> alloca wherever possible
 void honestOTExtSend1Of2RecvCryptokey(HonestOTExtSender* s,
     char *cryptokeys,int n,int len)
 {
@@ -770,9 +769,10 @@ void honestOTExtSend1Of2SendMessages(HonestOTExtSender* s,
 void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
     int n,int len)
 {
-  char *cryptokeys = alloca(n*s->otKeyBytes);
+  char *cryptokeys = malloc(n*s->otKeyBytes);
   honestOTExtSend1Of2RecvCryptokey(s,cryptokeys,n,len);
   honestOTExtSend1Of2SendMessages(s,opt0,opt1,cryptokeys,n,len);
+  free(cryptokeys);
 }
 
 void honestOTExtRecv1Of2SendCryptokey(HonestOTExtRecver* r,const bool* sel,
@@ -781,8 +781,8 @@ void honestOTExtRecv1Of2SendCryptokey(HonestOTExtRecver* r,const bool* sel,
   int i,j;
   const int bytes = (n+7)/8;
   const int keybytes = r->otKeyBytes;
-  char *cryptokeys1 = alloca(n*keybytes);
-  char *pseudorandom = alloca(bytes);
+  char *cryptokeys1 = malloc(n*keybytes);
+  char *pseudorandom = malloc(bytes);
   for(i=0;i<OT_KEY_BITS(r);++i)
   { randomizeBuffer(r->keyblock0[i],pseudorandom,bytes);
     for(j=0;j<n;++j) setBit(cryptokeys0+j*keybytes,i,getBit(pseudorandom,j));
@@ -794,6 +794,8 @@ void honestOTExtRecv1Of2SendCryptokey(HonestOTExtRecver* r,const bool* sel,
   for(i=0;i<n;++i) for(j=0;j<keybytes;++j)
     cryptokeys1[i*keybytes+j]^=cryptokeys0[i*keybytes+j];
   osend(r->pd,r->srcparty,cryptokeys1,n*keybytes);
+  free(pseudorandom);
+  free(cryptokeys1);
 }
 
 void honestOTExtRecv1Of2RecvMessages(HonestOTExtRecver* r,char* dest,
@@ -816,9 +818,10 @@ void honestOTExtRecv1Of2RecvMessages(HonestOTExtRecver* r,char* dest,
 void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len)
 {
-  char *cryptokeys0 = alloca(n*r->otKeyBytes);
+  char *cryptokeys0 = malloc(n*r->otKeyBytes);
   honestOTExtRecv1Of2SendCryptokey(r,sel,cryptokeys0,n,len);
   honestOTExtRecv1Of2RecvMessages(r,dest,sel,cryptokeys0,n,len);
+  free(cryptokeys0);
 }
 #undef BATCH_SIZE
 
@@ -890,9 +893,9 @@ bool dotProduct(const char* src1, const char* src2, int bytes)
 	return sum;
 }
 
-static clock_t begin;
-static clock_t end;
-static double total = 0;
+//static clock_t begin;
+//static clock_t end;
+//static double total = 0;
 
 #define CHECK_HASH_BYTES 10
 #define CHECK_HASH_BITS (8*CHECK_HASH_BYTES)

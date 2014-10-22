@@ -1,4 +1,5 @@
 #include<stdio.h>
+#include<stdlib.h>
 #include<bcrandom.h>
 #include<obliv.h>
 #include<obliv_common.h>
@@ -36,7 +37,7 @@ int main(int argc, char* argv[])
   BCipherRandomGen *gen = newBCipherRandomGen();
 	if(me==1)
 	{
-		char opt0[n*len], opt1[n*len];
+		char *opt0 = malloc(n*len), *opt1 = malloc(n*len);
     randomizeBuffer(gen,opt0,n*len);
     randomizeBuffer(gen,opt1,n*len);
     OTsender s;
@@ -46,15 +47,16 @@ int main(int argc, char* argv[])
       s = maliciousOTExtSenderAbstract(maliciousOTExtSenderNew(&pd,2));
     s.send(s.sender,opt0,opt1,n,len);
     otSenderRelease(&s);
+    free(opt0); free(opt1);
 	}
 	else 
 	{
 		int i;
-    char selpack[(n+7)/8];
-    bool sel[n];
-    randomizeBuffer(gen,selpack,sizeof(selpack));
+    char *selpack = malloc((n+7)/8);
+    bool *sel = malloc(sizeof(bool)*n);
+    randomizeBuffer(gen,selpack,(n+7)/8);
     unpackBitString(sel,selpack,n);
-    char output[n*len];
+    char *output = malloc(n*len);
     OTrecver r;
     if(argv[3][0]=='H')
       r = honestOTExtRecverAbstract(honestOTExtRecverNew(&pd,1));
@@ -62,6 +64,9 @@ int main(int argc, char* argv[])
       r = maliciousOTExtRecverAbstract(maliciousOTExtRecverNew(&pd,1));
     r.recv(r.recver,output,sel,n,len);
     otRecverRelease(&r);
+    free(output);
+    free(selpack);
+    free(sel);
 	}
   releaseBCipherRandomGen(gen);
 	cleanupProtocol(&pd);
