@@ -902,7 +902,7 @@ static double total = 0;
 
 void homomorphicHash(char* dest, const char* src, const char* keyMatrix, int cryptokeyLenBytes)
 {
-	begin = clock();
+	//begin = clock();
 	int i;
 	char buff[CHECK_HASH_BYTES];  
 	for(i=0; i<CHECK_HASH_BITS; i++) 
@@ -910,8 +910,8 @@ void homomorphicHash(char* dest, const char* src, const char* keyMatrix, int cry
 		setBit(buff,i, dotProduct(src, keyMatrix+i*cryptokeyLenBytes, cryptokeyLenBytes));
 	}
 	memcpy(dest, buff, CHECK_HASH_BYTES);
-	end = clock();
-	total+=(double)(end-begin);
+	//end = clock();
+	//total+=(double)(end-begin);
 }
 
 bool protocolDeviationCheckSender(MaliciousOTExtSender* s, char *cryptokeys, 
@@ -949,7 +949,7 @@ bool protocolDeviationCheckSender(MaliciousOTExtSender* s, char *cryptokeys,
 	}
 	free(hashFunctionMatrix);
 	free(columnKey);
-	fprintf(stderr, "total time: %lf\n", total/CLOCKS_PER_SEC);
+	//fprintf(stderr, "total time: %lf\n", total/CLOCKS_PER_SEC);
 	return rv;
 }
 
