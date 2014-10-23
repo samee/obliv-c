@@ -88,8 +88,8 @@ bool ocEqualityCheck(ProtocolDesc* pd,BCipherRandomGen* gen,
   free(buf);
   return rv;
 }
-bool ocRandomBytes(ProtocolDesc* pd,BCipherRandomGen* gen,
-                   void* dest,int n,int party)
+bool ocRandomBytes_impl(ProtocolDesc* pd,BCipherRandomGen* gen,
+                        void* dest,int n,int party)
 {
   char* buf = malloc(n);
   int i;
@@ -99,6 +99,16 @@ bool ocRandomBytes(ProtocolDesc* pd,BCipherRandomGen* gen,
   if(rv) for(i=0;i<n;++i) *((char*)dest+i) ^= buf[i];
   free(buf);
   return rv;
+}
+bool ocRandomBytes(ProtocolDesc* pd,BCipherRandomGen* gen,
+                   void* dest,int n,int party)
+{
+  if(n<=BC_SEEDLEN_DEFAULT)
+    return ocRandomBytes_impl(pd,gen,dest,n,party);
+  char buf[BC_SEEDLEN_DEFAULT];
+  if(!ocRandomBytes_impl(pd,gen,buf,sizeof(buf),party)) return false;
+  randomizeBufferByKey(buf,dest,n);
+  return true;
 }
 
 // Copied from ot.c
