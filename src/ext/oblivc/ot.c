@@ -907,12 +907,10 @@ void homomorphicHash(char* dest, const char* src, const char* keyMatrix, int cry
 {
 	//begin = clock();
 	int i;
-	char buff[CHECK_HASH_BYTES];  
 	for(i=0; i<CHECK_HASH_BITS; i++) 
 	{
-		setBit(buff,i, dotProduct(src, keyMatrix+i*cryptokeyLenBytes, cryptokeyLenBytes));
+		setBit(dest,i, dotProduct(src, keyMatrix+i*cryptokeyLenBytes, cryptokeyLenBytes));
 	}
-	memcpy(dest, buff, CHECK_HASH_BYTES);
 	//end = clock();
 	//total+=(double)(end-begin);
 }
