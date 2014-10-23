@@ -594,6 +594,113 @@ OTrecver npotRecverAbstract(NpotRecver* r)
                      .release=(void (*)(void*))npotRecverRelease };
 }
 
+// --------------- OT-extension ---------------------------------------------
+
+#define BATCH_SIZE 5
+#define OT_SEEDLEN BC_SEEDLEN_DEFAULT
+
+void unpackBytes(bool* dest, const char* src,int bytes)
+{
+  int i,j;
+  for(i=0;i<bytes;++i)
+  { char ch=src[i];
+    for(j=0;j<8;++j,ch>>=1) dest[8*i+j]=(ch&1);
+  }
+}
+/*
+  ExtensionBox:
+
+  Sender and receiver gets random matrixes. Row size can be extended later,
+  column size fixed to keyBytes. Property: 
+  senderMatrix[i][j] ^ recverMatrix[i][j] = R[i] && S[j]
+  where [i][j] refer to bit (not byte) at ith row and jth column
+  R is determined later as row size gets extended
+  S is sender's random key fixed at initialization.
+
+  No verification is done unless explicitly requested.
+*/
+typedef struct 
+{
+  ProtocolDesc* pd;
+  int destParty, keyBytes;
+  BCipherRandomGen **keyblock;
+  bool *S;
+  char *spack; // same as S, in packed bytes;
+} SenderExtensionBox;
+
+SenderExtensionBox* 
+senderExtensionBoxNew (ProtocolDesc* pd, int destParty, int keyBytes)
+{
+  const int k = keyBytes*8;
+  SenderExtensionBox* s = malloc(sizeof *s);
+  s->pd=pd; s->destParty=destParty; s->keyBytes = k/8;
+  s->spack = malloc(sizeof(char[k/8]));
+  gcry_randomize(s->spack,k/8,GCRY_STRONG_RANDOM);
+  s->S = malloc(sizeof(bool[k/8]));
+  unpackBytes(s->S,s->spack,k/8);
+  s->keyblock = malloc(sizeof(BCipherRandomGen*[k]));
+
+  // Perform base OTs, initialize s->keyblock
+  char seed[k][OT_SEEDLEN];
+  int i;
+  NpotRecver* ot = npotRecverNew(1<<BATCH_SIZE,pd,destParty);
+  npotRecv1Of2(ot,(char*)seed,s->S,k,OT_SEEDLEN,BATCH_SIZE);
+  npotRecverRelease(ot);
+  for(i=0;i<k;++i)
+    s->keyblock[i] = newBCipherRandomGenByKey(seed[i]);
+
+  return s;
+}
+void
+senderExtensionBoxRelease (SenderExtensionBox* s)
+{
+  const int k = s->keyBytes*8;
+  int i;
+  for(i=0;i<k;++i) releaseBCipherRandomGen(s->keyblock[i]);
+  free(s->keyblock);
+  free(s->S);
+  free(s);
+}
+
+typedef struct
+{
+  ProtocolDesc* pd;
+  int srcParty, keyBytes;
+  BCipherRandomGen **keyblock0, **keyblock1;
+} RecverExtensionBox;
+
+RecverExtensionBox*
+recverExtensionBoxNew (ProtocolDesc* pd, int srcParty, int keyBytes)
+{
+  const int k = keyBytes*8;
+  RecverExtensionBox* r = malloc(sizeof *r);
+  r->pd=pd; r->srcParty=srcParty; r->keyBytes=keyBytes;
+  char seed0[k][OT_SEEDLEN], seed1[k][OT_SEEDLEN];
+  gcry_randomize(seed0,sizeof(seed0),GCRY_STRONG_RANDOM);
+  gcry_randomize(seed1,sizeof(seed1),GCRY_STRONG_RANDOM);
+  int i;
+  NpotSender* ot = npotSenderNew(1<<BATCH_SIZE,pd,srcParty);
+  npotSend1Of2(ot,(char*)seed0,(char*)seed1,k,OT_SEEDLEN,BATCH_SIZE);
+  npotSenderRelease(ot);
+  for(i=0;i<k;++i)
+  { r->keyblock0[i] = newBCipherRandomGenByKey(seed0[i]);
+    r->keyblock1[i] = newBCipherRandomGenByKey(seed1[i]);
+  }
+  return r;
+}
+void
+recverExtensionBoxRelease (RecverExtensionBox* r)
+{
+  int i;
+  const int k = r->keyBytes*8;
+  for(i=0;i<k;++i)
+  { releaseBCipherRandomGen(r->keyblock0[i]);
+    releaseBCipherRandomGen(r->keyblock1[i]);
+  }
+  free(r);
+}
+
+
 // --------------- OT-extension (assuming passive adversary) ----------------
 
 // If it becomes much bigger than 20, we should malloc it
@@ -601,7 +708,6 @@ OTrecver npotRecverAbstract(NpotRecver* r)
 #define OT_KEY_BITS_MAX (8*OT_KEY_BYTES_MAX)
 #define OT_KEY_BITS(p) ((p)->otKeyBytes*8)
 #define OT_KEY_BYTES_HONEST 10
-#define OT_SEEDLEN BC_SEEDLEN_DEFAULT
 
 typedef struct HonestOTExtSender
 { BCipherRandomGen *keyblock[OT_KEY_BITS_MAX];
@@ -623,7 +729,6 @@ typedef struct HonestOTExtRecver
   int otKeyBytes;
 } HonestOTExtRecver;
 
-#define BATCH_SIZE 5
 
 HonestOTExtSender* honestOTExtSenderNew_ofKeyBytes(ProtocolDesc* pd,
     int destparty, int paddingAlgo, int otKeyBytes)
