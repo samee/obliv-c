@@ -56,17 +56,19 @@ void honestOTExtSend1Of2(struct HonestOTExtSender* s,
     const char* opt0,const char* opt1,int n,int len);
 OTsender honestOTExtSenderAbstract(struct HonestOTExtSender* s);
 
+struct OTExtSender;
+struct OTExtRecver;
 struct MaliciousOTExtRecver* maliciousOTExtRecverNew(ProtocolDesc* pd,int srcparty);
 void maliciousOTExtRecverRelease(struct MaliciousOTExtRecver* recver);
 bool maliciousOTExtRecv1Of2(struct MaliciousOTExtRecver* r,char* dest,const bool* sel,
     int n,int len);
-OTrecver maliciousOTExtRecverAbstract(struct MaliciousOTExtRecver* r);
+OTrecver maliciousOTExtRecverAbstract(struct OTExtRecver* r);
 
 struct MaliciousOTExtSender* maliciousOTExtSenderNew(ProtocolDesc* pd,int destparty);
-void maliciousOTExtSenderRelease(struct MaliciousOTExtSender* sender);
+void maliciousOTExtSenderRelease(struct OTExtSender* sender);
 bool maliciousOTExtSend1Of2(struct MaliciousOTExtSender* s,
     const char* opt0,const char* opt1,int n,int len);
-OTsender maliciousOTExtSenderAbstract(struct MaliciousOTExtSender* s);
+OTsender maliciousOTExtSenderAbstract(struct OTExtSender* s);
 
 // Overrides ypd so that we are not using semi-honest OT
 void yaoUseFullOTExt(ProtocolDesc* pd,int me);
