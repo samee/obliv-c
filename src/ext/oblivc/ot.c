@@ -600,12 +600,23 @@ OTrecver npotRecverAbstract(NpotRecver* r)
 #define OT_SEEDLEN BC_SEEDLEN_DEFAULT
 
 static void
-unpackBytes(bool* dest, const char* src,int bytes)
+unpackBytes(bool* dest, const char* src,int bits)
 {
   int i,j;
-  for(i=0;i<bytes;++i)
+  for(i=0;i<(bits+7)/8;++i)
   { char ch=src[i];
-    for(j=0;j<8;++j,ch>>=1) dest[8*i+j]=(ch&1);
+    for(j=0;j<8 && 8*i+j<bits;++j,ch>>=1) 
+      dest[8*i+j]=(ch&1);
+  }
+}
+static void
+packBytes(char* dest,const bool* src,int bits)
+{
+  int i,j,bytes=(bits+7)/8;
+  for(i=0;i<bytes;++i)
+  { char ch=0;
+    for(j=7;j>=0;--j) if(8*i+j<bits) ch = ((ch<<1)|src[8*i+j]);
+    dest[i]=ch;
   }
 }
 /*
@@ -638,7 +649,7 @@ senderExtensionBoxNew (ProtocolDesc* pd, int destParty, int keyBytes)
   s->spack = malloc(sizeof(char[k/8]));
   gcry_randomize(s->spack,k/8,GCRY_STRONG_RANDOM);
   s->S = malloc(sizeof(bool[k/8]));
-  unpackBytes(s->S,s->spack,k/8);
+  unpackBytes(s->S,s->spack,k);
   s->keyblock = malloc(sizeof(BCipherRandomGen*[k]));
 
   // Perform base OTs, initialize s->keyblock
@@ -702,36 +713,36 @@ recverExtensionBoxRelease (RecverExtensionBox* r)
 }
 
 /* Extension box, transposed: rows are obtained directly from base OTs
-   dest[] should be a char array of size s->keyBytes*rowBytes
-   Output row r is found in index dest[r*rowBytes .. (r+1)*rowBytes)
+   box[] should be a char array of size s->keyBytes*rowBytes
+   Output row r is found in index box[r*rowBytes .. (r+1)*rowBytes)
    Absolutely no validation is done: there is no guarantee that the receiver
      used a consistent mask over all rows (where s->S[r] is true)
    mask[] (in recver) should be of length rowBytes
 */
 void
-senderExtensionBoxXpose(SenderExtensionBox* s,char dest[],size_t rowBytes)
+senderExtensionBoxXpose(SenderExtensionBox* s,char box[],size_t rowBytes)
 {
   const int k = s->keyBytes*8;
   int i;
   char *keymine = malloc(rowBytes);
   for(i=0;i<k;++i)
   { randomizeBuffer(s->keyblock[i],keymine,rowBytes);
-    char *keydest = dest+i*rowBytes;
-    orecv(s->pd,s->destParty,keydest,rowBytes);
-    if(s->S[i]) memxor(keydest,keymine,rowBytes);
-    else        memcpy(keydest,keymine,rowBytes);
+    char *keybox = box+i*rowBytes;
+    orecv(s->pd,s->destParty,keybox,rowBytes);
+    if(s->S[i]) memxor(keybox,keymine,rowBytes);
+    else        memcpy(keybox,keymine,rowBytes);
   }
   free(keymine);
 }
 void
-recverExtensionBoxXpose(RecverExtensionBox* r,char dest[],
+recverExtensionBoxXpose(RecverExtensionBox* r,char box[],
                         const char mask[],size_t rowBytes)
 {
   const int k = r->keyBytes*8;
   int i;
   char *keyxor = malloc(rowBytes);
   for(i=0;i<k;++i)
-  { char *key0 = dest+i*rowBytes, *key1 = keyxor;
+  { char *key0 = box+i*rowBytes, *key1 = keyxor;
     randomizeBuffer(r->keyblock0[i],key0,rowBytes);
     randomizeBuffer(r->keyblock1[i],key1,rowBytes);
     memxor(key1,key0,rowBytes);
@@ -749,6 +760,22 @@ static void matrixXpose(char dest[],const char src[],int rows,int cols)
   int r,c;
   for(r=0;r<rows;++r) for(c=0;c<cols;++c)
     setBit(dest+c*(rows/8),r,getBit(src+r*(cols/8),c));
+}
+/*
+   Same as before, but instead of locating the element at row r and col c at
+   src[r][c] = src[r*cols+c], it is now read from src[r'][c]=src[r'*cols+c]
+   where r'=rowsRemaining[r]. So we rearrange/filter the input rows, and then
+   transpose the matrix.
+   */
+static void matrixXposeAndFilter(char dest[],const char src[],int rows,int cols,
+                                 const char rowsRemaining[])
+{
+  assert(rows%8==0 && cols%8==0);
+  int r,r2,c;
+  for(r=0;r<rows;++r)
+  { r2=rowsRemaining[r];
+    for(c=0;c<cols;++c) setBit(dest+c*(rows/8),r,getBit(src+r2*(cols/8),c));
+  }
 }
 
 #define CHECK_HASH_BYTES 10
@@ -778,7 +805,7 @@ bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
 }
 /*
    Validates honesty of the receiver during an invocation of
-   senderExtensionBoxXpose. The dest[] and rowBytes are the same as in that
+   senderExtensionBoxXpose. The box[] and rowBytes are the same as in that
    function. There is a probability of 2^(-c) that c bits of our secret s->S
    would be leaked to the receiver. This is why, if you plan to use this
    function, it is recommended that s->keyBytes be set to twice the level of
@@ -794,7 +821,7 @@ bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
 */
 bool
 senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
-                                 const char dest[],size_t rowBytes)
+                                 const char box[],size_t rowBytes)
 {
   const int k = s->keyBytes*8, hlen = CHECK_HASH_BYTES;
   char *hashmat = malloc(rowBytes*k);
@@ -803,7 +830,7 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
   if(!ocRandomBytes(s->pd,gen,hashmat,rowBytes,s->destParty)) return false;
   int i;
   for(i=0;i<k;++i)
-  { bitmatMul(hashcur,hashmat,dest+i*rowBytes,8*hlen,8*rowBytes);
+  { bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
     orecv(s->pd,s->destParty,hash0,hlen);
     if(s->S[0])
     { memxor(hashcur,hash0,hlen);
@@ -819,7 +846,7 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
    revealed receiver's choice mask */
 bool
 recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
-                                 const char dest[],size_t rowBytes)
+                                 const char box[],size_t rowBytes)
 {
   const int k = r->keyBytes*8, hlen = CHECK_HASH_BYTES;
   char *hashmat = malloc(rowBytes*k);
@@ -827,7 +854,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
   if(!ocRandomBytes(r->pd,gen,hashmat,rowBytes,r->srcParty)) return false;
   int i;
   for(i=0;i<k;++i)
-  { bitmatMul(hashcur,hashmat,dest+i*rowBytes,8*hlen,8*rowBytes);
+  { bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
     osend(r->pd,r->srcParty,hashcur,hlen);
   }
   free(hashmat);
@@ -836,7 +863,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
 
 /*
    Validates honesty of the receiver during an invocation of
-   senderExtensionBoxXpose. The dest[] and rowBytes are the same as in that
+   senderExtensionBoxXpose. The box[] and rowBytes are the same as in that
    function. There is a probability of 2^(-k(1-log(1+1/c))/2) that the receiver
    obtained enough information to compute s->S with 2^(k/2c) iterations, where
    the receiver can choose c in an adversarial manner. This is why, if you use
@@ -846,12 +873,16 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
    has to be lucky enough to win a gamble with probability 2^-k, or has to do
    2^k iterations of hashing.
 
-   Moreover, once this function is used, the same ExtensionBox should no longer
-   be used --- that can lead to too much information leak.
+   On success, it writes k/2 = r->keyBytes*4 integers in the array, indicating
+   the set of rows that should be used (using all rows in box will not add
+   any security). Moreover, once this function is used, the same ExtensionBox
+   should no longer be re-extended --- that can lead to too much information
+   leak (half the rows are revealed each time).
 */
 bool
 senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
-                                  const char* dest[], int rowBytes)
+                                  int rowsRemaining[],
+                                  const char* box[], int rowBytes)
 {
   const int k = s->keyBytes*8;
   unsigned perm[k],i;
@@ -861,10 +892,11 @@ senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
   osend(s->pd,s->destParty,perm,sizeof(int[k]));
   for(i=0;i<k;i+=2)
   { int a = perm[i], b = perm[i+1];
+    rowsRemaining[i/2]=a;
     sx = (s->S[a]!=s->S[b]);
     osend(s->pd,s->destParty,&sx,sizeof(bool));
-    memcpy(rowxme,dest+a*rowBytes,rowBytes);
-    memxor(rowxme,dest+b*rowBytes,rowBytes);
+    memcpy(rowxme,box+a*rowBytes,rowBytes);
+    memxor(rowxme,box+b*rowBytes,rowBytes);
     orecv(s->pd,s->destParty,rowxyou,rowBytes);
     if(memcmp(rowxme,rowxyou,rowBytes)) res=false;
   }
@@ -873,10 +905,14 @@ senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
   return res;
 }
 // Returns false if sender is not cooperating (e.g. not providing a
-// valid permutation). mask[] must be the same one used to construct dest[].
+// valid permutation). mask[] must be the same one used to construct box[].
+// On success, it writes k/2 = r->keyBytes*4 integers in the array, indicating
+// the set of rows that should be used (using all rows in box will not add
+// any security)
 bool
 recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
-                                  const char dest[],const char mask[],
+                                  int rowsRemaining[],
+                                  const char box[],const char mask[],
                                   int rowBytes)
 {
   const int k = r->keyBytes*8;
@@ -892,8 +928,9 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
   }
   for(i=0;i<k;i+=2)
   { int a = perm[i], b = perm[i+1];
-    memcpy(rowx,dest+a*rowBytes,rowBytes);
-    memxor(rowx,dest+b*rowBytes,rowBytes);
+    rowsRemaining[i/2]=a;
+    memcpy(rowx,box+a*rowBytes,rowBytes);
+    memxor(rowx,box+b*rowBytes,rowBytes);
     orecv(r->pd,r->srcParty,&sx,sizeof(bool));
     if(sx) memxor(rowx,mask,rowBytes);
     osend(r->pd,r->srcParty,rowx,rowBytes);
@@ -901,6 +938,248 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
   free(rowx);
   return true;
 }
+// Same function for encypt and decrypt. One-time pad, so don't reuse keys
+// Overlapping buffers not supported
+static void
+bcipherCrypt(BCipherRandomGen* gen,const char* key,int klen,int nonce,
+                  char* dest,const char* src,int n)
+{
+  int i;
+  char keyx[gen->klen];
+  assert(klen<=gen->klen);
+  memcpy(keyx,key,klen); memset(keyx+klen,0,gen->klen-klen);
+  resetBCipherRandomGen(gen,keyx);
+  setctrFromIntBCipherRandomGen(gen,nonce);
+  randomizeBuffer(gen,dest,n);
+  for(i=0;i<n;++i) dest[i]^=src[i];
+}
+
+static void
+bcipherCryptNoResize(BCipherRandomGen* gen,const char* key,int nonce,
+                     char* dest,const char* src,int n)
+{
+  resetBCipherRandomGen(gen,key);
+  setctrFromIntBCipherRandomGen(gen,nonce);
+  randomizeBuffer(gen,dest,n);
+  memxor(dest,src,n);
+}
+/*
+   Actually use our extension box (possibly after validation, depending on
+   how much we trust our receiver). Sends out encryptions of msg0 and msg1
+   (both of length len bytes) to the receiver. The encryption key is taken
+   from the column at bit position c in the box matrix. nonce is just a 
+   unique integer for CPA-secure encryption (usually just a sequential number).
+   It is assumed that the receiver has only one of the two decrpytion keys but
+   not both (either the one in column c by itself, or column c xored with our
+   secret S).
+   cipher is just a preallocated BCipherRandomGen, which we use internally for
+   encryption (we apply resetBCipherRandomGen, so it will lose any existing 
+   state). It is just so we don't have to allocate a new cipher every time.
+   XXX check how expensive that is.
+   */
+void
+senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
+                          const char box[],int rowBytes,int c,int nonce,
+                          const char msg0[],const char msg1[],size_t len)
+{
+  int i;
+  const int k=s->keyBytes*8;
+  char keyx[cipher->klen], *ctext = malloc(len);
+  assert(k/8<=sizeof keyx);
+  memset(keyx+k/8,0,sizeof keyx);
+  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+i*rowBytes,c));
+  bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg0,len);
+  osend(s->pd,s->destParty,ctext,len);
+  memxor(keyx,s->spack,k/8);
+  bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg1,len);
+  osend(s->pd,s->destParty,ctext,len);
+  free(ctext);
+}
+// mask should be the same as the one previously used to construct box[]
+// All other parameters (c,nonce,box,rowBytes etc.) should match the ones the
+// sender is expected to use.
+void
+recverExtensionBoxRecvMsg(RecverExtensionBox* r,BCipherRandomGen* cipher,
+                          const char box[],int rowBytes,int c,int nonce,
+                          char msg[],const char mask[],size_t len)
+{
+  int i;
+  const int k=r->keyBytes*8;
+  bool sel = getBit(mask,c);
+  char keyx[cipher->klen], *ctext = malloc(len);
+  assert(k/8<=sizeof keyx);
+  memset(keyx+k/8,0,sizeof keyx);
+  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+i*rowBytes,c));
+  orecv(r->pd,r->srcParty,sel?msg:ctext,len);
+  orecv(r->pd,r->srcParty,sel?ctext:msg,len);
+  bcipherCryptNoResize(cipher,keyx,nonce,msg,ctext,len);
+  free(ctext);
+}
+// Assumes rowBytes == (n+7)/8
+void
+senderExtensionBoxSendMsgs(SenderExtensionBox* s,BCipherRandomGen* cipher,
+                           const char box[],int n,int nonce0,
+                           const char* opt0, const char* opt1,int len)
+{ int i;
+  for(i=0;i<n;++i)
+    senderExtensionBoxSendMsg(s,cipher,box,(n+7)/8,i,nonce0++,
+                              opt0+i*len,opt1+i*len,len);
+}
+void
+recverExtensionBoxRecvMsgs(RecverExtensionBox* r,BCipherRandomGen* cipher,
+                           const char box[],int n,int nonce0,
+                           char* msg,const char mask[],int len)
+{ int i;
+  for(i=0;i<n;++i)
+    recverExtensionBoxRecvMsg(r,cipher,box,(n+7)/8,i,nonce0++,
+        msg+i*len,mask,len);
+}
+
+typedef struct HonestOTExtSender
+{ SenderExtensionBox* box;
+  BCipherRandomGen* padder;
+  size_t nonce;
+} HonestOTExtSender;
+
+typedef struct HonestOTExtRecver
+{ RecverExtensionBox* box;
+  BCipherRandomGen* padder;
+  size_t nonce;
+} HonestOTExtRecver;
+
+#define OT_KEY_BYTES_HONEST 10
+void
+honestOTExtSenderInit(HonestOTExtSender* s,ProtocolDesc* pd,
+                      int destParty,int keyBytes)
+{ s->box = senderExtensionBoxNew(pd,destParty,keyBytes);
+  s->padder = newBCipherRandomGen();
+  s->nonce = 0;
+}
+HonestOTExtSender*
+honestOTExtSenderNew(ProtocolDesc* pd,int destParty)
+{ HonestOTExtSender* s = malloc(sizeof *s);
+  honestOTExtSenderInit(s,pd,destParty,OT_KEY_BYTES_HONEST);
+  return s;
+}
+void
+honestOTExtRecverInit(HonestOTExtRecver* r,ProtocolDesc* pd,
+                      int srcParty,int keyBytes)
+{ r->box = recverExtensionBoxNew(pd,srcParty,keyBytes);
+  r->padder = newBCipherRandomGen();
+  r->nonce = 0;
+}
+HonestOTExtRecver*
+honestOTExtRecverNew(ProtocolDesc* pd,int srcParty)
+{ HonestOTExtRecver* r = malloc(sizeof *r);
+  honestOTExtRecverInit(r,pd,srcParty,OT_KEY_BYTES_HONEST);
+  return r;
+}
+void
+honestOTExtSenderCleanup(HonestOTExtSender* s)
+{ senderExtensionBoxRelease(s->box);
+  releaseBCipherRandomGen(s->padder);
+}
+void
+honestOTExtSenderRelease(HonestOTExtSender* s)
+{ honestOTExtSenderCleanup(s);
+  free(s);
+}
+void
+honestOTExtRecverCleanup(HonestOTExtRecver* r)
+{ recverExtensionBoxRelease(r->box);
+  releaseBCipherRandomGen(r->padder);
+}
+void
+honestOTExtRecverRelease(HonestOTExtRecver* r)
+{ honestOTExtRecverCleanup(r);
+  free(r);
+}
+
+void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
+    int n,int len)
+{
+  int rowBytes = (n+7)/8;
+  char *box = malloc(s->box->keyBytes*8*rowBytes);
+  senderExtensionBoxXpose(s->box,box,rowBytes);
+  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,s->nonce,opt0,opt1,len);
+  s->nonce+=n;
+  free(box);
+}
+void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len)
+{
+  int rowBytes = (n+7)/8;
+  char *box = malloc(r->box->keyBytes*8*rowBytes);
+  char *mask = malloc(rowBytes); packBytes(mask,sel,n);
+  recverExtensionBoxXpose(r->box,box,mask,rowBytes);
+  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,r->nonce,dest,mask,len);
+  r->nonce+=n;
+  free(mask);
+  free(box);
+}
+typedef struct
+{ HonestOTExtSender hs;
+  BCipherRandomGen* gen;
+  bool error;
+} OTExtSender;
+typedef struct
+{ HonestOTExtRecver hr;
+  BCipherRandomGen* gen;
+  bool error;
+} OTExtRecver;
+OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destParty)
+{ OTExtSender* s = malloc(sizeof *s);
+  honestOTExtSenderInit(&s->hs,pd,destParty,2*OT_KEY_BYTES_HONEST);
+  s->gen=newBCipherRandomGen();
+  s->error=false;
+}
+void otExtSenderRelease(OTExtSender* s)
+{ honestOTExtSenderCleanup(&s->hs);
+  releaseBCipherRandomGen(s->gen);
+  free(s);
+}
+OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int srcParty)
+{ OTExtRecver* r = malloc(sizeof *r);
+  honestOTExtRecverInit(&r->hr,pd,srcParty,2*OT_KEY_BYTES_HONEST);
+  r->gen=newBCipherRandomGen();
+  r->error=false;
+}
+void otExtRecverRelease(OTExtRecver* r)
+{ honestOTExtRecverCleanup(&r->hr);
+  releaseBCipherRandomGen(r->gen);
+  free(r);
+}
+void 
+otExtSend1Of2(OTExtSender* s,const char* opt0,const char* opt1,
+              int n,int len)
+{
+  if(s->error) return;
+  int rowBytes = (n+7)/8;
+  HonestOTExtSender* hs = &s->hs;
+  char *box = malloc(hs->box->keyBytes*8*rowBytes);
+  senderExtensionBoxXpose(hs->box,box,rowBytes);
+  s->error = senderExtensionBoxValidate_hhash(hs->box,s->gen,box,rowBytes);
+  senderExtensionBoxSendMsgs(hs->box,hs->padder,box,n,hs->nonce,opt0,opt1,len);
+  hs->nonce+=n;
+  free(box);
+}
+void
+otExtRecv1Of2(OTExtRecver* r,char* dest,const bool* sel,
+              int n,int len)
+{
+  if(r->error) return;
+  int rowBytes = (n+7)/8;
+  HonestOTExtRecver* hr = &r->hr;
+  char *box = malloc(hr->box->keyBytes*8*rowBytes);
+  char *mask = malloc(rowBytes); packBytes(mask,sel,n);
+  recverExtensionBoxXpose(hr->box,box,mask,rowBytes);
+  r->error = recverExtensionBoxValidate_hhash(hr->box,r->gen,box,rowBytes);
+  recverExtensionBoxRecvMsgs(hr->box,hr->padder,box,n,hr->nonce,dest,mask,len);
+  hr->nonce+=n;
+  free(mask);
+  free(box);
+}
+#if 0
 // --------------- OT-extension (assuming passive adversary) ----------------
 
 // If it becomes much bigger than 20, we should malloc it
@@ -1015,21 +1294,6 @@ void honestOTExtRecverRelease(HonestOTExtRecver* recver)
   }
   releaseBCipherRandomGen(recver->padder);
   free(recver);
-}
-
-// Same function for encypt and decrypt. One-time pad, so don't reuse keys
-// Overlapping buffers not supported
-void bcipherCrypt(BCipherRandomGen* gen,const char* key,int klen,int nonce,
-                  char* dest,const char* src,int n)
-{
-  int i;
-  char keyx[gen->klen];
-  assert(klen<=gen->klen);
-  memcpy(keyx,key,klen); memset(keyx+klen,0,gen->klen-klen);
-  resetBCipherRandomGen(gen,keyx);
-  setctrFromIntBCipherRandomGen(gen,nonce);
-  randomizeBuffer(gen,dest,n);
-  for(i=0;i<n;++i) dest[i]^=src[i];
 }
 
 void honestOTExtSend1Of2RecvCryptokey(HonestOTExtSender* s,
@@ -1318,13 +1582,14 @@ void maliciousWrapperSend(void* s,const char* opt0,const char* opt1,
     int n,int len) { maliciousOTExtSend1Of2(s,opt0,opt1,n,len); }
 void maliciousWrapperRecv(void* r,char* dest,const bool* sel,
     int n,int len) { maliciousOTExtRecv1Of2(r,dest,sel,n,len); }
+#endif
 
 OTsender maliciousOTExtSenderAbstract(MaliciousOTExtSender* s)
-{ return (OTsender){.sender=s, .send=maliciousWrapperSend, 
+{ return (OTsender){.sender=s, .send=maliciousOTExtSend1Of2, 
                     .release=(void(*)(void*))maliciousOTExtSenderRelease};
 }
 OTrecver maliciousOTExtRecverAbstract(MaliciousOTExtRecver* r)
-{ return (OTrecver){.recver=r, .recv=maliciousWrapperRecv, 
+{ return (OTrecver){.recver=r, .recv=maliciousOTExtRecv1Of2, 
                     .release=(void(*)(void*))maliciousOTExtRecverRelease};
 }
 
