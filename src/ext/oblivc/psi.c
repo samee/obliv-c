@@ -207,11 +207,6 @@ OcPsiResult* execPsiProtocol_DH(ProtocolDesc* pd,
 #define HASHBYTES (HASHBITS/8)
 static const char zeroes[HASHBYTES]={};
 
-void memxor (void* dest, const void* src, size_t n)
-{ size_t i;
-  for(i=0;i<n;++i) ((char*)dest)[i]^=((const char*)src)[i];
-}
-
 // dest needs to be of length 8*n
 static void unpackData(bool* dest, char** src, size_t n,size_t len)
 {

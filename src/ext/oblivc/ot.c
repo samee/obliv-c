@@ -599,7 +599,8 @@ OTrecver npotRecverAbstract(NpotRecver* r)
 #define BATCH_SIZE 5
 #define OT_SEEDLEN BC_SEEDLEN_DEFAULT
 
-void unpackBytes(bool* dest, const char* src,int bytes)
+static void
+unpackBytes(bool* dest, const char* src,int bytes)
 {
   int i,j;
   for(i=0;i<bytes;++i)
@@ -611,7 +612,7 @@ void unpackBytes(bool* dest, const char* src,int bytes)
   ExtensionBox:
 
   Sender and receiver gets random matrixes. Row size can be extended later,
-  column size fixed to keyBytes. Property: 
+  column size fixed to keyBytes. Property:
   senderMatrix[i][j] ^ recverMatrix[i][j] = R[i] && S[j]
   where [i][j] refer to bit (not byte) at ith row and jth column
   R is determined later as row size gets extended
@@ -619,7 +620,7 @@ void unpackBytes(bool* dest, const char* src,int bytes)
 
   No verification is done unless explicitly requested.
 */
-typedef struct 
+typedef struct
 {
   ProtocolDesc* pd;
   int destParty, keyBytes;
@@ -628,7 +629,7 @@ typedef struct
   char *spack; // same as S, in packed bytes;
 } SenderExtensionBox;
 
-SenderExtensionBox* 
+SenderExtensionBox*
 senderExtensionBoxNew (ProtocolDesc* pd, int destParty, int keyBytes)
 {
   const int k = keyBytes*8;
@@ -700,7 +701,206 @@ recverExtensionBoxRelease (RecverExtensionBox* r)
   free(r);
 }
 
+/* Extension box, transposed: rows are obtained directly from base OTs
+   dest[] should be a char array of size s->keyBytes*rowBytes
+   Output row r is found in index dest[r*rowBytes .. (r+1)*rowBytes)
+   Absolutely no validation is done: there is no guarantee that the receiver
+     used a consistent mask over all rows (where s->S[r] is true)
+   mask[] (in recver) should be of length rowBytes
+*/
+void
+senderExtensionBoxXpose(SenderExtensionBox* s,char dest[],size_t rowBytes)
+{
+  const int k = s->keyBytes*8;
+  int i;
+  char *keymine = malloc(rowBytes);
+  for(i=0;i<k;++i)
+  { randomizeBuffer(s->keyblock[i],keymine,rowBytes);
+    char *keydest = dest+i*rowBytes;
+    orecv(s->pd,s->destParty,keydest,rowBytes);
+    if(s->S[i]) memxor(keydest,keymine,rowBytes);
+    else        memcpy(keydest,keymine,rowBytes);
+  }
+  free(keymine);
+}
+void
+recverExtensionBoxXpose(RecverExtensionBox* r,char dest[],
+                        const char mask[],size_t rowBytes)
+{
+  const int k = r->keyBytes*8;
+  int i;
+  char *keyxor = malloc(rowBytes);
+  for(i=0;i<k;++i)
+  { char *key0 = dest+i*rowBytes, *key1 = keyxor;
+    randomizeBuffer(r->keyblock0[i],key0,rowBytes);
+    randomizeBuffer(r->keyblock1[i],key1,rowBytes);
+    memxor(key1,key0,rowBytes);
+    memxor(key1,mask,rowBytes);
+    osend(r->pd,r->srcParty,keyxor,rowBytes);
+  }
+  free(keyxor);
+}
+/* Transposes a rows x cols bitarray into a cols x rows one
+   In bytes, we get char[cols][rows/8] from char[rows][cols/8]
+   The two buffers may NOT overlap */
+static void matrixXpose(char dest[],const char src[],int rows,int cols)
+{
+  assert(rows%8==0 && cols%8==0);
+  int r,c;
+  for(r=0;r<rows;++r) for(c=0;c<cols;++c)
+    setBit(dest+c*(rows/8),r,getBit(src+r*(cols/8),c));
+}
 
+#define CHECK_HASH_BYTES 10
+#define CHECK_HASH_BITS (8*CHECK_HASH_BYTES)
+#define CHECK_HASH_BITS_LOGCEIL 7
+#define SECURITY_CONSTANT (2*CHECK_HASH_BITS+CHECK_HASH_BITS_LOGCEIL)
+
+/*
+  Inputs:
+  mat is char[rows][cols/8]
+  src is char[cols/8]
+  Output:
+  dest is char[rows/8]
+   */
+void
+bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
+{
+  assert(cols%8==0 && rows%8==0);
+  int r,c;
+  for(r=0;r<rows;++r)
+  {
+    char ch=0;
+    for(c=0;c<cols/8;++c) ch ^= (src[c]&mat[r*(cols/8)+c]);
+    while(ch>1) ch = ((ch&1)^(ch>>1));
+    setBit(dest,r,ch);
+  }
+}
+/*
+   Validates honesty of the receiver during an invocation of
+   senderExtensionBoxXpose. The dest[] and rowBytes are the same as in that
+   function. There is a probability of 2^(-c) that c bits of our secret s->S
+   would be leaked to the receiver. This is why, if you plan to use this
+   function, it is recommended that s->keyBytes be set to twice the level of
+   security you actually need (e.g. s->keyBytes=160 if 80-bits of security is
+   desired). s->keyBytes = 2k ensures that the receiver either has to be lucky
+   enough to win a gamble with probability 2^-k, or has to do 2^k iterations of
+   hashing.
+   Validation is done using an xor-homomorphic hash. This requires rowBytes
+   to be larger than necessary by SECURITY_CONSTANT bits, where the extra
+   mask[] bits in recverExtensionBoxXpose() should have been random (if the
+   extra bits are not random, the sender might be able to deduce a few bits of
+   the "usable" part of mask).
+*/
+bool
+senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
+                                 const char dest[],size_t rowBytes)
+{
+  const int k = s->keyBytes*8, hlen = CHECK_HASH_BYTES;
+  char *hashmat = malloc(rowBytes*k);
+  char hashcur[hlen],hash0[hlen],hashxor[hlen];
+  bool xorseen = false, res = true;
+  if(!ocRandomBytes(s->pd,gen,hashmat,rowBytes,s->destParty)) return false;
+  int i;
+  for(i=0;i<k;++i)
+  { bitmatMul(hashcur,hashmat,dest+i*rowBytes,8*hlen,8*rowBytes);
+    orecv(s->pd,s->destParty,hash0,hlen);
+    if(s->S[0])
+    { memxor(hashcur,hash0,hlen);
+      if(xorseen && memcmp(hashxor,hashcur,hlen)) res = false;
+      else { memcpy(hashxor,hashcur,hlen); xorseen = true; }
+    }else if(memcmp(hash0,hashcur,hlen)) res = false;
+  }
+  free(hashmat);
+  return res;
+}
+/* May return false if the sender is not co-operating. E.g. if the sender
+   was trying to select a special validation hash matrix that would have
+   revealed receiver's choice mask */
+bool
+recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
+                                 const char dest[],size_t rowBytes)
+{
+  const int k = r->keyBytes*8, hlen = CHECK_HASH_BYTES;
+  char *hashmat = malloc(rowBytes*k);
+  char hashcur[hlen];
+  if(!ocRandomBytes(r->pd,gen,hashmat,rowBytes,r->srcParty)) return false;
+  int i;
+  for(i=0;i<k;++i)
+  { bitmatMul(hashcur,hashmat,dest+i*rowBytes,8*hlen,8*rowBytes);
+    osend(r->pd,r->srcParty,hashcur,hlen);
+  }
+  free(hashmat);
+  return true;
+}
+
+/*
+   Validates honesty of the receiver during an invocation of
+   senderExtensionBoxXpose. The dest[] and rowBytes are the same as in that
+   function. There is a probability of 2^(-k(1-log(1+1/c))/2) that the receiver
+   obtained enough information to compute s->S with 2^(k/2c) iterations, where
+   the receiver can choose c in an adversarial manner. This is why, if you use
+   this function, it is recommended that s->keyBytes be set to 4 times the
+   level of security you actually need (e.g. s->keyBytes=320 if 80 bits of
+   security is desired). s->keyBytes = 4k ensures that the receiver either
+   has to be lucky enough to win a gamble with probability 2^-k, or has to do
+   2^k iterations of hashing.
+
+   Moreover, once this function is used, the same ExtensionBox should no longer
+   be used --- that can lead to too much information leak.
+*/
+bool
+senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
+                                  const char* dest[], int rowBytes)
+{
+  const int k = s->keyBytes*8;
+  unsigned perm[k],i;
+  bool sx, res=true;
+  char *rowxme = malloc(rowBytes), *rowxyou = malloc(rowBytes);
+  bcRandomPermutation(gen,perm,k);
+  osend(s->pd,s->destParty,perm,sizeof(int[k]));
+  for(i=0;i<k;i+=2)
+  { int a = perm[i], b = perm[i+1];
+    sx = (s->S[a]!=s->S[b]);
+    osend(s->pd,s->destParty,&sx,sizeof(bool));
+    memcpy(rowxme,dest+a*rowBytes,rowBytes);
+    memxor(rowxme,dest+b*rowBytes,rowBytes);
+    orecv(s->pd,s->destParty,rowxyou,rowBytes);
+    if(memcmp(rowxme,rowxyou,rowBytes)) res=false;
+  }
+  free(rowxme);
+  free(rowxyou);
+  return res;
+}
+// Returns false if sender is not cooperating (e.g. not providing a
+// valid permutation). mask[] must be the same one used to construct dest[].
+bool
+recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
+                                  const char dest[],const char mask[],
+                                  int rowBytes)
+{
+  const int k = r->keyBytes*8;
+  unsigned perm[k],i;
+  bool sx, inperm[k];
+  char *rowx = malloc(rowBytes);
+  orecv(r->pd,r->srcParty,perm,sizeof(int[k]));
+  memset(inperm,0,sizeof(inperm));
+  for(i=0;i<k;++i)
+  { if(i<0||i>=k) return false;
+    else if(inperm[perm[i]]) return false;
+    else inperm[perm[i]]=true;
+  }
+  for(i=0;i<k;i+=2)
+  { int a = perm[i], b = perm[i+1];
+    memcpy(rowx,dest+a*rowBytes,rowBytes);
+    memxor(rowx,dest+b*rowBytes,rowBytes);
+    orecv(r->pd,r->srcParty,&sx,sizeof(bool));
+    if(sx) memxor(rowx,mask,rowBytes);
+    osend(r->pd,r->srcParty,rowx,rowBytes);
+  }
+  free(rowx);
+  return true;
+}
 // --------------- OT-extension (assuming passive adversary) ----------------
 
 // If it becomes much bigger than 20, we should malloc it
@@ -1001,11 +1201,6 @@ bool dotProduct(const char* src1, const char* src2, int bytes)
 //static clock_t begin;
 //static clock_t end;
 //static double total = 0;
-
-#define CHECK_HASH_BYTES 10
-#define CHECK_HASH_BITS (8*CHECK_HASH_BYTES)
-#define CHECK_HASH_BITS_LOGCEIL 7
-#define SECURITY_CONSTANT (2*CHECK_HASH_BITS+CHECK_HASH_BITS_LOGCEIL)
 
 
 void homomorphicHash(char* dest, const char* src, const char* keyMatrix, int cryptokeyLenBytes)
