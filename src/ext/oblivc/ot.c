@@ -909,7 +909,6 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
     else if(inperm[perm[i]]) return false;
     else inperm[perm[i]]=true;
   }
-  fprintf(stderr,"Got valid permutation\n");
   for(i=0;i<k;i+=2)
   { int a = perm[i], b = perm[i+1];
     rowsRemaining[i/2]=a;
@@ -978,7 +977,7 @@ senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
   for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg0,len);
   osend(s->pd,s->destParty,ctext,len);
-  memxor(keyx,s->spack,k/8);
+  for(i=0;i<k;++i) setBit(keyx,i,getBit(keyx,i)!=s->S[rows[i]]);
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg1,len);
   osend(s->pd,s->destParty,ctext,len);
   free(ctext);
