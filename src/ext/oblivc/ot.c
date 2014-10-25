@@ -753,34 +753,6 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
   }
   free(keyxor);
 }
-#if 0
-/* Transposes a rows x cols bitarray into a cols x rows one
-   In bytes, we get char[cols][rows/8] from char[rows][cols/8]
-   The two buffers may NOT overlap */
-static void matrixXpose(char dest[],const char src[],int rows,int cols)
-{
-  assert(rows%8==0 && cols%8==0);
-  int r,c;
-  for(r=0;r<rows;++r) for(c=0;c<cols;++c)
-    setBit(dest+c*(rows/8),r,getBit(src+r*(cols/8),c));
-}
-/*
-   Same as before, but instead of locating the element at row r and col c at
-   src[r][c] = src[r*cols+c], it is now read from src[r'][c]=src[r'*cols+c]
-   where r'=rowsRemaining[r]. So we rearrange/filter the input rows, and then
-   transpose the matrix.
-   */
-static void matrixXposeAndFilter(char dest[],const char src[],int rows,int cols,
-                                 const char rowsRemaining[])
-{
-  assert(rows%8==0 && cols%8==0);
-  int r,r2,c;
-  for(r=0;r<rows;++r)
-  { r2=rowsRemaining[r];
-    for(c=0;c<cols;++c) setBit(dest+c*(rows/8),r,getBit(src+r2*(cols/8),c));
-  }
-}
-#endif
 
 #define CHECK_HASH_BYTES 10
 #define CHECK_HASH_BITS (8*CHECK_HASH_BYTES)
@@ -1023,23 +995,22 @@ recverExtensionBoxRecvMsg(RecverExtensionBox* r,BCipherRandomGen* cipher,
   bcipherCryptNoResize(cipher,keyx,nonce,msg,ctext,len);
   free(ctext);
 }
-// Assumes rowBytes == (n+7)/8
 void
 senderExtensionBoxSendMsgs(SenderExtensionBox* s,BCipherRandomGen* cipher,
-                           const char box[],int n,int nonce0,
+                           const char box[],int n,int rowBytes,int nonce0,
                            const char* opt0, const char* opt1,int len)
 { int i;
   for(i=0;i<n;++i)
-    senderExtensionBoxSendMsg(s,cipher,box,(n+7)/8,i,nonce0++,
+    senderExtensionBoxSendMsg(s,cipher,box,rowBytes,i,nonce0++,
                               opt0+i*len,opt1+i*len,len);
 }
 void
 recverExtensionBoxRecvMsgs(RecverExtensionBox* r,BCipherRandomGen* cipher,
-                           const char box[],int n,int nonce0,
+                           const char box[],int n,int rowBytes,int nonce0,
                            char* msg,const char mask[],int len)
 { int i;
   for(i=0;i<n;++i)
-    recverExtensionBoxRecvMsg(r,cipher,box,(n+7)/8,i,nonce0++,
+    recverExtensionBoxRecvMsg(r,cipher,box,rowBytes,i,nonce0++,
         msg+i*len,mask,len);
 }
 
@@ -1109,7 +1080,8 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   int rowBytes = (n+7)/8;
   char *box = malloc(s->box->keyBytes*8*rowBytes);
   senderExtensionBox(s->box,box,rowBytes);
-  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,s->nonce,opt0,opt1,len);
+  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,
+                             s->nonce,opt0,opt1,len);
   s->nonce+=n;
   free(box);
 }
@@ -1120,7 +1092,8 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   char *box = malloc(r->box->keyBytes*8*rowBytes);
   char *mask = malloc(rowBytes); packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
-  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,r->nonce,dest,mask,len);
+  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,
+                             r->nonce,dest,mask,len);
   r->nonce+=n;
   free(mask);
   free(box);
@@ -1186,12 +1159,13 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
               int n,int len)
 {
   if(ss->error) return;
-  int rowBytes = (n+7)/8;
+  int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtSender* s = &ss->hs;
   char *box = malloc(s->box->keyBytes*8*rowBytes);
   senderExtensionBox(s->box,box,rowBytes);
   ss->error = !senderExtensionBoxValidate_hhash(s->box,ss->gen,box,rowBytes);
-  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,s->nonce,opt0,opt1,len);
+  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,
+                             s->nonce,opt0,opt1,len);
   s->nonce+=n;
   free(box);
 }
@@ -1200,13 +1174,16 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
               int n,int len)
 {
   if(rr->error) return;
-  int rowBytes = (n+7)/8;
+  int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtRecver* r = &rr->hr;
   char *box = malloc(r->box->keyBytes*8*rowBytes);
-  char *mask = malloc(rowBytes); packBytes(mask,sel,n);
+  char *mask = malloc(rowBytes);
+  randomizeBuffer(rr->gen,mask,rowBytes);
+  packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
   rr->error = !recverExtensionBoxValidate_hhash(r->box,rr->gen,box,rowBytes);
-  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,r->nonce,dest,mask,len);
+  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,
+                             r->nonce,dest,mask,len);
   r->nonce+=n;
   free(mask);
   free(box);
