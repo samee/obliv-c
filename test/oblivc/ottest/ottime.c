@@ -34,6 +34,7 @@ int main(int argc, char* argv[])
   else err = protocolConnectTcp2P(&pd,REMOTEHOST,argv[1],1);
   if(err!=0) { fprintf(stderr,"TCP connection error\n"); return 2; }
 	setCurrentParty(&pd,me);
+  pd.error=0;
   BCipherRandomGen *gen = newBCipherRandomGen();
 	if(me==1)
 	{
