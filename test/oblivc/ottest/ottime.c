@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
   int n;
   const int len = 10;
   if(argc<5 || sscanf(argv[4],"%d",&n)!=1) 
-  { fprintf(stderr,"Usage %s <port> <party> <H|M> <n>\n",argv[0]); 
+  { fprintf(stderr,"Usage %s <port> <party> <H|M|P> <n>\n",argv[0]);
     return 1;
   }
 	ProtocolDesc pd;
@@ -44,6 +44,8 @@ int main(int argc, char* argv[])
     OTsender s;
     if(argv[3][0]=='H') 
       s = honestOTExtSenderAbstract(honestOTExtSenderNew(&pd,2));
+    else if(argv[3][0]=='P')
+      s = maliciousOTExtSenderAbstract(otExtSenderNew_byPair(&pd,2));
     else
       s = maliciousOTExtSenderAbstract(otExtSenderNew(&pd,2));
     s.send(s.sender,opt0,opt1,n,len);
@@ -61,6 +63,8 @@ int main(int argc, char* argv[])
     OTrecver r;
     if(argv[3][0]=='H')
       r = honestOTExtRecverAbstract(honestOTExtRecverNew(&pd,1));
+    else if(argv[3][0]=='P')
+      r = maliciousOTExtRecverAbstract(otExtRecverNew_byPair(&pd,1));
     else
       r = maliciousOTExtRecverAbstract(otExtRecverNew(&pd,1));
     r.recv(r.recver,output,sel,n,len);

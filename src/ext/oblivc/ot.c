@@ -1181,10 +1181,10 @@ otExtRecverNew_aux(ProtocolDesc* pd,int srcParty,OTExtValidation v)
   r->validation=v;
   return r;
 }
-OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int destParty)
-  { return otExtRecverNew_aux(pd,destParty,OTExtValidation_hhash); }
-OTExtRecver* otExtRecverNew_byPair(ProtocolDesc* pd,int destParty)
-  { return otExtRecverNew_aux(pd,destParty,OTExtValidation_byPair); }
+OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int srcParty)
+  { return otExtRecverNew_aux(pd,srcParty,OTExtValidation_hhash); }
+OTExtRecver* otExtRecverNew_byPair(ProtocolDesc* pd,int srcParty)
+  { return otExtRecverNew_aux(pd,srcParty,OTExtValidation_byPair); }
 void otExtRecverRelease(OTExtRecver* r)
 { honestOTExtRecverCleanup(&r->hr);
   releaseBCipherRandomGen(r->gen);
