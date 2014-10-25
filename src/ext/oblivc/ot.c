@@ -722,7 +722,7 @@ recverExtensionBoxRelease (RecverExtensionBox* r)
    mask[] (in recver) should be of length rowBytes
 */
 void
-senderExtensionBoxXpose(SenderExtensionBox* s,char box[],size_t rowBytes)
+senderExtensionBox(SenderExtensionBox* s,char box[],size_t rowBytes)
 {
   const int k = s->keyBytes*8;
   int i;
@@ -737,8 +737,8 @@ senderExtensionBoxXpose(SenderExtensionBox* s,char box[],size_t rowBytes)
   free(keymine);
 }
 void
-recverExtensionBoxXpose(RecverExtensionBox* r,char box[],
-                        const char mask[],size_t rowBytes)
+recverExtensionBox(RecverExtensionBox* r,char box[],
+                   const char mask[],size_t rowBytes)
 {
   const int k = r->keyBytes*8;
   int i;
@@ -810,7 +810,7 @@ bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
 // FIXME extra hash padding not being used
 /*
    Validates honesty of the receiver during an invocation of
-   senderExtensionBoxXpose. The box[] and rowBytes are the same as in that
+   senderExtensionBox. The box[] and rowBytes are the same as in that
    function. There is a probability of 2^(-c) that c bits of our secret s->S
    would be leaked to the receiver. This is why, if you plan to use this
    function, it is recommended that s->keyBytes be set to twice the level of
@@ -820,7 +820,7 @@ bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
    hashing.
    Validation is done using an xor-homomorphic hash. This requires rowBytes
    to be larger than necessary by SECURITY_CONSTANT bits, where the extra
-   mask[] bits in recverExtensionBoxXpose() should have been random (if the
+   mask[] bits in recverExtensionBox() should have been random (if the
    extra bits are not random, the sender might be able to deduce a few bits of
    the "usable" part of mask).
 */
@@ -870,7 +870,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
 
 /*
    Validates honesty of the receiver during an invocation of
-   senderExtensionBoxXpose. The box[] and rowBytes are the same as in that
+   senderExtensionBox. The box[] and rowBytes are the same as in that
    function. There is a probability of 2^(-k(1-log(1+1/c))/2) that the receiver
    obtained enough information to compute s->S with 2^(k/2c) iterations, where
    the receiver can choose c in an adversarial manner. This is why, if you use
@@ -1108,7 +1108,7 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
 {
   int rowBytes = (n+7)/8;
   char *box = malloc(s->box->keyBytes*8*rowBytes);
-  senderExtensionBoxXpose(s->box,box,rowBytes);
+  senderExtensionBox(s->box,box,rowBytes);
   senderExtensionBoxSendMsgs(s->box,s->padder,box,n,s->nonce,opt0,opt1,len);
   s->nonce+=n;
   free(box);
@@ -1119,7 +1119,7 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   int rowBytes = (n+7)/8;
   char *box = malloc(r->box->keyBytes*8*rowBytes);
   char *mask = malloc(rowBytes); packBytes(mask,sel,n);
-  recverExtensionBoxXpose(r->box,box,mask,rowBytes);
+  recverExtensionBox(r->box,box,mask,rowBytes);
   recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,r->nonce,dest,mask,len);
   r->nonce+=n;
   free(mask);
@@ -1189,7 +1189,7 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
   int rowBytes = (n+7)/8;
   HonestOTExtSender* s = &ss->hs;
   char *box = malloc(s->box->keyBytes*8*rowBytes);
-  senderExtensionBoxXpose(s->box,box,rowBytes);
+  senderExtensionBox(s->box,box,rowBytes);
   ss->error = !senderExtensionBoxValidate_hhash(s->box,ss->gen,box,rowBytes);
   senderExtensionBoxSendMsgs(s->box,s->padder,box,n,s->nonce,opt0,opt1,len);
   s->nonce+=n;
@@ -1204,7 +1204,7 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
   HonestOTExtRecver* r = &rr->hr;
   char *box = malloc(r->box->keyBytes*8*rowBytes);
   char *mask = malloc(rowBytes); packBytes(mask,sel,n);
-  recverExtensionBoxXpose(r->box,box,mask,rowBytes);
+  recverExtensionBox(r->box,box,mask,rowBytes);
   rr->error = !recverExtensionBoxValidate_hhash(r->box,rr->gen,box,rowBytes);
   recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,r->nonce,dest,mask,len);
   r->nonce+=n;
