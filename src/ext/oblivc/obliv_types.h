@@ -6,6 +6,9 @@
 #include<stdint.h>  // uint64_t
 #include<gcrypt.h>
 
+#define OC_ERROR_NONE 0
+#define OC_ERROR_OT_EXTENSION -1
+
 typedef long long widest_t;
 
 // These are the troublesome types that need to be included both in
@@ -31,7 +34,7 @@ typedef struct OblivBit OblivBit;
 typedef char yao_key_t[YAO_KEY_BYTES];
 
 struct ProtocolDesc {
-  int partyCount, thisParty;
+  int partyCount, thisParty, error;
   struct ProtocolTransport* trans;
   union // a struct for each protocol-specific info
   { 

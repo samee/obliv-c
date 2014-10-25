@@ -1117,12 +1117,10 @@ OTrecver honestOTExtRecverAbstract(HonestOTExtRecver* r)
 typedef struct OTExtSender
 { HonestOTExtSender hs;
   BCipherRandomGen* gen;
-  bool error;
 } OTExtSender;
 typedef struct OTExtRecver
 { HonestOTExtRecver hr;
   BCipherRandomGen* gen;
-  bool error;
 } OTExtRecver;
 OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destParty)
 { OTExtSender* s = malloc(sizeof *s);
@@ -1131,7 +1129,6 @@ OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destParty)
   releaseBCipherRandomGen(s->hs.padder);
   s->hs.padder = newBCipherRandomGenByAlgoKey(OT_EXT_PAD_ALGO,dummy);
   s->gen=newBCipherRandomGen();
-  s->error=false;
   return s;
 }
 void otExtSenderRelease(OTExtSender* s)
@@ -1146,7 +1143,6 @@ OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int srcParty)
   releaseBCipherRandomGen(r->hr.padder);
   r->hr.padder = newBCipherRandomGenByAlgoKey(OT_EXT_PAD_ALGO,dummy);
   r->gen=newBCipherRandomGen();
-  r->error=false;
   return r;
 }
 void otExtRecverRelease(OTExtRecver* r)
@@ -1158,12 +1154,13 @@ void
 otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
               int n,int len)
 {
-  if(ss->error) return;
+  if(ss->hs.box->pd->error) return;
   int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtSender* s = &ss->hs;
   char *box = malloc(s->box->keyBytes*8*rowBytes);
   senderExtensionBox(s->box,box,rowBytes);
-  ss->error = !senderExtensionBoxValidate_hhash(s->box,ss->gen,box,rowBytes);
+  if(!senderExtensionBoxValidate_hhash(s->box,ss->gen,box,rowBytes))
+    s->box->pd->error = OC_ERROR_OT_EXTENSION;
   senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,
                              s->nonce,opt0,opt1,len);
   s->nonce+=n;
@@ -1173,7 +1170,7 @@ void
 otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
               int n,int len)
 {
-  if(rr->error) return;
+  if(rr->hr.box->pd->error) return;
   int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtRecver* r = &rr->hr;
   char *box = malloc(r->box->keyBytes*8*rowBytes);
@@ -1181,7 +1178,8 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
   randomizeBuffer(rr->gen,mask,rowBytes);
   packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
-  rr->error = !recverExtensionBoxValidate_hhash(r->box,rr->gen,box,rowBytes);
+  if(!recverExtensionBoxValidate_hhash(r->box,rr->gen,box,rowBytes))
+    r->box->pd->error = OC_ERROR_OT_EXTENSION;
   recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,
                              r->nonce,dest,mask,len);
   r->nonce+=n;

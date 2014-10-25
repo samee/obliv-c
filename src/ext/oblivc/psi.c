@@ -142,6 +142,7 @@ OcPsiResult* execPsiProtocol_DH(ProtocolDesc* pd,
                 char** data,int ni,int nu,int len)
 {
   dhRandomInit();
+  pd->error = 0;
   pd->currentParty = ocCurrentPartyDefault;
   ocSetCurrentProto(pd); // used by broadcast
   BCipherRandomGen* gen = newBCipherRandomGen();

@@ -120,6 +120,7 @@ void execNetworkStressProtocol(ProtocolDesc* pd, int bytecount,
   nspd->buffer = malloc(bytecount);
   nspd->ypd = ypd;
   nspd->protoType = OC_PD_TYPE_NSP;
+  pd->error = 0;
   pd->currentParty = ocCurrentPartyDefault;
   pd->extra = nspd;
   pd->feedOblivInputs = netStressFeedOblivInputs;

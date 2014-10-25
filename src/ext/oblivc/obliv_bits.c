@@ -714,6 +714,7 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   YaoProtocolDesc* ypd = malloc(sizeof(YaoProtocolDesc));
   int me = pd->thisParty;
   pd->extra = ypd;
+  pd->error = 0;
   ypd->protoType = OC_PD_TYPE_YAO;
   ypd->extra = NULL;
   pd->partyCount = 2;
@@ -892,6 +893,7 @@ static void broadcastBits(int source,void* p,size_t n)
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   pd->currentParty = ocCurrentPartyDefault;
+  pd->error = 0;
   pd->feedOblivInputs = dbgProtoFeedOblivInputs;
   pd->revealOblivBits = dbgProtoRevealOblivBits;
   pd->setBitAnd = dbgProtoSetBitAnd;

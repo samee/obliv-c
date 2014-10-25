@@ -166,10 +166,11 @@ bool execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pthread_join(t1,NULL); 
   pthread_join(t2,NULL);
 
+  pd->error = (round1.ypd.error?round1.ypd.error:round2.ypd.error);
   atomic_queue_release(q);
   bool res = dualexEqualityCheck(pd,round1.threadhash,round2.threadhash);
 
   gcry_md_close(round1.threadhash);
   gcry_md_close(round2.threadhash);
-  return res;
+  return !pd->error && res;
 }
