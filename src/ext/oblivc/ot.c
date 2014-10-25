@@ -877,7 +877,11 @@ senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
     memcpy(rowxme,box+a*rowBytes,rowBytes);
     memxor(rowxme,box+b*rowBytes,rowBytes);
     orecv(s->pd,s->destParty,rowxyou,rowBytes);
-    if(memcmp(rowxme,rowxyou,rowBytes)) res=false;
+    if(memcmp(rowxme,rowxyou,rowBytes)) 
+    {
+      fprintf(stderr,"Check failed at a=%d,b=%d\n",a,b);
+      res=false;
+    }
   }
   free(rowxme);
   free(rowxyou);
@@ -905,6 +909,7 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
     else if(inperm[perm[i]]) return false;
     else inperm[perm[i]]=true;
   }
+  fprintf(stderr,"Got valid permutation\n");
   for(i=0;i<k;i+=2)
   { int a = perm[i], b = perm[i+1];
     rowsRemaining[i/2]=a;
@@ -1133,37 +1138,54 @@ OTrecver honestOTExtRecverAbstract(HonestOTExtRecver* r)
 
 #define OT_EXT_PAD_ALGO GCRY_CIPHER_AES256
 #define OT_EXT_PAD_KEYBYTES 32
+typedef enum { OTExtValidation_hhash, OTExtValidation_byPair } OTExtValidation;
 typedef struct OTExtSender
 { HonestOTExtSender hs;
   BCipherRandomGen* gen;
+  OTExtValidation validation;
 } OTExtSender;
 typedef struct OTExtRecver
 { HonestOTExtRecver hr;
   BCipherRandomGen* gen;
+  OTExtValidation validation;
 } OTExtRecver;
-OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destParty)
+OTExtSender*
+otExtSenderNew_aux(ProtocolDesc* pd,int destParty,OTExtValidation v)
 { OTExtSender* s = malloc(sizeof *s);
   char dummy[OT_EXT_PAD_KEYBYTES];
-  honestOTExtSenderInit(&s->hs,pd,destParty,2*OT_KEY_BYTES_HONEST);
+  const int keyBytes = (v==OTExtValidation_hhash?2:4)*OT_KEY_BYTES_HONEST;
+  honestOTExtSenderInit(&s->hs,pd,destParty,keyBytes);
   releaseBCipherRandomGen(s->hs.padder);
   s->hs.padder = newBCipherRandomGenByAlgoKey(OT_EXT_PAD_ALGO,dummy);
   s->gen=newBCipherRandomGen();
+  s->validation=v;
   return s;
 }
+OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destParty)
+  { return otExtSenderNew_aux(pd,destParty,OTExtValidation_hhash); }
+OTExtSender* otExtSenderNew_byPair(ProtocolDesc* pd,int destParty)
+  { return otExtSenderNew_aux(pd,destParty,OTExtValidation_byPair); }
 void otExtSenderRelease(OTExtSender* s)
 { honestOTExtSenderCleanup(&s->hs);
   releaseBCipherRandomGen(s->gen);
   free(s);
 }
-OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int srcParty)
+OTExtRecver*
+otExtRecverNew_aux(ProtocolDesc* pd,int srcParty,OTExtValidation v)
 { OTExtRecver* r = malloc(sizeof *r);
+  const int keyBytes = (v==OTExtValidation_hhash?2:4)*OT_KEY_BYTES_HONEST;
   char dummy[OT_EXT_PAD_KEYBYTES];
-  honestOTExtRecverInit(&r->hr,pd,srcParty,2*OT_KEY_BYTES_HONEST);
+  honestOTExtRecverInit(&r->hr,pd,srcParty,keyBytes);
   releaseBCipherRandomGen(r->hr.padder);
   r->hr.padder = newBCipherRandomGenByAlgoKey(OT_EXT_PAD_ALGO,dummy);
   r->gen=newBCipherRandomGen();
+  r->validation=v;
   return r;
 }
+OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int destParty)
+  { return otExtRecverNew_aux(pd,destParty,OTExtValidation_hhash); }
+OTExtRecver* otExtRecverNew_byPair(ProtocolDesc* pd,int destParty)
+  { return otExtRecverNew_aux(pd,destParty,OTExtValidation_byPair); }
 void otExtRecverRelease(OTExtRecver* r)
 { honestOTExtRecverCleanup(&r->hr);
   releaseBCipherRandomGen(r->gen);
@@ -1174,18 +1196,34 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
               int n,int len)
 {
   if(ss->hs.box->pd->error) return;
-  int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtSender* s = &ss->hs;
   const int k = 8*s->box->keyBytes;
+  int rowBytes, *rows, rc;
+
+  if(ss->validation==OTExtValidation_hhash)
+    rowBytes = (n+SECURITY_CONSTANT+7)/8;
+  else rowBytes = (n+7)/8;
+
   char *box = malloc(k*rowBytes);
-  int *all = allRows(k);
+  bool error = false;
   senderExtensionBox(s->box,box,rowBytes);
-  if(!senderExtensionBoxValidate_hhash(s->box,ss->gen,box,rowBytes))
-    s->box->pd->error = OC_ERROR_OT_EXTENSION;
-  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,all,k,
-                             s->nonce,opt0,opt1,len);
+  if(ss->validation==OTExtValidation_hhash)
+  { rows = allRows(k);
+    rc = k;
+    if(!senderExtensionBoxValidate_hhash(s->box,ss->gen,box,rowBytes))
+      error = true;
+  }else
+  { rows = malloc(sizeof(int[k/2]));
+    rc = k/2;
+    if(!senderExtensionBoxValidate_byPair(s->box,ss->gen,rows,box,rowBytes))
+      error = true;
+  }
+  if(error) s->box->pd->error = OC_ERROR_OT_EXTENSION;
+  else
+    senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,rows,rc,
+                               s->nonce,opt0,opt1,len);
   s->nonce+=n;
-  free(all);
+  free(rows);
   free(box);
 }
 void
@@ -1193,22 +1231,39 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
               int n,int len)
 {
   if(rr->hr.box->pd->error) return;
-  int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtRecver* r = &rr->hr;
   const int k = 8*r->box->keyBytes;
+  int rowBytes,*rows,rc;
+
+  if(rr->validation==OTExtValidation_hhash)
+    rowBytes = (n+SECURITY_CONSTANT+7)/8;
+  else rowBytes = (n+7)/8;
+
   char *box = malloc(k*rowBytes);
-  int *all = allRows(k);
+  bool error = false;
   char *mask = malloc(rowBytes);
   randomizeBuffer(rr->gen,mask,rowBytes);
   packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
-  if(!recverExtensionBoxValidate_hhash(r->box,rr->gen,box,rowBytes))
-    r->box->pd->error = OC_ERROR_OT_EXTENSION;
-  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,all,k,
-                             r->nonce,dest,mask,len);
+  if(rr->validation==OTExtValidation_hhash)
+  { rows = allRows(k);
+    rc=k;
+    if(!recverExtensionBoxValidate_hhash(r->box,rr->gen,box,rowBytes))
+      error = true;
+  }else
+  { rows = malloc(sizeof(int[k/2]));
+    rc=k/2;
+    if(!recverExtensionBoxValidate_byPair(r->box,rr->gen,rows,
+                                          box,mask,rowBytes))
+      error = true;
+  }
+  if(error) r->box->pd->error = OC_ERROR_OT_EXTENSION;
+  else
+    recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,rows,rc,
+                               r->nonce,dest,mask,len);
   r->nonce+=n;
   free(mask);
-  free(all);
+  free(rows);
   free(box);
 }
 #if 0
