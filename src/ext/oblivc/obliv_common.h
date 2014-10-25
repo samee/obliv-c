@@ -58,15 +58,15 @@ OTsender honestOTExtSenderAbstract(struct HonestOTExtSender* s);
 
 struct OTExtSender;
 struct OTExtRecver;
-struct MaliciousOTExtRecver* maliciousOTExtRecverNew(ProtocolDesc* pd,int srcparty);
-void maliciousOTExtRecverRelease(struct MaliciousOTExtRecver* recver);
-bool maliciousOTExtRecv1Of2(struct MaliciousOTExtRecver* r,char* dest,const bool* sel,
+struct OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int srcparty);
+void otExtRecverRelease(struct OTExtRecver* recver);
+void otExtRecv1Of2(struct OTExtRecver* r,char* dest,const bool* sel,
     int n,int len);
 OTrecver maliciousOTExtRecverAbstract(struct OTExtRecver* r);
 
-struct MaliciousOTExtSender* maliciousOTExtSenderNew(ProtocolDesc* pd,int destparty);
-void maliciousOTExtSenderRelease(struct OTExtSender* sender);
-bool maliciousOTExtSend1Of2(struct MaliciousOTExtSender* s,
+struct OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destparty);
+void otExtSenderRelease(struct OTExtSender* sender);
+void otExtSend1Of2(struct OTExtSender* s,
     const char* opt0,const char* opt1,int n,int len);
 OTsender maliciousOTExtSenderAbstract(struct OTExtSender* s);
 

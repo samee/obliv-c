@@ -956,18 +956,21 @@ bcipherCryptNoResize(BCipherRandomGen* gen,const char* key,int nonce,
    cipher is just a preallocated BCipherRandomGen, which we use internally for
    encryption (we apply resetBCipherRandomGen, so it will lose any existing 
    state). It is just so we don't have to allocate a new cipher every time.
+
+   TODO way too many params. Structify.
    */
 void
 senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
-                          const char box[],int rowBytes,int c,int nonce,
+                          const char box[],int rowBytes,
+                          const int rows[],int k,
+                          int c,int nonce,
                           const char msg0[],const char msg1[],size_t len)
 {
   int i;
-  const int k=s->keyBytes*8;
   char keyx[cipher->klen], *ctext = malloc(len);
-  assert(k/8<=sizeof keyx);
+  assert(k%8==0 && k/8<=sizeof keyx);
   memset(keyx+k/8,0,sizeof keyx-k/8);
-  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+i*rowBytes,c));
+  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg0,len);
   osend(s->pd,s->destParty,ctext,len);
   memxor(keyx,s->spack,k/8);
@@ -980,16 +983,17 @@ senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
 // sender is expected to use.
 void
 recverExtensionBoxRecvMsg(RecverExtensionBox* r,BCipherRandomGen* cipher,
-                          const char box[],int rowBytes,int c,int nonce,
+                          const char box[],int rowBytes,
+                          const int rows[],int k,
+                          int c,int nonce,
                           char msg[],const char mask[],size_t len)
 {
   int i;
-  const int k=r->keyBytes*8;
   bool sel = getBit(mask,c);
   char keyx[cipher->klen], *ctext = malloc(len);
-  assert(k/8<=sizeof keyx);
+  assert(k%8==0 && k/8<=sizeof keyx);
   memset(keyx+k/8,0,sizeof keyx-k/8);
-  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+i*rowBytes,c));
+  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
   orecv(r->pd,r->srcParty,sel?msg:ctext,len);
   orecv(r->pd,r->srcParty,sel?ctext:msg,len);
   bcipherCryptNoResize(cipher,keyx,nonce,msg,ctext,len);
@@ -997,21 +1001,30 @@ recverExtensionBoxRecvMsg(RecverExtensionBox* r,BCipherRandomGen* cipher,
 }
 void
 senderExtensionBoxSendMsgs(SenderExtensionBox* s,BCipherRandomGen* cipher,
-                           const char box[],int n,int rowBytes,int nonce0,
+                           const char box[],int n,int rowBytes,
+                           const int rows[],int k,
+                           int nonce0,
                            const char* opt0, const char* opt1,int len)
 { int i;
   for(i=0;i<n;++i)
-    senderExtensionBoxSendMsg(s,cipher,box,rowBytes,i,nonce0++,
+    senderExtensionBoxSendMsg(s,cipher,box,rowBytes,rows,k,i,nonce0++,
                               opt0+i*len,opt1+i*len,len);
 }
 void
 recverExtensionBoxRecvMsgs(RecverExtensionBox* r,BCipherRandomGen* cipher,
-                           const char box[],int n,int rowBytes,int nonce0,
+                           const char box[],int n,int rowBytes,
+                           const int rows[],int k,
+                           int nonce0,
                            char* msg,const char mask[],int len)
 { int i;
   for(i=0;i<n;++i)
-    recverExtensionBoxRecvMsg(r,cipher,box,rowBytes,i,nonce0++,
+    recverExtensionBoxRecvMsg(r,cipher,box,rowBytes,rows,k,i,nonce0++,
         msg+i*len,mask,len);
+}
+static int* allRows(int n)
+{ int i,*res = malloc(sizeof(int[n]));
+  for(i=0;i<n;++i) res[i]=i;
+  return res;
 }
 
 typedef struct HonestOTExtSender
@@ -1078,24 +1091,30 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
     int n,int len)
 {
   int rowBytes = (n+7)/8;
-  char *box = malloc(s->box->keyBytes*8*rowBytes);
+  const int k = 8*s->box->keyBytes;
+  char *box = malloc(k*rowBytes);
+  int *all = allRows(k);
   senderExtensionBox(s->box,box,rowBytes);
-  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,
+  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,all,k,
                              s->nonce,opt0,opt1,len);
   s->nonce+=n;
+  free(all);
   free(box);
 }
 void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len)
 {
   int rowBytes = (n+7)/8;
-  char *box = malloc(r->box->keyBytes*8*rowBytes);
+  const int k = 8*r->box->keyBytes;
+  char *box = malloc(k*rowBytes);
+  int *all = allRows(k);
   char *mask = malloc(rowBytes); packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
-  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,
+  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,all,k,
                              r->nonce,dest,mask,len);
   r->nonce+=n;
   free(mask);
+  free(all);
   free(box);
 }
 void honestWrapperSend(void* s,const char* opt0,const char* opt1,
@@ -1157,13 +1176,16 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
   if(ss->hs.box->pd->error) return;
   int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtSender* s = &ss->hs;
-  char *box = malloc(s->box->keyBytes*8*rowBytes);
+  const int k = 8*s->box->keyBytes;
+  char *box = malloc(k*rowBytes);
+  int *all = allRows(k);
   senderExtensionBox(s->box,box,rowBytes);
   if(!senderExtensionBoxValidate_hhash(s->box,ss->gen,box,rowBytes))
     s->box->pd->error = OC_ERROR_OT_EXTENSION;
-  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,
+  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,all,k,
                              s->nonce,opt0,opt1,len);
   s->nonce+=n;
+  free(all);
   free(box);
 }
 void
@@ -1173,17 +1195,20 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
   if(rr->hr.box->pd->error) return;
   int rowBytes = (n+SECURITY_CONSTANT+7)/8;
   HonestOTExtRecver* r = &rr->hr;
-  char *box = malloc(r->box->keyBytes*8*rowBytes);
+  const int k = 8*r->box->keyBytes;
+  char *box = malloc(k*rowBytes);
+  int *all = allRows(k);
   char *mask = malloc(rowBytes);
   randomizeBuffer(rr->gen,mask,rowBytes);
   packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
   if(!recverExtensionBoxValidate_hhash(r->box,rr->gen,box,rowBytes))
     r->box->pd->error = OC_ERROR_OT_EXTENSION;
-  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,
+  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,all,k,
                              r->nonce,dest,mask,len);
   r->nonce+=n;
   free(mask);
+  free(all);
   free(box);
 }
 #if 0

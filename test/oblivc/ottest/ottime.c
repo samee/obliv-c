@@ -44,7 +44,7 @@ int main(int argc, char* argv[])
     if(argv[3][0]=='H') 
       s = honestOTExtSenderAbstract(honestOTExtSenderNew(&pd,2));
     else
-      s = maliciousOTExtSenderAbstract(maliciousOTExtSenderNew(&pd,2));
+      s = maliciousOTExtSenderAbstract(otExtSenderNew(&pd,2));
     s.send(s.sender,opt0,opt1,n,len);
     otSenderRelease(&s);
     free(opt0); free(opt1);
@@ -61,7 +61,7 @@ int main(int argc, char* argv[])
     if(argv[3][0]=='H')
       r = honestOTExtRecverAbstract(honestOTExtRecverNew(&pd,1));
     else
-      r = maliciousOTExtRecverAbstract(maliciousOTExtRecverNew(&pd,1));
+      r = maliciousOTExtRecverAbstract(otExtRecverNew(&pd,1));
     r.recv(r.recver,output,sel,n,len);
     otRecverRelease(&r);
     free(output);
