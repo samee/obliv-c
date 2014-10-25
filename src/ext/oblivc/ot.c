@@ -773,10 +773,10 @@ bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
   int r,c;
   for(r=0;r<rows;++r)
   {
-    unsigned ch=0;
-    for(c=0;c<cols/(8*sizeof(unsigned));++c)
-      ch ^= (((const unsigned*)src)[c]&((const unsigned*)(mat+r*(cols/8)))[c]);
-    c*=sizeof(unsigned);
+    uint64_t ch=0;
+    for(c=0;c<cols/(8*sizeof(uint64_t));++c)
+      ch ^= (((const uint64_t*)src)[c]&((const uint64_t*)(mat+r*(cols/8)))[c]);
+    c*=sizeof(uint64_t);
     for(;c<cols/8;++c) ch ^= (src[c]&mat[r*(cols/8)+c]);
     while(ch>1) ch = ((ch&1)^(ch>>1));
     setBit(dest,r,ch);
