@@ -773,13 +773,15 @@ bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
   int r,c;
   for(r=0;r<rows;++r)
   {
-    unsigned char ch=0;
-    for(c=0;c<cols/8;++c) ch ^= (src[c]&mat[r*(cols/8)+c]);
+    unsigned ch=0;
+    for(c=0;c<cols/(8*sizeof(unsigned));++c)
+      ch ^= (((const unsigned*)src)[c]&((const unsigned*)(mat+r*(cols/8)))[c]);
+    c*=sizeof(unsigned);
+    for(;c<cols/8;++c) ch ^= (src[c]&mat[r*(cols/8)+c]);
     while(ch>1) ch = ((ch&1)^(ch>>1));
     setBit(dest,r,ch);
   }
 }
-// FIXME extra hash padding not being used
 /*
    Validates honesty of the receiver during an invocation of
    senderExtensionBox. The box[] and rowBytes are the same as in that
@@ -804,6 +806,7 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
   char *hashmat = malloc(rowBytes*8*hlen);
   char hashcur[hlen],hash0[hlen],hashxor[hlen];
   bool xorseen = false, res = true;
+
   if(!ocRandomBytes(s->pd,gen,hashmat,rowBytes*8*hlen,s->destParty)) 
     return false;
   int i;
