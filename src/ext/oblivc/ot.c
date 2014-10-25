@@ -861,7 +861,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
 bool
 senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
                                   int rowsRemaining[],
-                                  const char* box[], int rowBytes)
+                                  const char box[], int rowBytes)
 {
   const int k = s->keyBytes*8;
   unsigned perm[k],i;
