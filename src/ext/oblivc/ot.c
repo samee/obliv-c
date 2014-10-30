@@ -977,10 +977,17 @@ senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
   char keyx[cipher->klen], *ctext = malloc(len);
   assert(k%8==0 && k/8<=sizeof keyx);
   memset(keyx+k/8,0,sizeof keyx-k/8);
-  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
+  //for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
+  for(i=0;i<k/8;i++)
+  {
+    int j=0; char ch=0;
+    for(j=7;j>=0;--j)
+      ch = ((ch<<1)|getBit(box+rows[8*i+j]*rowBytes,c));
+    keyx[i]=ch;
+  }
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg0,len);
   osend(s->pd,s->destParty,ctext,len);
-  for(i=0;i<k;++i) setBit(keyx,i,getBit(keyx,i)!=s->S[rows[i]]);
+  for(i=0;i<k;++i) xorBit(keyx,i,s->S[rows[i]]);
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg1,len);
   osend(s->pd,s->destParty,ctext,len);
   free(ctext);
@@ -1000,7 +1007,14 @@ recverExtensionBoxRecvMsg(RecverExtensionBox* r,BCipherRandomGen* cipher,
   char keyx[cipher->klen], *ctext = malloc(len);
   assert(k%8==0 && k/8<=sizeof keyx);
   memset(keyx+k/8,0,sizeof keyx-k/8);
-  for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
+  //for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
+  for(i=0;i<k/8;i++)
+  {
+    int j=0; char ch=0;
+    for(j=7;j>=0;--j)
+      ch = ((ch<<1)|getBit(box+rows[8*i+j]*rowBytes,c));
+    keyx[i]=ch;
+  }
   orecv(r->pd,r->srcParty,sel?msg:ctext,len);
   orecv(r->pd,r->srcParty,sel?ctext:msg,len);
   bcipherCryptNoResize(cipher,keyx,nonce,msg,ctext,len);
@@ -1138,7 +1152,7 @@ OTrecver honestOTExtRecverAbstract(HonestOTExtRecver* r)
                     .release=(void(*)(void*))honestOTExtRecverRelease};
 }
 
-#define OT_EXT_PAD_ALGO GCRY_CIPHER_AES256
+#define OT_EXT_PAD_ALGO GCRY_CIPHER_AES192
 #define OT_EXT_PAD_KEYBYTES 32
 typedef enum { OTExtValidation_hhash, OTExtValidation_byPair } OTExtValidation;
 typedef struct OTExtSender
