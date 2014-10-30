@@ -987,7 +987,7 @@ senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
   }
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg0,len);
   osend(s->pd,s->destParty,ctext,len);
-  for(i=0;i<k;++i) xorBit(keyx,i,s->S[rows[i]]);
+  for(i=0;i<k/8;++i) keyx[i]^=s->spack[i];
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg1,len);
   osend(s->pd,s->destParty,ctext,len);
   free(ctext);
@@ -1233,6 +1233,8 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
     rc = k/2;
     if(!senderExtensionBoxValidate_byPair(s->box,ss->gen,rows,box,rowBytes))
       error = true;
+    int i;
+    for(i=0;i<rc;++i) setBit(s->box->spack,i,s->box->S[rows[i]]);
   }
   if(error) s->box->pd->error = OC_ERROR_OT_EXTENSION;
   else
