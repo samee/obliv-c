@@ -987,7 +987,7 @@ senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
   }
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg0,len);
   osend(s->pd,s->destParty,ctext,len);
-  for(i=0;i<k/8;++i) keyx[i]^=s->spack[i];
+  memxor(keyx,s->spack,k/8);
   bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg1,len);
   osend(s->pd,s->destParty,ctext,len);
   free(ctext);
