@@ -10,13 +10,12 @@
 //   keep it a valid obliv-C file after preprocessing. So e.g., no magic
 //   conversion from obliv int to OblivBits* inside inline functions.
 //   In fact, user code should never be aware of OblivBits type.
-
 void protocolUseStdio(ProtocolDesc*);
-void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount);
+void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient);
 void protocolAddSizeCheck(ProtocolDesc* pd);
-int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port,
-                          int sockCount);
-int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount);
+// The old sockCount parameter (was the last param) is no longer used.
+int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port);
+int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port);
 void cleanupProtocol(ProtocolDesc*);
 
 void setCurrentParty(ProtocolDesc* pd, int party);

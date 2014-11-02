@@ -9,12 +9,6 @@
 #include<obliv_common.h>
 #include<obliv_yao.h>
 
-// Create a temporary ProtocolTransport that uses only one of the 
-//   available channels. Becomes invalid when the parent transport is cleaned up
-inline static ProtocolTransport* 
-  subtransport(ProtocolTransport* trans, int newChannel)
-  { return trans->subtransport(trans,newChannel); }
-
 // TODO merge these two structs, and fix confusing pd/ypd parameters
 typedef struct {
   ProtocolDesc ypd;
@@ -150,8 +144,8 @@ bool execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 
   // Assign transport channels: assumes Yao protocol never invokes 
   //   setSubtransport, only uses the default channel
-  round1.ypd.trans = subtransport(trans,0);
-  round2.ypd.trans = subtransport(trans,1);
+  round1.ypd.trans = trans->split(trans);
+  round2.ypd.trans = trans->split(trans);
 
   // These will be used in the final equality tests
   gcryDefaultLibInit();

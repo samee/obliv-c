@@ -44,25 +44,22 @@ static int stdioRecv(ProtocolTransport* pt,int src,void* s,size_t n)
   return fread(s,1,n,stdin); 
 }
 
-static ProtocolTransport* stdioSubtransport(ProtocolTransport* pt,int x) 
-  { return NULL; }
-
 static void stdioCleanup(ProtocolTransport* pt) {}
 
 // Extremely simple, no multiplexing: two parties, one connection
 static struct stdioTransport stdioTransport 
-  = {{2, 1, 0, stdioSubtransport, stdioSend, stdioRecv, stdioCleanup},false};
+  = {{2, NULL, stdioSend, stdioRecv, stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
 
 //#define PROFILE_NETWORK
-// TCP connections for 2-Party protocols. Ignorse src/dest parameters
+// TCP connections for 2-Party protocols. Ignores src/dest parameters
 //   since there is only one remote
 typedef struct tcp2PTransport
 { ProtocolTransport cb;
-  int* socks; // size = cb.maxChannels
-  int cursock;
+  int sock;
+  bool isClient;
 #ifdef PROFILE_NETWORK
   size_t bytes;
 #endif
@@ -77,7 +74,7 @@ size_t tcp2PBytesSent(ProtocolDesc* pd)
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { struct tcp2PTransport* tcpt = CAST(pt);
-  int res = write(tcpt->cursock,s,n); 
+  int res = write(tcpt->sock,s,n);
   if(res<0) perror("TCP write error: ");
   if(res!=n) fprintf(stderr,"TCP write error: only %d bytes of %zd written\n",
                             res,n);
@@ -90,58 +87,44 @@ static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { int res,n2=0;
   do
-  { res = read(((tcp2PTransport*)pt)->cursock,n2+(char*)s,n-n2); 
+  { res = read(((tcp2PTransport*)pt)->sock,n2+(char*)s,n-n2);
     if(res<0) { perror("TCP read error: "); return res; }
     n2+=res;
   } while(n>n2);
   return res;
 }
 
-static void tcp2PCleanup(ProtocolTransport* pt)
-{ struct tcp2PTransport* t = CAST(pt);
-  int i;
-  for(i=0;i<t->cb.maxChannels;++i) close(t->socks[i]);
-  free(t->socks);
-  free(t);
-}
 
-static void tcp2PSubCleanup(ProtocolTransport* pt) { free(pt); }
-
-static ProtocolTransport* tcp2PSubtransport(ProtocolTransport* pt,int c)
-{
-  struct tcp2PTransport *t = CAST(pt), *tres;
-  tres = malloc(sizeof(*tres));
-  *tres = *t;
-  tres->socks = t->socks+c;
-  tres->cursock = t->socks[c];
-  tres->cb.maxChannels = 1;
-  tres->cb.curChannel = 0;
-  tres->cb.cleanup = tcp2PSubCleanup;
-  return &tres->cb;
-}
+// Doesn't close() sockets, since we might have been initialized directly by
+// tcp2PNew() --- fix this if open sockets become a problem.
+static void tcp2PCleanup(ProtocolTransport* pt) { free(pt); }
+static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 
 #ifdef PROFILE_NETWORK
 static const tcp2PTransport tcp2PTransportTemplate
-  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, 
-     NULL, 0, 0};
+  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
+      .cleanup = tcp2PCleanup},
+     .sock=0, .isClient=0, .bytes=0};
 #else
 static const tcp2PTransport tcp2PTransportTemplate
-  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, 
-     NULL, 0};
+  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
+      .cleanup = tcp2PCleanup},
+    .sock=0, .isClient=0};
 #endif
 
-void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
-{
-  struct tcp2PTransport* trans;
-  trans = malloc(sizeof(*trans));
+// isClient value will only be used for the split() method, otherwise
+// its value doesn't matter. In that case, it indicates which party should be
+// the server vs. client for the new connections (which is usually the same as
+// the old roles).
+static tcp2PTransport* tcp2PNew(int sock,bool isClient)
+{ tcp2PTransport* trans = malloc(sizeof(*trans));
   *trans = tcp2PTransportTemplate;
-  trans->socks = malloc(sizeof(int)*sockCount);
-  memcpy(trans->socks,socks,sizeof(int)*sockCount);
-  trans->cb.maxChannels = sockCount;
-  trans->cursock = socks[0];
-  trans->cb.curChannel = 0;
-  pd->trans = (ProtocolTransport*)trans;
+  trans->sock = sock;
+  trans->isClient=isClient;
+  return trans;
 }
+void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient)
+  { pd->trans = &tcp2PNew(sock,isClient)->cb; }
 
 static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
 {
@@ -152,24 +135,20 @@ static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
   return 0;
 }
 // used as sock=tcpConnect(...); ...; close(sock);
-static int tcpConnect(const char* name, const char* port)
+static int tcpConnect(struct sockaddr_in* sa)
 {
   int outsock;
-  struct sockaddr_in sa;
-
   if((outsock=socket(AF_INET,SOCK_STREAM,0))<0) return -1;
-  getsockaddr(name,port,(struct sockaddr*)&sa);
-  if(connect(outsock,(struct sockaddr*)&sa,sizeof(sa))<0) return -1;
+  if(connect(outsock,(struct sockaddr*)sa,sizeof(*sa))<0) return -1;
   return outsock;
 }
 
-int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port,
-                          int sockCount)
+int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port)
 {
-  int i, *socks = malloc(sizeof(int)*sockCount);
-  for(i=0;i<sockCount;++i) if((socks[i]=tcpConnect(server,port))<0) return -1;
-  protocolUseTcp2P(pd,socks,sockCount);
-  free(socks);
+  struct sockaddr_in sa;
+  if(getsockaddr(server,port,(struct sockaddr*)&sa)<0) return -1; // dns error
+  int sock=tcpConnect(&sa); if(sock<0) return -1;
+  protocolUseTcp2P(pd,sock,true);
   return 0;
 }
 
@@ -186,15 +165,55 @@ static int tcpListenAny(const char* portn)
   if(listen(outsock,SOMAXCONN)<0) return -1;
   return outsock;
 }
-int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount)
+int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port)
 {
-  int i, listenSock, *socks = malloc(sizeof(int)*sockCount);
+  int listenSock, sock;
   listenSock = tcpListenAny(port);
-  for(i=0;i<sockCount;++i) if((socks[i]=accept(listenSock,0,0))<0) return -1;
-  protocolUseTcp2P(pd,socks,sockCount);
+  if((sock=accept(listenSock,0,0))<0) return -1;
+  protocolUseTcp2P(pd,sock,false);
   close(listenSock);
-  free(socks);
   return 0;
+}
+
+/*
+   If two parties connected over a given socket execute this function
+   (one with isClient true and the other with false), they both end up with
+   a new socket that they can use in parallel with the old one. This is useful
+   just before two parties are planning to spawn a new thread each, such that
+   the two threads can have an independent channel with the corresponding thread
+   on the remote side. Meant to work on TCP sockets only.
+   */
+static int sockSplit(int sock,bool isClient)
+{
+  struct sockaddr_in sa; socklen_t sz=sizeof(sa);
+  if(isClient)
+  {
+    if(getsockname(sock,(struct sockaddr*)&sa,&sz)<0) return -1;
+    int rres=read(sock,&sa.sin_port,sizeof(sa.sin_port));
+    if(rres<0) { fprintf(stderr,"Socket read error\n"); return -1; }
+    if(rres<sizeof(sa.sin_port))
+      { fprintf(stderr,"BUG: fix with repeated reads\n"); return -1; }
+    return tcpConnect(&sa);
+  }
+  else
+  { // any change here should also change PROFILE_NETWORK in tcp2PSplit()
+    int listenSock=tcpListenAny("0");
+    if(getsockname(listenSock,(struct sockaddr*)&sa,&sz)<0) return -1;
+    if(write(sock,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
+    int newsock = accept(listenSock,0,0);
+    close(listenSock);
+    return newsock;
+  }
+}
+
+static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
+{
+  tcp2PTransport* t = CAST(tsrc);
+  int newsock = sockSplit(t->sock,t->isClient);
+#ifdef PROFILE_NETWORK
+  if(!t->isClient) t->bytes+=sizeof(in_port_t);
+#endif
+  return CAST(tcp2PNew(newsock,t->isClient));
 }
 
 typedef struct 
@@ -229,9 +248,6 @@ static void sizeCheckCleanup(ProtocolTransport* pt)
   free(pt);
 }
 
-static ProtocolTransport* sizeCheckSubtransport(ProtocolTransport* pt,int ch)
-  { return NULL; }
-
 void protocolAddSizeCheck(ProtocolDesc* pd)
 {
   SizeCheckTransportAdapter* t = malloc(sizeof(SizeCheckTransportAdapter));
@@ -240,7 +256,6 @@ void protocolAddSizeCheck(ProtocolDesc* pd)
   t->cb.send=sizeCheckSend;
   t->cb.recv=sizeCheckRecv;
   t->cb.cleanup=sizeCheckCleanup;
-  t->cb.subtransport=sizeCheckSubtransport;
 }
 // ---------------------------------------------------------------------------
 

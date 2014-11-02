@@ -30,8 +30,8 @@ int main(int argc, char* argv[])
   int me = argv[2][0]=='1'?1:2;
   int err;
 	//protocolUseStdio(&pd);
-  if(me==1) err = protocolAcceptTcp2P(&pd,argv[1],1);
-  else err = protocolConnectTcp2P(&pd,REMOTEHOST,argv[1],1);
+  if(me==1) err = protocolAcceptTcp2P(&pd,argv[1]);
+  else err = protocolConnectTcp2P(&pd,REMOTEHOST,argv[1]);
   if(err!=0) { fprintf(stderr,"TCP connection error\n"); return 2; }
 	setCurrentParty(&pd,me);
   pd.error=0;

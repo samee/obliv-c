@@ -98,14 +98,13 @@ typedef struct YaoProtocolDesc {
 #define OC_PD_TYPE_YAO 1
 static inline OC_DYN_EXTRA_FUN(protoYaoProtocolDesc,ProtocolDesc,
                                YaoProtocolDesc,OC_PD_TYPE_YAO)
-
 typedef struct ProtocolTransport ProtocolTransport;
 
 // Channels are just our name for sockets (but we give it a new name since
 //   at times we don't use tcp sockets).
 struct ProtocolTransport {
-  int maxParties, maxChannels, curChannel;
-  ProtocolTransport* (*subtransport)(ProtocolTransport*,int);
+  int maxParties;
+  ProtocolTransport* (*split)(ProtocolTransport*);
   int (*send)(ProtocolTransport*,int,const void*,size_t);
   int (*recv)(ProtocolTransport*,int,      void*,size_t);
   void (*cleanup)(ProtocolTransport*);
