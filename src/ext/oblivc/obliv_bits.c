@@ -188,7 +188,7 @@ static int sockSplit(int sock,bool isClient)
   struct sockaddr_in sa; socklen_t sz=sizeof(sa);
   if(isClient)
   {
-    if(getsockname(sock,(struct sockaddr*)&sa,&sz)<0) return -1;
+    if(getpeername(sock,(struct sockaddr*)&sa,&sz)<0) return -1;
     int rres=read(sock,&sa.sin_port,sizeof(sa.sin_port));
     if(rres<0) { fprintf(stderr,"Socket read error\n"); return -1; }
     if(rres<sizeof(sa.sin_port))
