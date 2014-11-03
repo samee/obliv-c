@@ -10,10 +10,14 @@
 void gcryDefaultLibInit(void);
 
 // Convenience functions
-static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
-  { return pd->trans->recv(pd->trans,s,p,n); }
+static inline int transSend(ProtocolTransport* t,int d,const void* p,size_t n)
+  { return t->send(t,d,p,n); }
+static inline int transRecv(ProtocolTransport* t,int s,void* p,size_t n)
+  { return t->recv(t,s,p,n); }
 static inline int osend(ProtocolDesc* pd,int d,const void* p,size_t n)
-  { return pd->trans->send(pd->trans,d,p,n); }
+  { return transSend(pd->trans,d,p,n); }
+static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
+  { return transRecv(pd->trans,s,p,n); }
 
 // Maybe these 5 lines should move to bcrandom.h
 #define DHCurveName "secp192r1"

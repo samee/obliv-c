@@ -963,84 +963,85 @@ bcipherCryptNoResize(BCipherRandomGen* gen,const char* key,int nonce,
    cipher is just a preallocated BCipherRandomGen, which we use internally for
    encryption (we apply resetBCipherRandomGen, so it will lose any existing 
    state). It is just so we don't have to allocate a new cipher every time.
-
-   TODO way too many params. Structify.
    */
+typedef struct
+{ BCipherRandomGen *cipher;
+  const char *box;
+  int n, rowBytes, *rows, k, nonce, len, destParty, c;
+  const char *opt0, *opt1, *spack;
+  ProtocolTransport *trans;
+} SendMsgArgs;
 void
-senderExtensionBoxSendMsg(SenderExtensionBox* s,BCipherRandomGen* cipher,
-                          const char box[],int rowBytes,
-                          const int rows[],int k,
-                          int c,int nonce,
-                          const char msg0[],const char msg1[],size_t len)
+senderExtensionBoxSendMsg(SendMsgArgs* a)
 {
   int i;
-  char keyx[cipher->klen], *ctext = malloc(len);
-  assert(k%8==0 && k/8<=sizeof keyx);
-  memset(keyx+k/8,0,sizeof keyx-k/8);
+  char keyx[a->cipher->klen], *ctext = malloc(a->len);
+  assert(a->k%8==0 && a->k/8<=sizeof keyx);
+  memset(keyx+a->k/8,0,sizeof keyx-a->k/8);
   //for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
-  for(i=0;i<k/8;i++)
+  for(i=0;i<a->k/8;i++)
   {
     int j=0; char ch=0;
     for(j=7;j>=0;--j)
-      ch = ((ch<<1)|getBit(box+rows[8*i+j]*rowBytes,c));
+      ch = ((ch<<1)|getBit(a->box+a->rows[8*i+j]*a->rowBytes,a->c));
     keyx[i]=ch;
   }
-  bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg0,len);
-  osend(s->pd,s->destParty,ctext,len);
-  memxor(keyx,s->spack,k/8);
-  bcipherCryptNoResize(cipher,keyx,nonce,ctext,msg1,len);
-  osend(s->pd,s->destParty,ctext,len);
+  bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt0,a->len);
+  transSend(a->trans,a->destParty,ctext,a->len);
+  memxor(keyx,a->spack,a->k/8);
+  bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt1,a->len);
+  transSend(a->trans,a->destParty,ctext,a->len);
+  a->nonce++;
   free(ctext);
 }
 // mask should be the same as the one previously used to construct box[]
 // All other parameters (c,nonce,box,rowBytes etc.) should match the ones the
 // sender is expected to use.
+typedef struct
+{ BCipherRandomGen *cipher;
+  const char *box;
+  int n, rowBytes, *rows, k, nonce, len, srcParty, c;
+  char *msg;
+  const char *mask; // Receiver's selections
+  ProtocolTransport *trans;
+} RecvMsgArgs;
 void
-recverExtensionBoxRecvMsg(RecverExtensionBox* r,BCipherRandomGen* cipher,
-                          const char box[],int rowBytes,
-                          const int rows[],int k,
-                          int c,int nonce,
-                          char msg[],const char mask[],size_t len)
+recverExtensionBoxRecvMsg(RecvMsgArgs* a)
 {
   int i;
-  bool sel = getBit(mask,c);
-  char keyx[cipher->klen], *ctext = malloc(len);
-  assert(k%8==0 && k/8<=sizeof keyx);
-  memset(keyx+k/8,0,sizeof keyx-k/8);
+  bool sel = getBit(a->mask,a->c);
+  char keyx[a->cipher->klen], *ctext = malloc(a->len);
+  assert(a->k%8==0 && a->k/8<=sizeof keyx);
+  memset(keyx+a->k/8,0,sizeof keyx-a->k/8);
   //for(i=0;i<k;++i) setBit(keyx,i,getBit(box+rows[i]*rowBytes,c));
-  for(i=0;i<k/8;i++)
+  for(i=0;i<a->k/8;i++)
   {
     int j=0; char ch=0;
     for(j=7;j>=0;--j)
-      ch = ((ch<<1)|getBit(box+rows[8*i+j]*rowBytes,c));
+      ch = ((ch<<1)|getBit(a->box+a->rows[8*i+j]*a->rowBytes,a->c));
     keyx[i]=ch;
   }
-  orecv(r->pd,r->srcParty,sel?msg:ctext,len);
-  orecv(r->pd,r->srcParty,sel?ctext:msg,len);
-  bcipherCryptNoResize(cipher,keyx,nonce,msg,ctext,len);
+  transRecv(a->trans,a->srcParty,sel?a->msg:ctext,a->len);
+  transRecv(a->trans,a->srcParty,sel?ctext:a->msg,a->len);
+  bcipherCryptNoResize(a->cipher,keyx,a->nonce++,a->msg,ctext,a->len);
   free(ctext);
 }
+
 void
-senderExtensionBoxSendMsgs(SenderExtensionBox* s,BCipherRandomGen* cipher,
-                           const char box[],int n,int rowBytes,
-                           const int rows[],int k,
-                           int nonce0,
-                           const char* opt0, const char* opt1,int len)
+senderExtensionBoxSendMsgs(SendMsgArgs* a)
 { int i;
-  for(i=0;i<n;++i)
-    senderExtensionBoxSendMsg(s,cipher,box,rowBytes,rows,k,i,nonce0++,
-                              opt0+i*len,opt1+i*len,len);
+  for(i=0;i<a->n;++i)
+  { a->c=i; a->opt0+=a->len; a->opt1+=a->len;
+    senderExtensionBoxSendMsg(a);
+  }
 }
 void
-recverExtensionBoxRecvMsgs(RecverExtensionBox* r,BCipherRandomGen* cipher,
-                           const char box[],int n,int rowBytes,
-                           const int rows[],int k,
-                           int nonce0,
-                           char* msg,const char mask[],int len)
+recverExtensionBoxRecvMsgs(RecvMsgArgs* a)
 { int i;
-  for(i=0;i<n;++i)
-    recverExtensionBoxRecvMsg(r,cipher,box,rowBytes,rows,k,i,nonce0++,
-        msg+i*len,mask,len);
+  for(i=0;i<a->n;++i)
+  { a->c=i; a->msg+=a->len;
+    recverExtensionBoxRecvMsg(a);
+  }
 }
 static int* allRows(int n)
 { int i,*res = malloc(sizeof(int[n]));
@@ -1116,9 +1117,13 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   char *box = malloc(k*rowBytes);
   int *all = allRows(k);
   senderExtensionBox(s->box,box,rowBytes);
-  senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,all,k,
-                             s->nonce,opt0,opt1,len);
-  s->nonce+=n;
+  SendMsgArgs args = {
+    .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
+    .k=k, .nonce=s->nonce, .opt0=opt0, .opt1=opt1, .len=len,
+    .destParty=s->box->destParty, .spack=s->box->spack, .trans=s->box->pd->trans
+  };
+  senderExtensionBoxSendMsgs(&args);
+  s->nonce=args.nonce;
   free(all);
   free(box);
 }
@@ -1131,9 +1136,13 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   int *all = allRows(k);
   char *mask = malloc(rowBytes); packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
-  recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,all,k,
-                             r->nonce,dest,mask,len);
-  r->nonce+=n;
+  RecvMsgArgs args = {
+    .cipher=r->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
+    .k=k, .nonce=r->nonce, .msg=dest, .mask=mask, .len=len,
+    .srcParty=r->box->srcParty, .trans=r->box->pd->trans
+  };
+  recverExtensionBoxRecvMsgs(&args);
+  r->nonce=args.nonce;
   free(mask);
   free(all);
   free(box);
@@ -1238,9 +1247,15 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
   }
   if(error) s->box->pd->error = OC_ERROR_OT_EXTENSION;
   else
-    senderExtensionBoxSendMsgs(s->box,s->padder,box,n,rowBytes,rows,rc,
-                               s->nonce,opt0,opt1,len);
-  s->nonce+=n;
+  { SendMsgArgs args = {
+      .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=rows,
+      .k=rc, .nonce=s->nonce, .opt0=opt0, .opt1=opt1, .len=len,
+      .destParty=s->box->destParty, .spack=s->box->spack,
+      .trans=s->box->pd->trans
+    };
+    senderExtensionBoxSendMsgs(&args);
+    s->nonce=args.nonce;
+  }
   free(rows);
   free(box);
 }
@@ -1277,9 +1292,15 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
   }
   if(error) r->box->pd->error = OC_ERROR_OT_EXTENSION;
   else
-    recverExtensionBoxRecvMsgs(r->box,r->padder,box,n,rowBytes,rows,rc,
-                               r->nonce,dest,mask,len);
-  r->nonce+=n;
+  {
+    RecvMsgArgs args = {
+      .cipher=r->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=rows,
+      .k=rc, .nonce=r->nonce, .msg=dest, .mask=mask, .len=len,
+      .srcParty=r->box->srcParty, .trans=r->box->pd->trans
+    };
+    recverExtensionBoxRecvMsgs(&args);
+    r->nonce=args.nonce;
+  }
   free(mask);
   free(rows);
   free(box);
