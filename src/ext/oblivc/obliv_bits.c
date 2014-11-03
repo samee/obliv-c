@@ -94,10 +94,10 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
   return res;
 }
 
-
-// Doesn't close() sockets, since we might have been initialized directly by
-// tcp2PNew() --- fix this if open sockets become a problem.
-static void tcp2PCleanup(ProtocolTransport* pt) { free(pt); }
+static void tcp2PCleanup(ProtocolTransport* pt)
+{ close(((tcp2PTransport*)pt)->sock);
+  free(pt);
+}
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 
 #ifdef PROFILE_NETWORK
