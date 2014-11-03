@@ -210,6 +210,7 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
 {
   tcp2PTransport* t = CAST(tsrc);
   int newsock = sockSplit(t->sock,t->isClient);
+  if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
 #ifdef PROFILE_NETWORK
   if(!t->isClient) t->bytes+=sizeof(in_port_t);
 #endif
