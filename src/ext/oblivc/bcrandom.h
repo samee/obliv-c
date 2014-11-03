@@ -13,11 +13,13 @@ typedef struct
 { gcry_cipher_hd_t cipher;
   unsigned char zeroes[BC_MAXBLEN], ctr[BC_MAXBLEN];
   size_t blen,klen;
+  int algo;
 } BCipherRandomGen;
 
 BCipherRandomGen* newBCipherRandomGen();
 BCipherRandomGen* newBCipherRandomGenByKey(const char* key);
 BCipherRandomGen* newBCipherRandomGenByAlgoKey(int algo,const char* key);
+BCipherRandomGen* copyBCipherRandomGenNoKey(BCipherRandomGen* bc);
 void releaseBCipherRandomGen(BCipherRandomGen* gen);
 // key is assumed to be gen->klen long
 void resetBCipherRandomGen(BCipherRandomGen* gen,const char* key);

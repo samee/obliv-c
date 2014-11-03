@@ -13,6 +13,7 @@ static BCipherRandomGen* newBCipherRandomGenNoKey(int algo)
   gen->cipher = cipher;
   gen->blen = gcry_cipher_get_algo_blklen(algo);
   gen->klen = gcry_cipher_get_algo_keylen(algo);
+  gen->algo = algo;
   assert(gen->blen<=sizeof(gen->zeroes));
   assert(gen->blen>=sizeof(uint64_t)); // used in setctrFromIntBCipherRandomGen
   for(i=0;i<gen->blen;++i) gen->zeroes[i]=gen->ctr[i]=0;
@@ -42,6 +43,10 @@ BCipherRandomGen* newBCipherRandomGenByAlgoKey(int algo,const char* key)
   BCipherRandomGen* gen = newBCipherRandomGenNoKey(algo);
   gcry_cipher_setkey(gen->cipher,key,gen->klen);
   return gen;
+}
+BCipherRandomGen* copyBCipherRandomGenNoKey(BCipherRandomGen* bc)
+{
+  return newBCipherRandomGenNoKey(bc->algo);
 }
 void releaseBCipherRandomGen(BCipherRandomGen* gen)
 {

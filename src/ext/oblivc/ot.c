@@ -1027,22 +1027,86 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
   free(ctext);
 }
 
+#define OT_THREAD_THRESHOLD 500
+#define OT_THREAD_COUNT 4
+static void* senderExtensionBoxSendMsgs_thread(void* va)
+{ SendMsgArgs* a=va;
+  int i;
+  for(i=0;i<a->n;++i)
+  { senderExtensionBoxSendMsg(a);
+    a->opt0+=a->len; a->opt1+=a->len; a->c++;
+  }
+  return NULL;
+}
 void
 senderExtensionBoxSendMsgs(SendMsgArgs* a)
-{ int i;
-  for(i=0;i<a->n;++i)
-  { a->c=i;
-    senderExtensionBoxSendMsg(a);
-    a->opt0+=a->len; a->opt1+=a->len;
+{
+  if(a->n<=OT_THREAD_THRESHOLD)
+    senderExtensionBoxSendMsgs_thread(a);
+
+  else
+  { pthread_t th[OT_THREAD_COUNT];
+    SendMsgArgs si[OT_THREAD_COUNT];
+    int i,ndone=0,tc=OT_THREAD_COUNT;
+    for(i=0;i<tc;++i)
+    { si[i]=*a;
+      si[i].c=ndone;
+      si[i].n=(a->n-ndone+tc-i-1)/(tc-i);
+      si[i].nonce=a->nonce+ndone;
+      si[i].opt0=a->opt0+a->len*ndone;
+      si[i].opt1=a->opt1+a->len*ndone;
+      si[i].trans=a->trans->split(a->trans);
+      si[i].cipher=copyBCipherRandomGenNoKey(a->cipher);
+      pthread_create(&th[i],NULL,senderExtensionBoxSendMsgs_thread,&si[i]);
+      ndone+=si[i].n;
+    }
+    assert(ndone==a->n);
+    for(i=0;i<tc;++i)
+    { pthread_join(th[i],NULL);
+      si[i].trans->cleanup(si[i].trans);
+      releaseBCipherRandomGen(si[i].cipher);
+    }
+    a->nonce+=ndone;
   }
+}
+
+static void* recverExtensionBoxRecvMsgs_thread(void* va)
+{ RecvMsgArgs* a=va;
+  int i;
+  for(i=0;i<a->n;++i)
+  { recverExtensionBoxRecvMsg(a);
+    a->msg+=a->len; a->c++;
+  }
+  return NULL;
 }
 void
 recverExtensionBoxRecvMsgs(RecvMsgArgs* a)
-{ int i;
-  for(i=0;i<a->n;++i)
-  { a->c=i;
-    recverExtensionBoxRecvMsg(a);
-    a->msg+=a->len;
+{
+  if(a->n<=OT_THREAD_THRESHOLD)
+    recverExtensionBoxRecvMsgs_thread(a);
+  else
+  {
+    pthread_t th[OT_THREAD_COUNT];
+    RecvMsgArgs ri[OT_THREAD_COUNT];
+    int i,ndone=0,tc=OT_THREAD_COUNT;
+    for(i=0;i<tc;++i)
+    { ri[i]=*a;
+      ri[i].c=ndone;
+      ri[i].n=(a->n-ndone+tc-i-1)/(tc-i);
+      ri[i].nonce=a->nonce+ndone;
+      ri[i].msg=a->msg+a->len*ndone;
+      ri[i].trans=a->trans->split(a->trans);
+      ri[i].cipher=copyBCipherRandomGenNoKey(a->cipher);
+      pthread_create(&th[i],NULL,recverExtensionBoxRecvMsgs_thread,&ri[i]);
+      ndone+=ri[i].n;
+    }
+    assert(ndone==a->n);
+    for(i=0;i<tc;++i)
+    { pthread_join(th[i],NULL);
+      ri[i].trans->cleanup(ri[i].trans);
+      releaseBCipherRandomGen(ri[i].cipher);
+    }
+    a->nonce+=ndone;
   }
 }
 static int* allRows(int n)
