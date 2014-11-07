@@ -75,25 +75,25 @@ size_t tcp2PBytesSent(ProtocolDesc* pd)
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { struct tcp2PTransport* tcpt = CAST(pt);
-  while(n>0) {
-    int res = write(tcpt->sock,s,n);
-    if(res<0) { perror("TCP write error: "); return res; }
-    n-=res;
-    s+=res;
+  size_t n2=0;
+  while(n>n2) {
+    int res = write(tcpt->sock,n2+(char*)s,n-n2);
+    if(res<=0) { perror("TCP write error: "); return res; }
+    n2+=res;
 #ifdef PROFILE_NETWORK
     tcpt->bytes += res;
 #endif
   }
-  return n;
+  return n2;
 }
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
-{ int res,n2=0;
-  do
+{ int res=0,n2=0;
+  while(n>n2)
   { res = read(((tcp2PTransport*)pt)->sock,n2+(char*)s,n-n2);
-    if(res<0) { perror("TCP read error: "); return res; }
+    if(res<=0) { perror("TCP read error: "); return res; }
     n2+=res;
-  } while(n>n2);
+  }
   return res;
 }
 
