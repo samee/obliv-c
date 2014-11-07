@@ -62,6 +62,7 @@ typedef struct tcp2PTransport
   bool isClient;
 #ifdef PROFILE_NETWORK
   size_t bytes;
+  struct tcp2PTransport* parent;
 #endif
 } tcp2PTransport;
 
@@ -78,9 +79,7 @@ static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
   if(res<0) perror("TCP write error: ");
   if(res!=n) fprintf(stderr,"TCP write error: only %d bytes of %zd written\n",
                             res,n);
-#ifdef PROFILE_NETWORK
-  tcpt->bytes += n;
-#endif
+  tcpt->bytes+=n;
   return res;
 }
 
@@ -96,6 +95,11 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 
 static void tcp2PCleanup(ProtocolTransport* pt)
 { close(((tcp2PTransport*)pt)->sock);
+#ifdef PROFILE_NETWORK
+  tcp2PTransport* t = CAST(pt);
+  if(t->parent==NULL) fprintf(stderr,"Total bytes sent: %zd\n",t->bytes);
+  else t->parent->bytes+=t->bytes;
+#endif
   free(pt);
 }
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
@@ -104,7 +108,7 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
       .cleanup = tcp2PCleanup},
-     .sock=0, .isClient=0, .bytes=0};
+     .sock=0, .isClient=0, .bytes=0, .parent=NULL};
 #else
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
@@ -214,7 +218,11 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
 #ifdef PROFILE_NETWORK
   if(!t->isClient) t->bytes+=sizeof(in_port_t);
 #endif
-  return CAST(tcp2PNew(newsock,t->isClient));
+  tcp2PTransport* tnew = tcp2PNew(newsock,t->isClient);
+#ifdef PROFILE_NETWORK
+  tnew->parent=t;
+#endif
+  return CAST(tnew);
 }
 
 typedef struct 
