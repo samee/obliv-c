@@ -1028,7 +1028,7 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
 }
 
 #define OT_THREAD_THRESHOLD 500
-#define OT_THREAD_COUNT 8
+#define OT_THREAD_COUNT 4
 static void* senderExtensionBoxSendMsgs_thread(void* va)
 { SendMsgArgs* a=va;
   int i;

@@ -9,6 +9,7 @@ PROJECT_PATH="$(cd "$DIR/../../../.." && pwd)"
 REMOTE_PATH="$PROJECT_PATH"
 REMOTE_HOST="localhost"
 LOCAL_HOST="localhost"
+LOCAL_PORT=1234
 
 OTSRC="src/ext/oblivc/ot.c"
 BENCHDIR="test/oblivc/ottest/"
@@ -30,6 +31,8 @@ while [ $# -ge 1 ]; do
     REMOTE_PATH=${1#--remote-path=}
   elif [[ $1 = "--local-host="* ]]; then
     LOCAL_HOST=${1#--local-host=}
+  elif [[ $1 = "--local-port-init="* ]]; then
+    LOCAL_PORT=${1#--local-port-init=}
   fi
   shift
 done
@@ -54,12 +57,15 @@ cd "$PROJECT_PATH/$BENCHDIR"
 # Compilie benchmark program locally
 $OBLIVCC -O3 $PROJECT_PATH/$BENCHSRC -o $BENCHBIN
 ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN -DREMOTEHOST='\"$LOCAL_HOST\"'"
+port=$LOCAL_PORT
 for ottype in H M P; do
-  for ((otcount=1000000; $otcount<=5000000; otcount=1+$otcount)); do
-    for ((port=1234; $port<1234+6; port=$port+1)); do
+  for ((otcount=1000000; $otcount<=5000000; otcount=1000000+$otcount)); do
+    for ((run=0; $run<6; run=$run+1)); do
       ./$BENCHBIN $port 1 $ottype $otcount &
-      sleep 0.1
-      ssh $REMOTEHOST $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port 2 $ottype $otcount
+      sleep 0.3
+      echo -n "$port $ottype $otcount" >> $0.log
+      ssh $REMOTE_HOST time $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port 2 $ottype $otcount &>> $0.log
+      port=$((port+1))
     done
   done
 done
