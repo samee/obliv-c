@@ -64,6 +64,7 @@ struct OTExtSender;
 struct OTExtRecver;
 struct OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int srcparty);
 struct OTExtRecver* otExtRecverNew_byPair(ProtocolDesc* pd,int srcparty);
+struct OTExtRecver* otExtRecverNew_byPhair(ProtocolDesc* pd,int srcparty);
 void otExtRecverRelease(struct OTExtRecver* recver);
 void otExtRecv1Of2(struct OTExtRecver* r,char* dest,const bool* sel,
     int n,int len);
@@ -71,6 +72,7 @@ OTrecver maliciousOTExtRecverAbstract(struct OTExtRecver* r);
 
 struct OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destparty);
 struct OTExtSender* otExtSenderNew_byPair(ProtocolDesc* pd,int destparty);
+struct OTExtSender* otExtSenderNew_byPhair(ProtocolDesc* pd,int destparty);
 void otExtSenderRelease(struct OTExtSender* sender);
 void otExtSend1Of2(struct OTExtSender* s,
     const char* opt0,const char* opt1,int n,int len);

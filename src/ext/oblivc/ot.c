@@ -843,6 +843,8 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
   return true;
 }
 
+#define PHAIR_ALGO GCRY_MD_SHA1
+#define PHAIR_HASHLEN (160/8)
 /*
    Validates honesty of the receiver during an invocation of
    senderExtensionBox. The box[] and rowBytes are the same as in that
@@ -864,12 +866,13 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
 bool
 senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
                                   int rowsRemaining[],
-                                  const char box[], int rowBytes)
+                                  const char box[], int rowBytes,bool dohash)
 {
   const int k = s->keyBytes*8;
   unsigned perm[k],i;
   bool sx, res=true;
-  char *rowxme = malloc(rowBytes), *rowxyou = malloc(rowBytes);
+  char *rowxme = malloc(rowBytes), *rowxyou = (dohash?NULL:malloc(rowBytes));
+  char phair_hash[PHAIR_HASHLEN], phair_hash_you[PHAIR_HASHLEN];
   bcRandomPermutation(gen,perm,k);
   osend(s->pd,s->destParty,perm,sizeof(int[k]));
   for(i=0;i<k;i+=2)
@@ -879,11 +882,14 @@ senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
     osend(s->pd,s->destParty,&sx,sizeof(bool));
     memcpy(rowxme,box+a*rowBytes,rowBytes);
     memxor(rowxme,box+b*rowBytes,rowBytes);
-    orecv(s->pd,s->destParty,rowxyou,rowBytes);
-    if(memcmp(rowxme,rowxyou,rowBytes)) 
-    {
-      fprintf(stderr,"Check failed at a=%d,b=%d\n",a,b);
-      res=false;
+    if(dohash)
+    { gcry_md_hash_buffer(PHAIR_ALGO,phair_hash,rowxme,rowBytes);
+      orecv(s->pd,s->destParty,phair_hash_you,PHAIR_HASHLEN);
+      if(memcmp(phair_hash,phair_hash_you,PHAIR_HASHLEN)) res=false;
+    }
+    else
+    { orecv(s->pd,s->destParty,rowxyou,rowBytes);
+      if(memcmp(rowxme,rowxyou,rowBytes)) res=false;
     }
   }
   free(rowxme);
@@ -899,12 +905,13 @@ bool
 recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
                                   int rowsRemaining[],
                                   const char box[],const char mask[],
-                                  int rowBytes)
+                                  int rowBytes,bool dohash)
 {
   const int k = r->keyBytes*8;
   unsigned perm[k],i;
   bool sx, inperm[k];
   char *rowx = malloc(rowBytes);
+  char phair_hash[PHAIR_HASHLEN];
   orecv(r->pd,r->srcParty,perm,sizeof(int[k]));
   memset(inperm,0,sizeof(inperm));
   for(i=0;i<k;++i)
@@ -919,7 +926,11 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
     memxor(rowx,box+b*rowBytes,rowBytes);
     orecv(r->pd,r->srcParty,&sx,sizeof(bool));
     if(sx) memxor(rowx,mask,rowBytes);
-    osend(r->pd,r->srcParty,rowx,rowBytes);
+    if(dohash)
+    { gcry_md_hash_buffer(PHAIR_ALGO,phair_hash,rowx,rowBytes);
+      osend(r->pd,r->srcParty,phair_hash,PHAIR_HASHLEN);
+    }
+    else osend(r->pd,r->srcParty,rowx,rowBytes);
   }
   free(rowx);
   return true;
@@ -1229,7 +1240,10 @@ OTrecver honestOTExtRecverAbstract(HonestOTExtRecver* r)
 
 #define OT_EXT_PAD_ALGO GCRY_CIPHER_AES192
 #define OT_EXT_PAD_KEYBYTES 32
-typedef enum { OTExtValidation_hhash, OTExtValidation_byPair } OTExtValidation;
+typedef enum {
+  OTExtValidation_hhash,
+  OTExtValidation_byPair, OTExtValidation_byPhair
+} OTExtValidation;
 typedef struct OTExtSender
 { HonestOTExtSender hs;
   BCipherRandomGen* gen;
@@ -1256,6 +1270,8 @@ OTExtSender* otExtSenderNew(ProtocolDesc* pd,int destParty)
   { return otExtSenderNew_aux(pd,destParty,OTExtValidation_hhash); }
 OTExtSender* otExtSenderNew_byPair(ProtocolDesc* pd,int destParty)
   { return otExtSenderNew_aux(pd,destParty,OTExtValidation_byPair); }
+OTExtSender* otExtSenderNew_byPhair(ProtocolDesc* pd,int destParty)
+  { return otExtSenderNew_aux(pd,destParty,OTExtValidation_byPhair); }
 void otExtSenderRelease(OTExtSender* s)
 { honestOTExtSenderCleanup(&s->hs);
   releaseBCipherRandomGen(s->gen);
@@ -1277,6 +1293,8 @@ OTExtRecver* otExtRecverNew(ProtocolDesc* pd,int srcParty)
   { return otExtRecverNew_aux(pd,srcParty,OTExtValidation_hhash); }
 OTExtRecver* otExtRecverNew_byPair(ProtocolDesc* pd,int srcParty)
   { return otExtRecverNew_aux(pd,srcParty,OTExtValidation_byPair); }
+OTExtRecver* otExtRecverNew_byPhair(ProtocolDesc* pd,int srcParty)
+  { return otExtRecverNew_aux(pd,srcParty,OTExtValidation_byPhair); }
 void otExtRecverRelease(OTExtRecver* r)
 { honestOTExtRecverCleanup(&r->hr);
   releaseBCipherRandomGen(r->gen);
@@ -1306,7 +1324,8 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
   }else
   { rows = malloc(sizeof(int[k/2]));
     rc = k/2;
-    if(!senderExtensionBoxValidate_byPair(s->box,ss->gen,rows,box,rowBytes))
+    if(!senderExtensionBoxValidate_byPair(s->box,ss->gen,rows,box,rowBytes,
+            ss->validation==OTExtValidation_byPhair))
       error = true;
     int i;
     for(i=0;i<rc;++i) setBit(s->box->spack,i,s->box->S[rows[i]]);
@@ -1353,7 +1372,7 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
   { rows = malloc(sizeof(int[k/2]));
     rc=k/2;
     if(!recverExtensionBoxValidate_byPair(r->box,rr->gen,rows,
-                                          box,mask,rowBytes))
+            box,mask,rowBytes,rr->validation==OTExtValidation_byPhair))
       error = true;
   }
   if(error) r->box->pd->error = OC_ERROR_OT_EXTENSION;
