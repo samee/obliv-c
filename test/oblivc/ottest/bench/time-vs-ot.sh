@@ -58,7 +58,7 @@ cd "$PROJECT_PATH/$BENCHDIR"
 $OBLIVCC -O3 $PROJECT_PATH/$BENCHSRC -o $BENCHBIN
 ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN -DREMOTEHOST='\"$LOCAL_HOST\"'"
 port=$LOCAL_PORT
-for ottype in H M P; do
+for ottype in H M P Q; do
   for ((otcount=1000000; $otcount<=5000000; otcount=1000000+$otcount)); do
     for ((run=0; $run<6; run=$run+1)); do
       ./$BENCHBIN $port 1 $ottype $otcount &

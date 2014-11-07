@@ -46,7 +46,7 @@ for ((tcount=1;tcount<=8;tcount++)); do
   # Compile benchmark program
   $OBLIVCC -O3 $PROJECT_PATH/$BENCHSRC -o $BENCHBIN
   ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN -DREMOTEHOST='\"$LOCAL_HOST\"'"
-  for ottype in M P; do
+  for ottype in M Q; do
     for ((run=0; run<5; run++)); do
       ./$BENCHBIN $port 1 $ottype 5000000 &
       sleep 0.3
