@@ -984,22 +984,22 @@ typedef struct
   char *buf; int bufused;
 } SendMsgArgs;
 
-#define SENDBUFFER_SIZE 10000
+#define MSGBUFFER_SIZE 10000
 static void sendBufFlush(SendMsgArgs* a)
 {
-  transSend(a->trans,-1,a->buf,a->bufused);
+  transSend(a->trans,a->destParty,a->buf,a->bufused);
   a->bufused=0;
 }
 
 static void sendBufSend(SendMsgArgs* a,const char* data)
 {
-  if(a->bufused>=a->len*SENDBUFFER_SIZE) sendBufFlush(a);
+  if(a->bufused>=a->len*MSGBUFFER_SIZE) sendBufFlush(a);
   memcpy(a->buf+a->bufused,data,a->len);
   a->bufused+=a->len;
 }
 static void sendBufInit(SendMsgArgs* a)
 {
-  a->buf=malloc(a->len*SENDBUFFER_SIZE);
+  a->buf=malloc(a->len*MSGBUFFER_SIZE);
   a->bufused=0;
 }
 static void sendBufRelease(SendMsgArgs* a) { sendBufFlush(a); free(a->buf); }
@@ -1037,7 +1037,30 @@ typedef struct
   char *msg;
   const char *mask; // Receiver's selections
   ProtocolTransport *trans;
+  char *buf; int bufread, payloadLeft;
 } RecvMsgArgs;
+static void recvBufFill(RecvMsgArgs* a)
+{
+  int n = (a->payloadLeft<MSGBUFFER_SIZE?a->payloadLeft:MSGBUFFER_SIZE);
+  transRecv(a->trans,a->srcParty,a->buf,n*a->len);
+  a->bufread=0;
+}
+
+static void recvBufRecv(RecvMsgArgs* a,char* data)
+{
+  if(a->bufread>=a->len*MSGBUFFER_SIZE) recvBufFill(a);
+  memcpy(data,a->buf+a->bufread,a->len);
+  a->bufread+=a->len;
+  a->payloadLeft--;
+}
+static void recvBufInit(RecvMsgArgs* a)
+{
+  a->buf=malloc(a->len*MSGBUFFER_SIZE);
+  a->bufread=a->len*MSGBUFFER_SIZE;
+  a->payloadLeft=2*a->n;
+}
+static void recvBufRelease(RecvMsgArgs* a) { free(a->buf); }
+
 void
 recverExtensionBoxRecvMsg(RecvMsgArgs* a)
 {
@@ -1054,8 +1077,8 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
       ch = ((ch<<1)|getBit(a->box+a->rows[8*i+j]*a->rowBytes,a->c));
     keyx[i]=ch;
   }
-  transRecv(a->trans,a->srcParty,sel?a->msg:ctext,a->len);
-  transRecv(a->trans,a->srcParty,sel?ctext:a->msg,a->len);
+  recvBufRecv(a,sel?a->msg:ctext);
+  recvBufRecv(a,sel?ctext:a->msg);
   bcipherCryptNoResize(a->cipher,keyx,a->nonce++,a->msg,ctext,a->len);
   free(ctext);
 }
@@ -1108,10 +1131,12 @@ senderExtensionBoxSendMsgs(SendMsgArgs* a)
 static void* recverExtensionBoxRecvMsgs_thread(void* va)
 { RecvMsgArgs* a=va;
   int i;
+  recvBufInit(a);
   for(i=0;i<a->n;++i)
   { recverExtensionBoxRecvMsg(a);
     a->msg+=a->len; a->c++;
   }
+  recvBufRelease(a);
   return NULL;
 }
 void
