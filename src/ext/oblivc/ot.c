@@ -754,6 +754,9 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
   free(keyxor);
 }
 
+#define OT_THREAD_THRESHOLD 500
+#define OT_THREAD_COUNT 4
+
 #define CHECK_HASH_BYTES 10
 #define CHECK_HASH_BITS (8*CHECK_HASH_BYTES)
 #define CHECK_HASH_BITS_LOGCEIL 7
@@ -782,6 +785,21 @@ bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols)
     setBit(dest,r,ch);
   }
 }
+typedef struct
+{
+  char (*dest)[CHECK_HASH_BYTES];
+  const char *hashmat,*src;
+  int rowBytes,from,to;
+} BitMatMulThread;
+void* bitmatMul_thread(void* args)
+{
+  BitMatMulThread* a=args;
+  int i;
+  for(i=a->from;i<a->to;i++)
+    bitmatMul(a->dest[i],a->hashmat,a->src+i*a->rowBytes,
+              8*CHECK_HASH_BYTES,8*a->rowBytes);
+  return NULL;
+}
 /*
    Validates honesty of the receiver during an invocation of
    senderExtensionBox. The box[] and rowBytes are the same as in that
@@ -804,20 +822,34 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
 {
   const int k = s->keyBytes*8, hlen = CHECK_HASH_BYTES;
   char *hashmat = malloc(rowBytes*8*hlen);
-  char hashcur[hlen],hash0[hlen],hashxor[hlen];
+  char hashcur[k][hlen],hash0[hlen],hashxor[hlen];
   bool xorseen = false, res = true;
 
   if(!ocRandomBytes(s->pd,gen,hashmat,rowBytes*8*hlen,s->destParty)) 
     return false;
-  int i;
+  int i,done=0,tc;
+  BitMatMulThread args[OT_THREAD_COUNT];
+  pthread_t hasht[OT_THREAD_COUNT];
+  if(8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
+  else tc=OT_THREAD_COUNT;
+  for(i=0;i<tc;++i)
+  {
+    int c = (k-done)/(tc-i);
+    args[i] = (BitMatMulThread){.dest=hashcur,.hashmat=hashmat,.src=box,
+                                .rowBytes=rowBytes,.from=done,.to=done+c};
+    if(i==tc-1) bitmatMul_thread(&args[i]); // no thread if tc==1
+    else pthread_create(&hasht[i],NULL,bitmatMul_thread,&args[i]);
+    done+=c;
+  }
+  for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
   for(i=0;i<k;++i)
-  { bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
+  { //bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
     orecv(s->pd,s->destParty,hash0,hlen);
     if(s->S[i])
-    { memxor(hashcur,hash0,hlen);
-      if(xorseen && memcmp(hashxor,hashcur,hlen)) res = false;
-      else { memcpy(hashxor,hashcur,hlen); xorseen = true; }
-    }else if(memcmp(hash0,hashcur,hlen)) res = false;
+    { memxor(hashcur[i],hash0,hlen);
+      if(xorseen && memcmp(hashxor,hashcur[i],hlen)) res = false;
+      else { memcpy(hashxor,hashcur[i],hlen); xorseen = true; }
+    }else if(memcmp(hash0,hashcur[i],hlen)) res = false;
   }
   free(hashmat);
   return res;
@@ -831,13 +863,27 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
 {
   const int k = r->keyBytes*8, hlen = CHECK_HASH_BYTES;
   char *hashmat = malloc(rowBytes*8*hlen);
-  char hashcur[hlen];
+  char hashcur[k][hlen];
   if(!ocRandomBytes(r->pd,gen,hashmat,rowBytes*8*hlen,r->srcParty)) 
     return false;
-  int i;
+  int i,done=0,tc;
+  BitMatMulThread args[OT_THREAD_COUNT];
+  pthread_t hasht[OT_THREAD_COUNT];
+  if(8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
+  else tc=OT_THREAD_COUNT;
+  for(i=0;i<tc;++i)
+  {
+    int c = (k-done)/(tc-i);
+    args[i] = (BitMatMulThread){.dest=hashcur,.hashmat=hashmat,.src=box,
+                                .rowBytes=rowBytes,.from=done,.to=done+c};
+    if(i==tc-1) bitmatMul_thread(&args[i]); // no thread if tc==1
+    else pthread_create(&hasht[i],NULL,bitmatMul_thread,&args[i]);
+    done+=c;
+  }
+  for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
   for(i=0;i<k;++i)
-  { bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
-    osend(r->pd,r->srcParty,hashcur,hlen);
+  { //bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
+    osend(r->pd,r->srcParty,hashcur[i],hlen);
   }
   free(hashmat);
   return true;
@@ -1083,8 +1129,6 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
   free(ctext);
 }
 
-#define OT_THREAD_THRESHOLD 500
-#define OT_THREAD_COUNT 4
 static void* senderExtensionBoxSendMsgs_thread(void* va)
 { SendMsgArgs* a=va;
   int i;
