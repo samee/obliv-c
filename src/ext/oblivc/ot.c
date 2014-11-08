@@ -985,24 +985,24 @@ typedef struct
 } SendMsgArgs;
 
 #define SENDBUFFER_SIZE 10000
-static void bufflush(SendMsgArgs* a)
+static void sendBufFlush(SendMsgArgs* a)
 {
   transSend(a->trans,-1,a->buf,a->bufused);
   a->bufused=0;
 }
 
-static void bufsend(SendMsgArgs* a,const char* data)
+static void sendBufSend(SendMsgArgs* a,const char* data)
 {
-  if(a->bufused>=a->len*SENDBUFFER_SIZE) bufflush(a);
+  if(a->bufused>=a->len*SENDBUFFER_SIZE) sendBufFlush(a);
   memcpy(a->buf+a->bufused,data,a->len);
   a->bufused+=a->len;
 }
-static void bufinit(SendMsgArgs* a)
+static void sendBufInit(SendMsgArgs* a)
 {
   a->buf=malloc(a->len*SENDBUFFER_SIZE);
   a->bufused=0;
 }
-static void bufrelease(SendMsgArgs* a) { bufflush(a); free(a->buf); }
+static void sendBufRelease(SendMsgArgs* a) { sendBufFlush(a); free(a->buf); }
 
 void
 senderExtensionBoxSendMsg(SendMsgArgs* a)
@@ -1020,10 +1020,10 @@ senderExtensionBoxSendMsg(SendMsgArgs* a)
     keyx[i]=ch;
   }
   bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt0,a->len);
-  bufsend(a,ctext);
+  sendBufSend(a,ctext);
   memxor(keyx,a->spack,a->k/8);
   bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt1,a->len);
-  bufsend(a,ctext);
+  sendBufSend(a,ctext);
   a->nonce++;
   free(ctext);
 }
@@ -1065,12 +1065,12 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
 static void* senderExtensionBoxSendMsgs_thread(void* va)
 { SendMsgArgs* a=va;
   int i;
-  bufinit(a);
+  sendBufInit(a);
   for(i=0;i<a->n;++i)
   { senderExtensionBoxSendMsg(a);
     a->opt0+=a->len; a->opt1+=a->len; a->c++;
   }
-  bufrelease(a);
+  sendBufRelease(a);
   return NULL;
 }
 void
