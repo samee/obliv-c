@@ -711,6 +711,7 @@ recverExtensionBoxRelease (RecverExtensionBox* r)
   { releaseBCipherRandomGen(r->keyblock0[i]);
     releaseBCipherRandomGen(r->keyblock1[i]);
   }
+  free(r->keyblock0); free(r->keyblock1);
   free(r);
 }
 
