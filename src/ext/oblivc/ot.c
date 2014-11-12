@@ -1354,8 +1354,8 @@ OTExtSender*
 otExtSenderNew_aux(ProtocolDesc* pd,int destParty,OTExtValidation v)
 { OTExtSender* s = malloc(sizeof *s);
   char dummy[OT_EXT_PAD_KEYBYTES];
-  const int keyBytes = (v==OTExtValidation_hhash?OT_KEY_BYTES_HHASH
-                                                :OT_KEY_BYTES_BYPAIR);
+  const int keyBytes = (v==OTExtValidation_hhash?OT_KEY_BYTES_MAL_HHASH
+                                                :OT_KEY_BYTES_MAL_BYPAIR);
   honestOTExtSenderInit(&s->hs,pd,destParty,keyBytes);
   releaseBCipherRandomGen(s->hs.padder);
   s->hs.padder = newBCipherRandomGenByAlgoKey(OT_EXT_PAD_ALGO,dummy);
@@ -1377,8 +1377,8 @@ void otExtSenderRelease(OTExtSender* s)
 OTExtRecver*
 otExtRecverNew_aux(ProtocolDesc* pd,int srcParty,OTExtValidation v)
 { OTExtRecver* r = malloc(sizeof *r);
-  const int keyBytes = (v==OTExtValidation_hhash?OT_KEY_BYTES_HHASH
-                                                :OT_KEY_BYTES_BYPAIR);
+  const int keyBytes = (v==OTExtValidation_hhash?OT_KEY_BYTES_MAL_HHASH
+                                                :OT_KEY_BYTES_MAL_BYPAIR);
   char dummy[OT_EXT_PAD_KEYBYTES];
   honestOTExtRecverInit(&r->hr,pd,srcParty,keyBytes);
   releaseBCipherRandomGen(r->hr.padder);
