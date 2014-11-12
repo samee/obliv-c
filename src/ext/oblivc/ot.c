@@ -756,7 +756,7 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
 }
 
 #define OT_THREAD_THRESHOLD 500
-#define OT_THREAD_COUNT 4
+#define OT_THREAD_COUNT 8
 
 #define CHECK_HASH_BYTES 10
 #define CHECK_HASH_BITS (8*CHECK_HASH_BYTES)
@@ -1233,6 +1233,8 @@ typedef struct HonestOTExtRecver
 } HonestOTExtRecver;
 
 #define OT_KEY_BYTES_HONEST 10
+#define OT_KEY_BYTES_MAL_HHASH 20
+#define OT_KEY_BYTES_MAL_BYPAIR 38
 void
 honestOTExtSenderInit(HonestOTExtSender* s,ProtocolDesc* pd,
                       int destParty,int keyBytes)
@@ -1352,7 +1354,8 @@ OTExtSender*
 otExtSenderNew_aux(ProtocolDesc* pd,int destParty,OTExtValidation v)
 { OTExtSender* s = malloc(sizeof *s);
   char dummy[OT_EXT_PAD_KEYBYTES];
-  const int keyBytes = (v==OTExtValidation_hhash?2:4)*OT_KEY_BYTES_HONEST;
+  const int keyBytes = (v==OTExtValidation_hhash?OT_KEY_BYTES_HHASH
+                                                :OT_KEY_BYTES_BYPAIR);
   honestOTExtSenderInit(&s->hs,pd,destParty,keyBytes);
   releaseBCipherRandomGen(s->hs.padder);
   s->hs.padder = newBCipherRandomGenByAlgoKey(OT_EXT_PAD_ALGO,dummy);
@@ -1374,7 +1377,8 @@ void otExtSenderRelease(OTExtSender* s)
 OTExtRecver*
 otExtRecverNew_aux(ProtocolDesc* pd,int srcParty,OTExtValidation v)
 { OTExtRecver* r = malloc(sizeof *r);
-  const int keyBytes = (v==OTExtValidation_hhash?2:4)*OT_KEY_BYTES_HONEST;
+  const int keyBytes = (v==OTExtValidation_hhash?OT_KEY_BYTES_HHASH
+                                                :OT_KEY_BYTES_BYPAIR);
   char dummy[OT_EXT_PAD_KEYBYTES];
   honestOTExtRecverInit(&r->hr,pd,srcParty,keyBytes);
   releaseBCipherRandomGen(r->hr.padder);
