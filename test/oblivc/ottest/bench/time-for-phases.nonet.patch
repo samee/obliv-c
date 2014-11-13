@@ -1,0 +1,102 @@
+diff --git a/src/ext/oblivc/ot.c b/src/ext/oblivc/ot.c
+index 26f818e..f47b546 100644
+--- a/src/ext/oblivc/ot.c
++++ b/src/ext/oblivc/ot.c
+@@ -731,7 +731,7 @@ senderExtensionBox(SenderExtensionBox* s,char box[],size_t rowBytes)
+   for(i=0;i<k;++i)
+   { randomizeBuffer(s->keyblock[i],keymine,rowBytes);
+     char *keybox = box+i*rowBytes;
+-    orecv(s->pd,s->destParty,keybox,rowBytes);
++    //orecv(s->pd,s->destParty,keybox,rowBytes);
+     if(s->S[i]) memxor(keybox,keymine,rowBytes);
+     else        memcpy(keybox,keymine,rowBytes);
+   }
+@@ -750,7 +750,7 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
+     randomizeBuffer(r->keyblock1[i],key1,rowBytes);
+     memxor(key1,key0,rowBytes);
+     memxor(key1,mask,rowBytes);
+-    osend(r->pd,r->srcParty,keyxor,rowBytes);
++    //osend(r->pd,r->srcParty,keyxor,rowBytes);
+   }
+   free(keyxor);
+ }
+@@ -845,7 +845,7 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen
+   for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
+   for(i=0;i<k;++i)
+   { //bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
+-    orecv(s->pd,s->destParty,hash0,hlen);
++    //orecv(s->pd,s->destParty,hash0,hlen);
+     if(s->S[i])
+     { memxor(hashcur[i],hash0,hlen);
+       if(xorseen && memcmp(hashxor,hashcur[i],hlen)) res = false;
+@@ -884,7 +884,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen
+   for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
+   for(i=0;i<k;++i)
+   { //bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
+-    osend(r->pd,r->srcParty,hashcur[i],hlen);
++    //osend(r->pd,r->srcParty,hashcur[i],hlen);
+   }
+   free(hashmat);
+   return true;
+@@ -926,16 +926,16 @@ senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* 
+   { int a = perm[i], b = perm[i+1];
+     rowsRemaining[i/2]=a;
+     sx = (s->S[a]!=s->S[b]);
+-    osend(s->pd,s->destParty,&sx,sizeof(bool));
++    //osend(s->pd,s->destParty,&sx,sizeof(bool));
+     memcpy(rowxme,box+a*rowBytes,rowBytes);
+     memxor(rowxme,box+b*rowBytes,rowBytes);
+     if(dohash)
+     { gcry_md_hash_buffer(PHAIR_ALGO,phair_hash,rowxme,rowBytes);
+-      orecv(s->pd,s->destParty,phair_hash_you,PHAIR_HASHLEN);
++      //orecv(s->pd,s->destParty,phair_hash_you,PHAIR_HASHLEN);
+       if(memcmp(phair_hash,phair_hash_you,PHAIR_HASHLEN)) res=false;
+     }
+     else
+-    { orecv(s->pd,s->destParty,rowxyou,rowBytes);
++    { //orecv(s->pd,s->destParty,rowxyou,rowBytes);
+       if(memcmp(rowxme,rowxyou,rowBytes)) res=false;
+     }
+   }
+@@ -971,13 +971,13 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* 
+     rowsRemaining[i/2]=a;
+     memcpy(rowx,box+a*rowBytes,rowBytes);
+     memxor(rowx,box+b*rowBytes,rowBytes);
+-    orecv(r->pd,r->srcParty,&sx,sizeof(bool));
++    //orecv(r->pd,r->srcParty,&sx,sizeof(bool));
+     if(sx) memxor(rowx,mask,rowBytes);
+     if(dohash)
+     { gcry_md_hash_buffer(PHAIR_ALGO,phair_hash,rowx,rowBytes);
+-      osend(r->pd,r->srcParty,phair_hash,PHAIR_HASHLEN);
++      //osend(r->pd,r->srcParty,phair_hash,PHAIR_HASHLEN);
+     }
+-    else osend(r->pd,r->srcParty,rowx,rowBytes);
++    else ;//osend(r->pd,r->srcParty,rowx,rowBytes);
+   }
+   free(rowx);
+   return true;
+@@ -1067,10 +1067,10 @@ senderExtensionBoxSendMsg(SendMsgArgs* a)
+     keyx[i]=ch;
+   }
+   bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt0,a->len);
+-  sendBufSend(a,ctext);
++  //sendBufSend(a,ctext);
+   memxor(keyx,a->spack,a->k/8);
+   bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt1,a->len);
+-  sendBufSend(a,ctext);
++  //sendBufSend(a,ctext);
+   a->nonce++;
+   free(ctext);
+ }
+@@ -1124,8 +1124,8 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
+       ch = ((ch<<1)|getBit(a->box+a->rows[8*i+j]*a->rowBytes,a->c));
+     keyx[i]=ch;
+   }
+-  recvBufRecv(a,sel?a->msg:ctext);
+-  recvBufRecv(a,sel?ctext:a->msg);
++  //recvBufRecv(a,sel?a->msg:ctext);
++  //recvBufRecv(a,sel?ctext:a->msg);
+   bcipherCryptNoResize(a->cipher,keyx,a->nonce++,a->msg,ctext,a->len);
+   free(ctext);
+ }
+

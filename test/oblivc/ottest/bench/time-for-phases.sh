@@ -31,7 +31,7 @@ done
 echo $REMOTE_HOST:$REMOTE_PATH
 cd "$PROJECT_PATH/$BENCHDIR"
 port=$LOCAL_PORT
-for macro_suffix in BASE_OT EXTENSION VALIDATION; do
+for macro_suffix in BASE_OT EXTENSION VALIDATION PAYLOAD; do
   # Change thread count
   sed -i "1i #define PHASE_TIME_UPTO_$macro_suffix" $PROJECT_PATH/$OTSRC
   # Build project
