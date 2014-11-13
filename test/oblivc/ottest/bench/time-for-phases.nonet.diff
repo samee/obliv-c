@@ -1,5 +1,5 @@
 diff --git a/src/ext/oblivc/ot.c b/src/ext/oblivc/ot.c
-index 26f818e..f47b546 100644
+index 26f818e..3148d06 100644
 --- a/src/ext/oblivc/ot.c
 +++ b/src/ext/oblivc/ot.c
 @@ -731,7 +731,7 @@ senderExtensionBox(SenderExtensionBox* s,char box[],size_t rowBytes)
@@ -20,7 +20,7 @@ index 26f818e..f47b546 100644
    }
    free(keyxor);
  }
-@@ -845,7 +845,7 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen
+@@ -845,7 +845,7 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
    for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
    for(i=0;i<k;++i)
    { //bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
@@ -29,7 +29,7 @@ index 26f818e..f47b546 100644
      if(s->S[i])
      { memxor(hashcur[i],hash0,hlen);
        if(xorseen && memcmp(hashxor,hashcur[i],hlen)) res = false;
-@@ -884,7 +884,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen
+@@ -884,7 +884,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
    for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
    for(i=0;i<k;++i)
    { //bitmatMul(hashcur,hashmat,box+i*rowBytes,8*hlen,8*rowBytes);
@@ -38,7 +38,7 @@ index 26f818e..f47b546 100644
    }
    free(hashmat);
    return true;
-@@ -926,16 +926,16 @@ senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* 
+@@ -926,16 +926,16 @@ senderExtensionBoxValidate_byPair(SenderExtensionBox* s,BCipherRandomGen* gen,
    { int a = perm[i], b = perm[i+1];
      rowsRemaining[i/2]=a;
      sx = (s->S[a]!=s->S[b]);
@@ -58,7 +58,7 @@ index 26f818e..f47b546 100644
        if(memcmp(rowxme,rowxyou,rowBytes)) res=false;
      }
    }
-@@ -971,13 +971,13 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* 
+@@ -971,13 +971,13 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
      rowsRemaining[i/2]=a;
      memcpy(rowx,box+a*rowBytes,rowBytes);
      memxor(rowx,box+b*rowBytes,rowBytes);
@@ -71,7 +71,7 @@ index 26f818e..f47b546 100644
 +      //osend(r->pd,r->srcParty,phair_hash,PHAIR_HASHLEN);
      }
 -    else osend(r->pd,r->srcParty,rowx,rowBytes);
-+    else ;//osend(r->pd,r->srcParty,rowx,rowBytes);
++    else;// osend(r->pd,r->srcParty,rowx,rowBytes);
    }
    free(rowx);
    return true;
@@ -99,4 +99,19 @@ index 26f818e..f47b546 100644
    bcipherCryptNoResize(a->cipher,keyx,a->nonce++,a->msg,ctext,a->len);
    free(ctext);
  }
-
+@@ -1431,6 +1431,7 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
+     for(i=0;i<rc;++i) setBit(s->box->spack,i,s->box->S[rows[i]]);
+   }
+ #ifndef PHASE_TIME_UPTO_VALIDATION
++  error=false;
+   if(error) s->box->pd->error = OC_ERROR_OT_EXTENSION;
+   else
+   { SendMsgArgs args = {
+@@ -1482,6 +1483,7 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
+       error = true;
+   }
+ #ifndef PHASE_TIME_UPTO_VALIDATION
++  error=false;
+   if(error) r->box->pd->error = OC_ERROR_OT_EXTENSION;
+   else
+   {

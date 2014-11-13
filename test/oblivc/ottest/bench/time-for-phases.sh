@@ -24,6 +24,8 @@ while [ $# -ge 1 ]; do
     LOCAL_HOST=${1#--local-host=}
   elif [[ $1 = "--local-port-init="* ]]; then
     LOCAL_PORT=${1#--local-port-init=}
+  elif [ $1 = "--thread-never" ]; then
+    sed -i 's/#define OT_THREAD_THRESHOLD .*$/#define OT_THREAD_THRESHOLD 0x7fffffff/' $PROJECT_PATH/$OTSRC
   fi
   shift
 done
