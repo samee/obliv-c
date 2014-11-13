@@ -1110,7 +1110,7 @@ void __obliv_c__setMul (void* vdest
                        ,size_t size)
 {
   const OblivBit *op1=vop1, *op2=vop2;
-  OblivBit temp[MAX_BITS],sum[MAX_BITS];
+  OblivBit temp[MAX_BITS]={},sum[MAX_BITS]={};
   int i;
   assert(size<=MAX_BITS);
   __obliv_c__setUnsignedKnown(sum,0,size);
