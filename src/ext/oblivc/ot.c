@@ -1411,9 +1411,11 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
     rowBytes = (n+SECURITY_CONSTANT+7)/8;
   else rowBytes = (n+7)/8;
 
+#ifndef PHASE_TIME_UPTO_BASE_OT
   char *box = malloc(k*rowBytes);
   bool error = false;
   senderExtensionBox(s->box,box,rowBytes);
+#ifndef PHASE_TIME_UPTO_EXTENSION
   if(ss->validation==OTExtValidation_hhash)
   { rows = allRows(k);
     rc = k;
@@ -1428,6 +1430,7 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
     int i;
     for(i=0;i<rc;++i) setBit(s->box->spack,i,s->box->S[rows[i]]);
   }
+#ifndef PHASE_TIME_UPTO_VALIDATION
   if(error) s->box->pd->error = OC_ERROR_OT_EXTENSION;
   else
   { SendMsgArgs args = {
@@ -1439,8 +1442,11 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
     senderExtensionBoxSendMsgs(&args);
     s->nonce=args.nonce;
   }
+#endif
   free(rows);
+#endif
   free(box);
+#endif
 }
 void
 otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
@@ -1455,12 +1461,14 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
     rowBytes = (n+SECURITY_CONSTANT+7)/8;
   else rowBytes = (n+7)/8;
 
+#ifndef PHASE_TIME_UPTO_BASE_OT
   char *box = malloc(k*rowBytes);
   bool error = false;
   char *mask = malloc(rowBytes);
   randomizeBuffer(rr->gen,mask,rowBytes);
   packBytes(mask,sel,n);
   recverExtensionBox(r->box,box,mask,rowBytes);
+#ifndef PHASE_TIME_UPTO_EXTENSION
   if(rr->validation==OTExtValidation_hhash)
   { rows = allRows(k);
     rc=k;
@@ -1473,6 +1481,7 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
             box,mask,rowBytes,rr->validation==OTExtValidation_byPhair))
       error = true;
   }
+#ifndef PHASE_TIME_UPTO_VALIDATION
   if(error) r->box->pd->error = OC_ERROR_OT_EXTENSION;
   else
   {
@@ -1484,9 +1493,12 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
     recverExtensionBoxRecvMsgs(&args);
     r->nonce=args.nonce;
   }
-  free(mask);
+#endif
   free(rows);
+#endif
+  free(mask);
   free(box);
+#endif
 }
 #if 0
 // --------------- OT-extension (assuming passive adversary) ----------------
