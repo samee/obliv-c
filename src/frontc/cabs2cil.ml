@@ -6342,25 +6342,33 @@ and doBody (blk: A.block) : chunk =
   let init,battrs = match isRipObliv blk with
   | None -> empty,blk.A.battrs
   | Some nm -> 
-      let l = revConvLoc !currentLoc in
-      (* Register a new variable *)
-      let specifier = [SpecAttr ("obliv",[]); SpecType Tbool] in
-      let initName = ((nm,A.JUSTBASE,[],l),NO_INIT) in
-      let condef = A.DEFINITION (A.DECDEF((specifier,[initName]),l)) in
-      (* Since CIL might change variable name, obtain the new name *)
-      let newvar = ref None in
-      let init = withLocalVarListener (fun vi -> newvar := Some vi) (fun () ->
-        empty @@ doStatement condef
-      ) in
-      (* Record that new variable name in CIL attributes *)
-      let battrs = match !newvar with
-      | Some vi -> List.map (function 
-            | "~obliv",_ -> "~obliv",[A.CONSTANT (A.CONST_STRING vi.vname)]
-            | x -> x
-            ) blk.A.battrs
-      | None -> E.s (bug "~obliv missing although isRipObliv is true")
-      in
-      init, battrs
+      if nm = "" then
+        let battrs = List.map (function
+          | "~obliv",_ -> "~obliv",[A.CONSTANT (A.CONST_STRING "")]
+          | x -> x
+          ) blk.A.battrs in
+        empty,battrs (* Leave variable name empty *)
+      else begin
+        let l = revConvLoc !currentLoc in
+        (* Register a new variable *)
+        let specifier = [SpecAttr ("obliv",[]); SpecType Tbool] in
+        let initName = ((nm,A.JUSTBASE,[],l),NO_INIT) in
+        let condef = A.DEFINITION (A.DECDEF((specifier,[initName]),l)) in
+        (* Since CIL might change variable name, obtain the new name *)
+        let newvar = ref None in
+        let init = withLocalVarListener (fun vi -> newvar := Some vi) (fun () ->
+          empty @@ doStatement condef
+        ) in
+        (* Record that new variable name in CIL attributes *)
+        let battrs = match !newvar with
+        | Some vi -> List.map (function 
+              | "~obliv",_ -> "~obliv",[A.CONSTANT (A.CONST_STRING vi.vname)]
+              | x -> x
+              ) blk.A.battrs
+        | None -> E.s (bug "~obliv missing although isRipObliv is true")
+        in
+        init, battrs
+      end
   in
   (* See if we have some attributes *)
   let battrs' = doAttributes battrs in
