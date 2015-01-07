@@ -33,6 +33,11 @@ typedef struct OblivBit OblivBit;
 
 typedef char yao_key_t[YAO_KEY_BYTES];
 
+#define NNOB_KEY_BYTES 10 
+typedef char nnob_key_t[NNOB_KEY_BYTES];
+
+
+
 struct ProtocolDesc {
   int partyCount, thisParty, error;
   struct ProtocolTransport* trans;
