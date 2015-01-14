@@ -24,9 +24,9 @@ int main(int argc,char *argv[])
     return 1;
   }
 
-  protocolUseStdio(&pd);
-  //if(argv[2][0]=='1') protocolAcceptTcp2P(&pd,argv[1]);
-  //else protocolConnectTcp2P(&pd,"jamuna.cs.virginia.edu",argv[1]);
+  //protocolUseStdio(&pd);
+  if(argv[3][0]=='1') protocolAcceptTcp2P(&pd,argv[1]);
+  else protocolConnectTcp2P(&pd,"augusta.cs.virginia.edu",argv[1]);
 
   setCurrentParty(&pd,(argv[3][0]=='1'?1:2));
   if(!strcmp("yao",argv[2])) execYaoProtocol(&pd,hammingDistance,&io);

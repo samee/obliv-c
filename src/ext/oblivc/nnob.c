@@ -5,6 +5,22 @@
 #include<stdio.h>
 #include<time.h>
 
+
+void debugTimer(time_struct* t)
+{
+	clock_gettime(CLOCK_REALTIME, &(t->wallclockTime));
+	t->cpuclockTime = clock();
+}
+
+void debugPrintTime(time_struct* begin, time_struct* end, char* name, int party)
+{
+	double wallclockSeconds = (double)((end->wallclockTime.tv_sec+end->wallclockTime.tv_nsec*1e-9) - 
+			(double)(begin->wallclockTime.tv_sec+begin->wallclockTime.tv_nsec*1e-9));
+	double cpuclockSeconds = (double)(end->cpuclockTime - begin->cpuclockTime)/CLOCKS_PER_SEC;
+	fprintf(stderr, "CPU clock time for %s, party %d: %lf\n", name, party, cpuclockSeconds);
+	fprintf(stderr, "Wallclock time for %s, party %d: %lf\n", name, party, wallclockSeconds);
+}
+
 void debugGetNnobHalfBit(NnobHalfBit* output, bool bit, const nnob_key_t key, 
 		const nnob_key_t globalDelta, NnobHalfBitType type)
 {
@@ -373,18 +389,26 @@ NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, OTExtValida
 
 	npd->error = false;
 
+	time_struct begin, end;
 	if(destparty==1)
 	{
-
+		debugTimer(&begin);
 		npd->error |= aBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.mac, 
 				npd->aBitsShareAndMac.share, numOTs, validation, destparty);
-
 		npd->error |= aBitBoxGetKey(pd, npd->aBitsKey.key, npd->globalDelta, 
 				numOTs, validation, destparty);
+		debugTimer(&end);
+		debugPrintTime(&begin, &end, "aBitBox", 1);
+		debugTimer(&begin);
 		npd->error |= aOT(pd, npd, Key, bucketSize, destparty);
 		npd->error |= aOT(pd, npd, ShareAndMac, bucketSize, destparty);
+		debugTimer(&end);
+		debugPrintTime(&begin, &end, "aOT", 1);
+		debugTimer(&begin);
 		npd->error |= aAND(pd, npd, ShareAndMac, bucketSize, destparty);
 		npd->error |= aAND(pd, npd, Key, bucketSize, destparty);
+		debugTimer(&end);
+		debugPrintTime(&begin, &end, "aAND", 1);
 	}
 	else
 	{
@@ -425,6 +449,7 @@ void cleanupNnobProtocol(NnobProtocolDesc* npd)
 bool aBitBoxGetBitAndMac(ProtocolDesc* pd, char* mac, bool* b,
 		int n, OTExtValidation validation, int destparty){
 	assert(n%8==0);
+	time_struct begin, end;
 	int i,j;
 	bool success = true;
 	int k = 8*A_BIT_PARAMETER_BYTES;
@@ -435,10 +460,17 @@ bool aBitBoxGetBitAndMac(ProtocolDesc* pd, char* mac, bool* b,
 	char *mask = malloc(rowBytes);
 	char mat[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
 	BCipherRandomGen* gen = newBCipherRandomGen();
+	debugTimer(&begin);
 	RecverExtensionBox* r =recverExtensionBoxNew(pd, destparty, k/8);
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"recverExtensionBoxNew",pd->thisParty);
 	randomizeBuffer(gen,mask,rowBytes);
 	unpackBytes(b,mask,n);
+	debugTimer(&begin);
 	recverExtensionBox(r,box,mask,rowBytes);
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"recverExtensionBox",pd->thisParty);
+	debugTimer(&begin);
 	if(validation==OTExtValidation_hhash)
 	{ 
 		rows = allRows(k);
@@ -454,11 +486,14 @@ bool aBitBoxGetBitAndMac(ProtocolDesc* pd, char* mac, bool* b,
 					box,mask,rowBytes, true))
 			success = false;
 	}
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"recverExtensionBoxValidate",pd->thisParty);
 	if(!success) r->pd->error = OC_ERROR_OT_EXTENSION;
 	success&=ocRandomBytes(pd, gen, mat, sizeof(mat), destparty);
 	assert(rc==8*A_BIT_PARAMETER_BYTES);
 	char aBitFullMac[A_BIT_PARAMETER_BYTES];
 	char* boxColumn;
+	debugTimer(&begin);
 	for(i=0;i<n;i++) // go through columns
 	{
 		for(j=0;j<rc;j++) // go through rows
@@ -468,6 +503,8 @@ bool aBitBoxGetBitAndMac(ProtocolDesc* pd, char* mac, bool* b,
 		}
 		bitmatMul(mac+i*NNOB_KEY_BYTES, mat, aBitFullMac, 8*NNOB_KEY_BYTES, rc);
 	}
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"receiver bitmatMul",pd->thisParty);
 	free(mask);
 	free(rows);
 	free(box);
@@ -480,6 +517,7 @@ bool aBitBoxGetBitAndMac(ProtocolDesc* pd, char* mac, bool* b,
 bool aBitBoxGetKey(ProtocolDesc* pd, char* key, nnob_key_t globalDelta, 
 		int n, OTExtValidation validation, int destparty){
 	assert(n%8==0);
+	time_struct begin, end;
 	int i,j;
 	bool success = true;
 	int k = 8*A_BIT_PARAMETER_BYTES;
@@ -489,9 +527,16 @@ bool aBitBoxGetKey(ProtocolDesc* pd, char* key, nnob_key_t globalDelta,
 	char *box = malloc(k*rowBytes);
 	char mat[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
 	BCipherRandomGen* gen = newBCipherRandomGen();
+	debugTimer(&begin);
 	SenderExtensionBox* s = senderExtensionBoxNew(pd, destparty, k/8);
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"senderExtensionBoxNew",pd->thisParty);
+	debugTimer(&begin);
 	senderExtensionBox(s,box,rowBytes);
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"senderExtensionBox",pd->thisParty);
 
+	debugTimer(&begin);
 	if(validation==OTExtValidation_hhash)
 	{ 
 		rows = allRows(k);
@@ -505,6 +550,8 @@ bool aBitBoxGetKey(ProtocolDesc* pd, char* key, nnob_key_t globalDelta,
 			success = false;
 		for(i=0;i<rc;++i) setBit(s->spack,i,s->S[rows[i]]);
 	}
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"senderExtensionBoxValidate",pd->thisParty);
 	if(!success) s->pd->error = OC_ERROR_OT_EXTENSION;
 	success&=ocRandomBytes(pd, gen, mat, sizeof(mat), destparty);
 
@@ -512,6 +559,7 @@ bool aBitBoxGetKey(ProtocolDesc* pd, char* key, nnob_key_t globalDelta,
 	assert(rc==8*A_BIT_PARAMETER_BYTES);
 	char aBitFullKey[A_BIT_PARAMETER_BYTES];
 	char* boxColumn;
+	debugTimer(&begin);
 	for(i=0;i<n;i++) // go through columns
 	{
 		for(j=0;j<rc;j++) // go through rows
@@ -521,6 +569,8 @@ bool aBitBoxGetKey(ProtocolDesc* pd, char* key, nnob_key_t globalDelta,
 		}
 		bitmatMul(key+i*NNOB_KEY_BYTES, mat, aBitFullKey, 8*NNOB_KEY_BYTES, rc);
 	}
+	debugTimer(&end);
+	debugPrintTime(&begin,&end,"sender bitmatMul",pd->thisParty);
 	free(rows);
 	free(box);
 	senderExtensionBoxRelease(s);

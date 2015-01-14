@@ -16,6 +16,11 @@ typedef enum { OTExtValidation_hhash, OTExtValidation_byPair } OTExtValidation;
 typedef enum {ShareAndMac=true, Key=false} NnobHalfBitType;
 
 typedef struct {
+	struct timespec wallclockTime;
+	clock_t cpuclockTime;
+} time_struct;
+
+typedef struct {
 	NnobHalfBitType type;
 	union {
 		struct {
@@ -81,6 +86,8 @@ typedef struct NnobProtocolDesc
 	} FDeal;
 } NnobProtocolDesc;
 
+void debugTimer(time_struct* t);
+void debugPrintTime(time_struct* begin, time_struct* end, char* name, int party);
 bool debugMatchingOblivBit(const OblivBit* x, const nnob_key_t globalDeltaToXKey,
 		const OblivBit* y, const nnob_key_t globalDeltaToYKey);
 void nnobGetOblivInput(ProtocolDesc* pd, NnobProtocolDesc* npd, bool* input,
