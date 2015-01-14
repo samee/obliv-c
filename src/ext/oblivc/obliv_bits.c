@@ -60,6 +60,8 @@ typedef struct tcp2PTransport
 { ProtocolTransport cb;
   int sock;
   bool isClient;
+  FILE* sockStream;
+  bool needFlush;
 #ifdef PROFILE_NETWORK
   size_t bytes;
   struct tcp2PTransport* parent;
@@ -76,9 +78,18 @@ size_t tcp2PBytesSent(ProtocolDesc* pd)
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { struct tcp2PTransport* tcpt = CAST(pt);
   size_t n2=0;
+  tcpt->needFlush=true;
+  /*while(n>n2) {*/
+    /*int res = write(tcpt->sock,n2+(char*)s,n-n2);*/
+    /*if(res<=0) { perror("TCP write error: "); return res; }*/
+    /*n2+=res;*/
+/*#ifdef PROFILE_NETWORK*/
+    /*tcpt->bytes += res;*/
+/*#endif*/
+  /*}*/
   while(n>n2) {
-    int res = write(tcpt->sock,n2+(char*)s,n-n2);
-    if(res<=0) { perror("TCP write error: "); return res; }
+    int res = fwrite(n2+(char*)s,1,n-n2,tcpt->sockStream);
+    if(res<0) { perror("TCP write error: "); return res; }
     n2+=res;
 #ifdef PROFILE_NETWORK
     tcpt->bytes += res;
@@ -89,16 +100,30 @@ static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { int res=0,n2=0;
+	struct tcp2PTransport* tcpt = CAST(pt);
+	if(tcpt->needFlush)
+	{
+		fflush(tcpt->sockStream);	
+		tcpt->needFlush=false;
+	}
+  /*while(n>n2)*/
+  /*{ res = read(((tcp2PTransport*)pt)->sock,n2+(char*)s,n-n2);*/
+    /*if(res<=0) { perror("TCP read error: "); return res; }*/
+    /*n2+=res;*/
+  /*}*/
   while(n>n2)
-  { res = read(((tcp2PTransport*)pt)->sock,n2+(char*)s,n-n2);
-    if(res<=0) { perror("TCP read error: "); return res; }
-    n2+=res;
+  { res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
+	if(res<0 || feof(tcpt->sockStream)) { perror("TCP read error: "); return res; }
+	n2+=res;
   }
   return res;
 }
 
 static void tcp2PCleanup(ProtocolTransport* pt)
-{ close(((tcp2PTransport*)pt)->sock);
+{ 
+	fflush(((tcp2PTransport*)pt)->sockStream);
+	fclose(((tcp2PTransport*)pt)->sockStream);
+	close(((tcp2PTransport*)pt)->sock);
 #ifdef PROFILE_NETWORK
   tcp2PTransport* t = CAST(pt);
   if(t->parent==NULL) fprintf(stderr,"Total bytes sent: %zd\n",t->bytes);
@@ -112,12 +137,12 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
       .cleanup = tcp2PCleanup},
-     .sock=0, .isClient=0, .bytes=0, .parent=NULL};
+     .sock=0, .isClient=0, .needFlush=false, .bytes=0, .parent=NULL};
 #else
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
       .cleanup = tcp2PCleanup},
-    .sock=0, .isClient=0};
+    .sock=0, .isClient=0, .needFlush=false};
 #endif
 
 // isClient value will only be used for the split() method, otherwise
@@ -129,6 +154,7 @@ static tcp2PTransport* tcp2PNew(int sock,bool isClient)
   *trans = tcp2PTransportTemplate;
   trans->sock = sock;
   trans->isClient=isClient;
+  trans->sockStream=fdopen(sock, "rb+");
   return trans;
 }
 void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient)
