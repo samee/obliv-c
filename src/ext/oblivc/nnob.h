@@ -105,10 +105,14 @@ void debugPrintOblivBit(const OblivBit* bit);
 void cleanupNnobProtocol(NnobProtocolDesc* npd);
 NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, OTExtValidation validation,
 		int destparty);
-bool aBitBoxGetBitAndMac(ProtocolDesc* pd, char* mac, bool* b,
+
+bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
+		char* mat, char* aBitFullMac,
 		int n, OTExtValidation validation, int destparty);
-bool aBitBoxGetKey(ProtocolDesc* pd, char* key, nnob_key_t globalDelta, 
+bool WaBitBoxGetKey(ProtocolDesc* pd, nnob_key_t globalDelta,
+		char* mat, char* aBitFullKey,
 		int n, OTExtValidation validation, int destparty);
+void WaBitToaBit(char* aBit, char* WaBit, char* mat, int n);
 
 bool LaOT(ProtocolDesc* pd, NnobProtocolDesc* npd, const NnobHalfBit* x0, const NnobHalfBit* x1, const NnobHalfBit* c,
 		const NnobHalfBit* r, NnobHalfBit* z,  
