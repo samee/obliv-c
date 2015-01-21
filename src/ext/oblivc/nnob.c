@@ -406,39 +406,22 @@ NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, OTExtValida
 
 	npd->error = false;
 
-	time_struct begin, end;
 	char mat1[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
 	char mat2[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
 	char* aBitFullMac = malloc(numOTs*A_BIT_PARAMETER_BYTES);
 	char* aBitFullKey = malloc(numOTs*A_BIT_PARAMETER_BYTES);
 	if(destparty==1)
 	{
-		debugTimer(&begin);
 		npd->error |= WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share, 
 				mat1, aBitFullMac, numOTs, validation, destparty);
 		npd->error |= WaBitBoxGetKey(pd, npd->globalDelta, 
 				mat2, aBitFullKey, numOTs, validation, destparty);
-		debugTimer(&end);
-		debugPrintTime(&begin, &end, "WaBitBox", 1);
-		debugTimer(&begin);
 		WaBitToaBit(npd->aBitsShareAndMac.mac, aBitFullMac, mat1, numOTs);
 		WaBitToaBit(npd->aBitsKey.key, aBitFullKey, mat2, numOTs);
-		debugTimer(&end);
-		debugPrintTime(&begin, &end, "aBitBox", 1);
-		/*npd->error |= aBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.mac, */
-				/*npd->aBitsShareAndMac.share, numOTs, validation, destparty);*/
-		/*npd->error |= aBitBoxGetKey(pd, npd->aBitsKey.key, npd->globalDelta, */
-				/*numOTs, validation, destparty);*/
-		debugTimer(&begin);
 		npd->error |= aOT(pd, npd, Key, bucketSize, destparty);
 		npd->error |= aOT(pd, npd, ShareAndMac, bucketSize, destparty);
-		debugTimer(&end);
-		debugPrintTime(&begin, &end, "aOT", 1);
-		debugTimer(&begin);
 		npd->error |= aAND(pd, npd, ShareAndMac, bucketSize, destparty);
 		npd->error |= aAND(pd, npd, Key, bucketSize, destparty);
-		debugTimer(&end);
-		debugPrintTime(&begin, &end, "aAND", 1);
 	}
 	else
 	{
@@ -448,10 +431,6 @@ NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, OTExtValida
 				mat2, aBitFullMac, numOTs, validation, destparty);
 		WaBitToaBit(npd->aBitsShareAndMac.mac, aBitFullMac, mat2, numOTs);
 		WaBitToaBit(npd->aBitsKey.key, aBitFullKey, mat1, numOTs);
-		/*npd->error |= aBitBoxGetKey(pd, npd->aBitsKey.key, npd->globalDelta, */
-				/*numOTs, validation, destparty);*/
-		/*npd->error |= aBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.mac, */
-				/*npd->aBitsShareAndMac.share, numOTs, validation, destparty);*/
 		npd->error |= aOT(pd, npd, ShareAndMac, bucketSize, destparty);
 		npd->error |= aOT(pd, npd, Key, bucketSize, destparty);
 		npd->error |= aAND(pd, npd, Key, bucketSize, destparty);
@@ -504,14 +483,6 @@ void* transpose_thread(void* args){
 			setBit(a->dest+i*A_BIT_PARAMETER_BYTES, j, getBit(boxColumn,i));
 		}
 	}
-	/*for(i=0;i<n;i++) // go through columns*/
-	/*{*/
-		/*for(j=0;j<rc;j++) // go through rows*/
-		/*{*/
-			/*boxColumn=box+rows[j]*rowBytes;*/
-			/*setBit(aBitFullMac+i*A_BIT_PARAMETER_BYTES, j, getBit(boxColumn, i));*/
-		/*}*/
-	/*}*/
 	return NULL;
 }
 bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
@@ -562,14 +533,6 @@ bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
 		done+=c;
 	}
 	for(i=0;i<tc-1;++i) pthread_join(transpt[i],NULL);
-	/*for(i=0;i<n;i++) // go through columns*/
-	/*{*/
-		/*for(j=0;j<rc;j++) // go through rows*/
-		/*{*/
-			/*boxColumn=box+rows[j]*rowBytes;*/
-			/*setBit(aBitFullMac+i*A_BIT_PARAMETER_BYTES, j, getBit(boxColumn, i));*/
-		/*}*/
-	/*}*/
 
 	free(mask);
 	free(rows);
@@ -623,14 +586,6 @@ bool WaBitBoxGetKey(ProtocolDesc* pd, nnob_key_t globalDelta,
 		done+=c;
 	}
 	for(i=0;i<tc-1;++i) pthread_join(transpt[i],NULL);
-	/*for(i=0;i<n;i++) // go through columns*/
-	/*{*/
-		/*for(j=0;j<rc;j++) // go through rows*/
-		/*{*/
-			/*boxColumn=box+rows[j]*rowBytes;*/
-			/*setBit(aBitFullKey+i*A_BIT_PARAMETER_BYTES, j, getBit(boxColumn, i));*/
-		/*}*/
-	/*}*/
 
 	free(rows);
 	free(box);
