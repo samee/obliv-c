@@ -285,26 +285,6 @@ static int* allRows(int n)
   return res;
 }
 
-void
-bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols);
-
-typedef struct
-{
-  char* dest;
-  const char *hashmat,*src;
-  int rowBytes,from,to;
-} BitMatMulThread;
-
-
-void* bitmatMul_thread_nnob(void* args)
-{
-  BitMatMulThread* a=args;
-  int i;
-  for(i=a->from;i<a->to;i++)
-    bitmatMul(a->dest+i*NNOB_KEY_BYTES,a->hashmat,a->src+i*a->rowBytes,
-              8*NNOB_KEY_BYTES,8*a->rowBytes);
-  return NULL;
-}
 
 bool
 senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
@@ -323,11 +303,11 @@ recverExtensionBoxValidate_byPair(RecverExtensionBox* r,BCipherRandomGen* gen,
                                   const char box[],const char mask[],
                                   int rowBytes, bool dohash);
 // Computes ceil(log_b(x))
-static int logfloor(int x,int b)
-{ int res=0;
-  while(b<=x) { x/=b; res++; }
-  return res;
-}
+/*static int logfloor(int x,int b)*/
+/*{ int res=0;*/
+  /*while(b<=x) { x/=b; res++; }*/
+  /*return res;*/
+/*}*/
 
 static void
 bcipherCrypt(BCipherRandomGen* gen,const char* key,int klen,int nonce,
@@ -351,6 +331,178 @@ void nnobHash(BCipherRandomGen* gen, const char* key, int klen, int nonce,
 
 void (*nnobPRG)(BCipherRandomGen* gen,const char* key,int klen,int nonce,
                   char* dest,const char* src,int n) = bcipherCrypt;
+
+void
+bitmatMul(char* dest,const char* mat,const char* src,int rows,int cols);
+
+typedef struct
+{
+  char (*dest)[NNOB_KEY_BYTES];
+  char *hashmat,(*src)[A_BIT_PARAMETER_BYTES] ;
+  int from,to;
+} BitMatMulThread;
+
+
+void* bitmatMul_thread_nnob(void* args)
+{
+  BitMatMulThread* a=args;
+  int i;
+  for(i=a->from;i<a->to;i++)
+    bitmatMul(a->dest[i],a->hashmat,a->src[i],
+              8*NNOB_KEY_BYTES,8*A_BIT_PARAMETER_BYTES);
+  return NULL;
+}
+
+
+typedef struct TransposeThread {
+	int* rows;
+	char*  src;
+	char (*dest)[A_BIT_PARAMETER_BYTES];
+	int rc;
+	int rowBytes;
+	int from;
+	int to;
+} TransposeThread;
+
+void* transpose_thread(void* args){
+	TransposeThread* a=args;
+	int i,j;
+	char* boxColumn;
+	for(i=a->from;i<a->to;i++) {
+		for(j=0;j<a->rc;j++) {
+			boxColumn=a->src+a->rows[j]*a->rowBytes;
+			setBit(a->dest[i], j, getBit(boxColumn,i));
+		}
+	}
+	return NULL;
+}
+bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
+		char* mat, char (*aBitFullMac)[A_BIT_PARAMETER_BYTES],
+		int n, OTExtValidation validation, int destparty){
+	assert(n%8==0);
+	int i;
+	bool success = true;
+	int k = 8*A_BIT_PARAMETER_BYTES;
+	k*=validation==OTExtValidation_hhash?1:2;
+	int rowBytes = (n+7)/8;
+	int *rows,rc;
+	char *box = malloc(k*rowBytes);
+	char *mask = malloc(rowBytes);
+	BCipherRandomGen* gen = newBCipherRandomGen();
+	RecverExtensionBox* r =recverExtensionBoxNew(pd, destparty, k/8);
+	randomizeBuffer(gen,mask,rowBytes);
+	unpackBytes(b,mask,n);
+	recverExtensionBox(r,box,mask,rowBytes);
+	if(validation==OTExtValidation_hhash)
+	{ 
+		rows = allRows(k);
+		rc=k;
+		if(!recverExtensionBoxValidate_hhash(r, gen, box, rowBytes))
+			success = false;
+	}
+	else
+	{ 
+		rows = malloc(sizeof(int[k/2]));
+		rc=k/2;
+		if(!recverExtensionBoxValidate_byPair(r, gen, rows,
+					box,mask,rowBytes, true))
+			success = false;
+	}
+	if(!success) r->pd->error = OC_ERROR_OT_EXTENSION;
+	success&=ocRandomBytes(pd, gen, mat,8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES, destparty);
+	assert(rc==8*A_BIT_PARAMETER_BYTES);
+	int tc=OT_THREAD_COUNT, done=0;
+	TransposeThread args[OT_THREAD_COUNT];
+	pthread_t transpt[OT_THREAD_COUNT];
+	for(i=0;i<tc;++i)
+	{
+		int c = (n-done)/(tc-i); 
+		args[i] = (TransposeThread){.dest=aBitFullMac,.src=box,
+			.rc=rc,.rows=rows,.rowBytes=rowBytes,.from=done,.to=done+c};
+		if(i==tc-1) transpose_thread(&args[i]); // no thread if tc==1
+		else pthread_create(&transpt[i],NULL,transpose_thread,&args[i]);
+		done+=c;
+	}
+	for(i=0;i<tc-1;++i) pthread_join(transpt[i],NULL);
+
+	free(mask);
+	free(rows);
+	free(box);
+	recverExtensionBoxRelease(r);
+	releaseBCipherRandomGen(gen);
+	return success;
+}
+
+bool WaBitBoxGetKey(ProtocolDesc* pd, nnob_key_t globalDelta,
+		char* mat, char (*aBitFullKey)[A_BIT_PARAMETER_BYTES],
+		int n, OTExtValidation validation, int destparty){
+	assert(n%8==0);
+	int i;
+	bool success = true;
+	int k = 8*A_BIT_PARAMETER_BYTES;
+	k*=validation==OTExtValidation_hhash?1:2;
+	int rowBytes = (n+7)/8;
+	int *rows, rc;
+	char *box = malloc(k*rowBytes);
+	BCipherRandomGen* gen = newBCipherRandomGen();
+	SenderExtensionBox* s = senderExtensionBoxNew(pd, destparty, k/8);
+	senderExtensionBox(s,box,rowBytes);
+	if(validation==OTExtValidation_hhash)
+	{ 
+		rows = allRows(k);
+		rc = k;
+		if(!senderExtensionBoxValidate_hhash(s,gen,box,rowBytes))
+			success = false;
+	} else
+	{ rows = malloc(sizeof(int[k/2]));
+		rc = k/2;
+		if(!senderExtensionBoxValidate_byPair(s,gen,rows,box,rowBytes, true))
+			success = false;
+		for(i=0;i<rc;++i) setBit(s->spack,i,s->S[rows[i]]);
+	}
+	if(!success) s->pd->error = OC_ERROR_OT_EXTENSION;
+	success&=ocRandomBytes(pd, gen, mat,8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES, destparty);
+	bitmatMul(globalDelta, mat, s->spack, 8*NNOB_KEY_BYTES, rc);
+	assert(rc==8*A_BIT_PARAMETER_BYTES);
+	int tc=OT_THREAD_COUNT, done=0;
+	TransposeThread args[OT_THREAD_COUNT];
+	pthread_t transpt[OT_THREAD_COUNT];
+	for(i=0;i<tc;++i)
+	{
+		int c = (n-done)/(tc-i); 
+		args[i] = (TransposeThread){.dest=aBitFullKey,.src=box,
+			.rc=rc,.rows=rows,.rowBytes=rowBytes,.from=done,.to=done+c};
+		if(i==tc-1) transpose_thread(&args[i]); // no thread if tc==1
+		else pthread_create(&transpt[i],NULL,transpose_thread,&args[i]);
+		done+=c;
+	}
+	for(i=0;i<tc-1;++i) pthread_join(transpt[i],NULL);
+
+	free(rows);
+	free(box);
+	senderExtensionBoxRelease(s);
+	releaseBCipherRandomGen(gen);
+	return success;
+}
+
+void WaBitToaBit(char (*aBit)[NNOB_KEY_BYTES], char (*WaBit)[A_BIT_PARAMETER_BYTES], char* mat, int n){
+	int rowBytes = (n+7)/8, i,done=0,tc;
+	BitMatMulThread args[OT_THREAD_COUNT];
+	pthread_t hasht[OT_THREAD_COUNT];
+	if(8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
+	else tc=OT_THREAD_COUNT;
+
+	for(i=0;i<tc;++i)
+	{
+		int c = (n-done)/(tc-i); 
+		args[i] = (BitMatMulThread){.dest=aBit,.hashmat=mat,.src=WaBit,
+			.from=done,.to=done+c};
+		if(i==tc-1) bitmatMul_thread_nnob(&args[i]); // no thread if tc==1
+		else pthread_create(&hasht[i],NULL,bitmatMul_thread_nnob,&args[i]);
+		done+=c;
+	}
+	for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
+}
 
 NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, OTExtValidation validation,
 		int destparty)
@@ -408,8 +560,8 @@ NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, OTExtValida
 
 	char mat1[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
 	char mat2[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
-	char* aBitFullMac = malloc(numOTs*A_BIT_PARAMETER_BYTES);
-	char* aBitFullKey = malloc(numOTs*A_BIT_PARAMETER_BYTES);
+	char (*aBitFullMac)[A_BIT_PARAMETER_BYTES] = malloc(numOTs*A_BIT_PARAMETER_BYTES);
+	char (*aBitFullKey)[A_BIT_PARAMETER_BYTES] = malloc(numOTs*A_BIT_PARAMETER_BYTES);
 	if(destparty==1)
 	{
 		npd->error |= WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share, 
@@ -463,156 +615,6 @@ void cleanupNnobProtocol(NnobProtocolDesc* npd)
 	free(npd);
 }
 
-typedef struct TransposeThread {
-	int* rows;
-	char* src;
-	char* dest;
-	int rc;
-	int rowBytes;
-	int from;
-	int to;
-} TransposeThread;
-
-void* transpose_thread(void* args){
-	TransposeThread* a=args;
-	int i,j;
-	char* boxColumn;
-	for(i=a->from;i<a->to;i++) {
-		for(j=0;j<a->rc;j++) {
-			boxColumn=a->src+a->rows[j]*a->rowBytes;
-			setBit(a->dest+i*A_BIT_PARAMETER_BYTES, j, getBit(boxColumn,i));
-		}
-	}
-	return NULL;
-}
-bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
-		char* mat, char* aBitFullMac,
-		int n, OTExtValidation validation, int destparty){
-	assert(n%8==0);
-	int i,j;
-	bool success = true;
-	int k = 8*A_BIT_PARAMETER_BYTES;
-	k*=validation==OTExtValidation_hhash?1:2;
-	int rowBytes = (n+7)/8;
-	int *rows,rc;
-	char *box = malloc(k*rowBytes);
-	char *mask = malloc(rowBytes);
-	BCipherRandomGen* gen = newBCipherRandomGen();
-	RecverExtensionBox* r =recverExtensionBoxNew(pd, destparty, k/8);
-	randomizeBuffer(gen,mask,rowBytes);
-	unpackBytes(b,mask,n);
-	recverExtensionBox(r,box,mask,rowBytes);
-	if(validation==OTExtValidation_hhash)
-	{ 
-		rows = allRows(k);
-		rc=k;
-		if(!recverExtensionBoxValidate_hhash(r, gen, box, rowBytes))
-			success = false;
-	}
-	else
-	{ 
-		rows = malloc(sizeof(int[k/2]));
-		rc=k/2;
-		if(!recverExtensionBoxValidate_byPair(r, gen, rows,
-					box,mask,rowBytes, true))
-			success = false;
-	}
-	if(!success) r->pd->error = OC_ERROR_OT_EXTENSION;
-	success&=ocRandomBytes(pd, gen, mat,8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES, destparty);
-	assert(rc==8*A_BIT_PARAMETER_BYTES);
-	int tc=OT_THREAD_COUNT, done=0;
-	TransposeThread args[OT_THREAD_COUNT];
-	pthread_t transpt[OT_THREAD_COUNT];
-	for(i=0;i<tc;++i)
-	{
-		int c = (n-done)/(tc-i); 
-		args[i] = (TransposeThread){.dest=aBitFullMac,.src=box,
-			.rc=rc,.rows=rows,.rowBytes=rowBytes,.from=done,.to=done+c};
-		if(i==tc-1) transpose_thread(&args[i]); // no thread if tc==1
-		else pthread_create(&transpt[i],NULL,transpose_thread,&args[i]);
-		done+=c;
-	}
-	for(i=0;i<tc-1;++i) pthread_join(transpt[i],NULL);
-
-	free(mask);
-	free(rows);
-	free(box);
-	recverExtensionBoxRelease(r);
-	releaseBCipherRandomGen(gen);
-	return success;
-}
-
-bool WaBitBoxGetKey(ProtocolDesc* pd, nnob_key_t globalDelta,
-		char* mat, char* aBitFullKey,
-		int n, OTExtValidation validation, int destparty){
-	assert(n%8==0);
-	int i,j;
-	bool success = true;
-	int k = 8*A_BIT_PARAMETER_BYTES;
-	k*=validation==OTExtValidation_hhash?1:2;
-	int rowBytes = (n+7)/8;
-	int *rows, rc;
-	char *box = malloc(k*rowBytes);
-	BCipherRandomGen* gen = newBCipherRandomGen();
-	SenderExtensionBox* s = senderExtensionBoxNew(pd, destparty, k/8);
-	senderExtensionBox(s,box,rowBytes);
-	if(validation==OTExtValidation_hhash)
-	{ 
-		rows = allRows(k);
-		rc = k;
-		if(!senderExtensionBoxValidate_hhash(s,gen,box,rowBytes))
-			success = false;
-	} else
-	{ rows = malloc(sizeof(int[k/2]));
-		rc = k/2;
-		if(!senderExtensionBoxValidate_byPair(s,gen,rows,box,rowBytes, true))
-			success = false;
-		for(i=0;i<rc;++i) setBit(s->spack,i,s->S[rows[i]]);
-	}
-	if(!success) s->pd->error = OC_ERROR_OT_EXTENSION;
-	success&=ocRandomBytes(pd, gen, mat,8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES, destparty);
-	bitmatMul(globalDelta, mat, s->spack, 8*NNOB_KEY_BYTES, rc);
-	assert(rc==8*A_BIT_PARAMETER_BYTES);
-	int tc=OT_THREAD_COUNT, done=0;
-	TransposeThread args[OT_THREAD_COUNT];
-	pthread_t transpt[OT_THREAD_COUNT];
-	for(i=0;i<tc;++i)
-	{
-		int c = (n-done)/(tc-i); 
-		args[i] = (TransposeThread){.dest=aBitFullKey,.src=box,
-			.rc=rc,.rows=rows,.rowBytes=rowBytes,.from=done,.to=done+c};
-		if(i==tc-1) transpose_thread(&args[i]); // no thread if tc==1
-		else pthread_create(&transpt[i],NULL,transpose_thread,&args[i]);
-		done+=c;
-	}
-	for(i=0;i<tc-1;++i) pthread_join(transpt[i],NULL);
-
-	free(rows);
-	free(box);
-	senderExtensionBoxRelease(s);
-	releaseBCipherRandomGen(gen);
-	return success;
-}
-
-void WaBitToaBit(char* aBit, char* WaBit, char* mat, int n){
-	int rowBytes = (n+7)/8, i,done=0,tc;
-	BitMatMulThread args[OT_THREAD_COUNT];
-	pthread_t hasht[OT_THREAD_COUNT];
-	if(8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
-	else tc=OT_THREAD_COUNT;
-
-	for(i=0;i<tc;++i)
-	{
-		int c = (n-done)/(tc-i); 
-		args[i] = (BitMatMulThread){.dest=aBit,.hashmat=mat,.src=WaBit,
-			.rowBytes=A_BIT_PARAMETER_BYTES,.from=done,.to=done+c};
-		if(i==tc-1) bitmatMul_thread_nnob(&args[i]); // no thread if tc==1
-		else pthread_create(&hasht[i],NULL,bitmatMul_thread_nnob,&args[i]);
-		done+=c;
-	}
-	for(i=0;i<tc-1;++i) pthread_join(hasht[i],NULL);
-}
-
 void randomOblivAuthentication(NnobProtocolDesc* npd,
 		NnobHalfBit* bit, NnobHalfBitType type)
 {
@@ -623,14 +625,14 @@ void randomOblivAuthentication(NnobProtocolDesc* npd,
 		npd->aBitsShareAndMac.counter+=1;
 		assert(counter<npd->aBitsShareAndMac.n);
 		bit->ShareAndMac.value = npd->aBitsShareAndMac.share[counter];
-		memcpy(bit->ShareAndMac.mac, npd->aBitsShareAndMac.mac+counter*NNOB_KEY_BYTES, NNOB_KEY_BYTES);
+		memcpy(bit->ShareAndMac.mac, npd->aBitsShareAndMac.mac[counter], NNOB_KEY_BYTES);
 	}
 	else
 	{
 		counter = npd->aBitsKey.counter;
 		npd->aBitsKey.counter+=1;
 		assert(counter<npd->aBitsKey.n);
-		memcpy(bit->key, npd->aBitsKey.key+counter*NNOB_KEY_BYTES, NNOB_KEY_BYTES);
+		memcpy(bit->key, npd->aBitsKey.key[counter], NNOB_KEY_BYTES);
 	}
 }
 
