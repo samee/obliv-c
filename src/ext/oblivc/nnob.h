@@ -31,6 +31,40 @@ typedef struct {
 	};
 } NnobHalfBit;
 
+typedef struct AOTShareAndMacOfZ {
+	NnobKey* x0;
+	NnobKey* x1;
+	NnobShareAndMac* c;
+	NnobShareAndMac* z;
+	int counter;
+	int n;
+} AOTShareAndMacOfZ;
+
+typedef struct AOTKeyOfZ {
+	NnobShareAndMac* x0;
+	NnobShareAndMac* x1;
+	NnobKey* c;
+	NnobKey* z;
+	int counter;
+	int n;
+} AOTKeyOfZ;
+
+typedef struct AANDShareAndMac{
+	NnobShareAndMac* x;
+	NnobShareAndMac* y;
+	NnobShareAndMac* z;
+	int counter;
+	int n;
+} AANDShareAndMac;
+
+typedef struct AANDKey{
+	NnobKey* x;
+	NnobKey* y;
+	NnobKey* z;
+	int counter;
+	int n;
+} AANDKey;
+
 typedef struct NnobProtocolDesc
 {
 	bool error;
@@ -49,89 +83,33 @@ typedef struct NnobProtocolDesc
 		int n;
 	} aBitsKey;
 	struct {
-		struct {
-			struct {
-				NnobHalfBit* x0;
-				NnobHalfBit* x1;
-				NnobHalfBit* c;
-				NnobHalfBit* z;
-				int counter;
-				int n;
-			} aOTShareAndMacOfZ;
-			struct {
-				NnobHalfBit* x0;
-				NnobHalfBit* x1;
-				NnobHalfBit* c;
-				NnobHalfBit* z;
-				int counter;
-				int n;
-			} aOTKeyOfZ;
-		} aOTQuadruple;
-		struct {
-			struct {
-				NnobHalfBit* x;
-				NnobHalfBit* y;
-				NnobHalfBit* z;
-				int counter;
-				int n;
-			} aANDShareAndMac;
-			struct {
-				NnobHalfBit* x;
-				NnobHalfBit* y;
-				NnobHalfBit* z;
-				int counter;
-				int n;
-			} aANDKey;
-		} aANDTriple;
+		AOTShareAndMacOfZ aOTShareAndMacOfZ;			
+		AOTKeyOfZ aOTKeyOfZ;
+		AANDShareAndMac aANDShareAndMac;
+		AANDKey aANDKey;
 	} FDeal;
 } NnobProtocolDesc;
+
+NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, 
+		OTExtValidation validation);
+void cleanupNnobProtocol(NnobProtocolDesc* npd);
+void nnobSendOblivInput(ProtocolDesc* pd, bool* input, OblivBit* oblivInput, int numOblivInput);
+void nnobRecvOblivInput(ProtocolDesc* pd, OblivBit* oblivInput, int numOblivInput);
 
 void debugTimer(time_struct* t);
 void debugPrintTime(time_struct* begin, time_struct* end, char* name, int party);
 bool debugMatchingOblivBit(const OblivBit* x, const nnob_key_t globalDeltaToXKey,
 		const OblivBit* y, const nnob_key_t globalDeltaToYKey);
-void nnobGetOblivInput(ProtocolDesc* pd, NnobProtocolDesc* npd, bool* input,
-		OblivBit* x, OblivBit* y, int numOblivInput);
-void nnobGetOblivInputSendShare(ProtocolDesc* pd, NnobProtocolDesc* npd, bool input,
-		OblivBit* myInput);
-void nnobGetOblivInputRecvShare(ProtocolDesc* pd, NnobProtocolDesc* npd, OblivBit* yourInput);
-bool nnobRevealOblivBit(ProtocolDesc* pd, NnobProtocolDesc* npd, bool* output, 
-		OblivBit* input);
 static int* allRows(int n);
-void randomOblivAuthentication(NnobProtocolDesc* pd, NnobHalfBit* bit, NnobHalfBitType type);
-bool nnobSetBitAnd(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit *y);
 void debugPrintOblivBit(const OblivBit* bit);
 
-void cleanupNnobProtocol(NnobProtocolDesc* npd);
-NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, OTExtValidation validation,
-		int destparty);
 
-bool LaOT(ProtocolDesc* pd, NnobProtocolDesc* npd, const NnobHalfBit* x0, const NnobHalfBit* x1, const NnobHalfBit* c,
-		const NnobHalfBit* r, NnobHalfBit* z,  
-		BCipherRandomGen* padder, BCipherRandomGen* gen, int* nonce, int numLaOTs, int destparty);
-
-void LaOTCombine(ProtocolDesc* pd,  
-		NnobHalfBit* x10, const NnobHalfBit* x20, 
-		NnobHalfBit* x11,const NnobHalfBit* x21, 
-		NnobHalfBit* c1, const NnobHalfBit* c2, 
-		NnobHalfBit* z1, const NnobHalfBit* z2, 
-		int destparty);
-bool aOT(ProtocolDesc* pd, NnobProtocolDesc* npd, NnobHalfBitType outputType, int bucketSize, int destparty);
-bool LaAND(ProtocolDesc* pd, NnobProtocolDesc* npd, const NnobHalfBit* x, 
-		const NnobHalfBit* y, const NnobHalfBit* r, NnobHalfBit* z, 
-		BCipherRandomGen* padder, BCipherRandomGen* gen, int* nonce, int numLaANDs, int destparty);
-void LaANDCombine(ProtocolDesc* pd, 
-		NnobHalfBit* x1, const NnobHalfBit* x2, 
-		NnobHalfBit* y1, const NnobHalfBit* y2,
-		NnobHalfBit* z1, const NnobHalfBit* z2,
-		int destparty);
-bool aAND(ProtocolDesc *pd, NnobProtocolDesc* npd, NnobHalfBitType type, int bucketSize, int destparty);
-void getRandomAOTQuadruple(NnobProtocolDesc* npd, 
-		NnobHalfBit* x0, NnobHalfBit* x1, NnobHalfBit* c, NnobHalfBit* z, NnobHalfBitType zType);
-void getRandomAANDTriple(NnobProtocolDesc* npd, 
-		NnobHalfBit* x, NnobHalfBit* y, NnobHalfBit* z, NnobHalfBitType type);
-void debugGetNnobHalfBit(NnobHalfBit* output, bool bit,const nnob_key_t key, 
-		const nnob_key_t globalDelta, NnobHalfBitType type);
+//void getRandomAOTQuadruple(NnobProtocolDesc* npd, 
+		//NnobHalfBit* x0, NnobHalfBit* x1, NnobHalfBit* c, NnobHalfBit* z, NnobHalfBitType zType);
+//void getRandomAANDTriple(NnobProtocolDesc* npd, 
+		//NnobHalfBit* x, NnobHalfBit* y, NnobHalfBit* z, NnobHalfBitType type);
+//void debugGetNnobHalfBit(NnobHalfBit* output, bool bit,const nnob_key_t key, 
+		//const nnob_key_t globalDelta, NnobHalfBitType type);
 bool debugCheckOT(const NnobHalfBit* x0_1, const NnobHalfBit* x1_1,
 		const NnobHalfBit* c_1, const NnobHalfBit* z_1, const nnob_key_t globalDelta_1,
 		const NnobHalfBit* x0_2, const NnobHalfBit* x1_2,
