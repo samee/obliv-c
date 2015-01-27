@@ -9,7 +9,7 @@
 #define NNOB_HASH_ALGO GCRY_CIPHER_AES192
 #define NNOB_HASH_ALGO_KEYBYTES 24
 //#define ALL_OTS (2*(OTS_PER_aOT+OTS_PER_aAND+OTS_FOR_R+OTS_FOR_INPUTS)) // 2* because both sides need 1
-#define A_BIT_PARAMETER_BYTES (A_BIT_MULTIPLIER*NNOB_KEY_BYTES) // NNOB_KEY_BYTES = 2*k
+#define A_BIT_PARAMETER_BYTES (A_BIT_MULTIPLIER*NNOB_KEY_BYTES) 
 #define A_BIT_MULTIPLIER 8 
 
 typedef enum { OTExtValidation_hhash, OTExtValidation_byPair } OTExtValidation;

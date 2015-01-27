@@ -79,7 +79,7 @@ bool debugMatchingOblivBit(const OblivBit* x, const nnob_key_t globalDeltaToXKey
 		memcpy(temp, y->nnob.shareAndMac.mac, NNOB_KEY_BYTES);
 		memxor(temp, globalDeltaToXKey, NNOB_KEY_BYTES);
 		success&=memcmp(temp, x->nnob.key.key, NNOB_KEY_BYTES)==0?true:false;
-		assert(success);
+		//assert(success);
 	}
 	else success&=memcmp(y->nnob.shareAndMac.mac, x->nnob.key.key, NNOB_KEY_BYTES)==0?true:false;
 	return success;
@@ -181,7 +181,7 @@ bcipherCrypt(BCipherRandomGen* gen,const char* key,int klen,int nonce,
 {
   int i;
   char keyx[gen->klen];
-  assert(klen<=gen->klen);
+  //assert(klen<=gen->klen);
   memcpy(keyx,key,klen); memset(keyx+klen,0,gen->klen-klen);
   resetBCipherRandomGen(gen,keyx);
   setctrFromIntBCipherRandomGen(gen,nonce);
@@ -243,7 +243,7 @@ void* transpose_thread(void* args){
 bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
 		char* mat, char (*aBitFullMac)[A_BIT_PARAMETER_BYTES],
 		int n, OTExtValidation validation, int destparty){
-	assert(n%8==0);
+	//assert(n%8==0);
 	int i;
 	bool success = true;
 	int k = 8*A_BIT_PARAMETER_BYTES;
@@ -274,7 +274,7 @@ bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
 	}
 	if(!success) r->pd->error = OC_ERROR_OT_EXTENSION;
 	success&=ocRandomBytes(pd, gen, mat,8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES, destparty);
-	assert(rc==8*A_BIT_PARAMETER_BYTES);
+	//assert(rc==8*A_BIT_PARAMETER_BYTES);
 	int tc=OT_THREAD_COUNT, done=0;
 	TransposeThread args[OT_THREAD_COUNT];
 	pthread_t transpt[OT_THREAD_COUNT];
@@ -300,7 +300,7 @@ bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
 bool WaBitBoxGetKey(ProtocolDesc* pd, nnob_key_t globalDelta,
 		char* mat, char (*aBitFullKey)[A_BIT_PARAMETER_BYTES],
 		int n, OTExtValidation validation, int destparty){
-	assert(n%8==0);
+	//assert(n%8==0);
 	int i;
 	bool success = true;
 	int k = 8*A_BIT_PARAMETER_BYTES;
@@ -327,7 +327,7 @@ bool WaBitBoxGetKey(ProtocolDesc* pd, nnob_key_t globalDelta,
 	if(!success) s->pd->error = OC_ERROR_OT_EXTENSION;
 	success&=ocRandomBytes(pd, gen, mat,8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES, destparty);
 	bitmatMul(globalDelta, mat, s->spack, 8*NNOB_KEY_BYTES, rc);
-	assert(rc==8*A_BIT_PARAMETER_BYTES);
+	//assert(rc==8*A_BIT_PARAMETER_BYTES);
 	int tc=OT_THREAD_COUNT, done=0;
 	TransposeThread args[OT_THREAD_COUNT];
 	pthread_t transpt[OT_THREAD_COUNT];
@@ -372,7 +372,7 @@ void WaBitToaBit(char (*aBit)[NNOB_KEY_BYTES], char (*WaBit)[A_BIT_PARAMETER_BYT
 void randomOblivAuthenticationShareAndMac(NnobProtocolDesc* npd, NnobShareAndMac* sm) {
 	int counter = npd->aBitsShareAndMac.counter;
 	npd->aBitsShareAndMac.counter+=1;
-	assert(counter<npd->aBitsShareAndMac.n);
+	//assert(counter<npd->aBitsShareAndMac.n);
 	sm->share = npd->aBitsShareAndMac.share[counter];
 	memcpy(sm->mac, npd->aBitsShareAndMac.mac[counter], NNOB_KEY_BYTES);
 }
@@ -380,7 +380,7 @@ void randomOblivAuthenticationShareAndMac(NnobProtocolDesc* npd, NnobShareAndMac
 void randomOblivAuthenticationKey(NnobProtocolDesc* npd, NnobKey* k) {
 	int counter = npd->aBitsKey.counter;
 	npd->aBitsKey.counter+=1;
-	assert(counter<npd->aBitsKey.n);
+	//assert(counter<npd->aBitsKey.n);
 	memcpy(k->key, npd->aBitsKey.key[counter], NNOB_KEY_BYTES);
 }
 
@@ -416,7 +416,7 @@ void nnobXOR(OblivBit* z, const OblivBit* x, const OblivBit* y) {
 void nnobSendOblivInput(ProtocolDesc* pd, bool* input, OblivBit* oblivInput, int numOblivInput)
 {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i, destparty = pd->thisParty==1?1:2; 
 	bool* b = malloc(numOblivInput);
 	char const* globalDelta = npd->globalDelta;
@@ -433,7 +433,7 @@ void nnobSendOblivInput(ProtocolDesc* pd, bool* input, OblivBit* oblivInput, int
 void nnobRecvOblivInput(ProtocolDesc* pd, OblivBit* oblivInput, int numOblivInput)
 {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i, destparty = pd->thisParty==1?1:2; 
 	bool* b = malloc(numOblivInput);
 	orecv(pd, destparty, b, numOblivInput);
@@ -472,7 +472,7 @@ bool nnobRevealOblivBit(ProtocolDesc* pd, NnobProtocolDesc* npd, bool* output,
 		osend(pd, 1, &input->nnob.shareAndMac.share, 1);
 	}
 	*output = inputBit^input->nnob.shareAndMac.share;
-	assert(success);
+	//assert(success);
 	return success;
 }
 
@@ -482,7 +482,7 @@ bool LaOTShareAndMacOfZ(ProtocolDesc* pd, const NnobKey* x0,
 		BCipherRandomGen* gen, int* nonce, int numLaOTs) {
 
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i, destparty = pd->thisParty==1?1:2;
 	bool success = true;
 	const int XOTBytes = 1+2*NNOB_KEY_BYTES;
@@ -509,7 +509,7 @@ bool LaOTShareAndMacOfZ(ProtocolDesc* pd, const NnobKey* x0,
 		else memcpy(temp, x0[i].key, NNOB_KEY_BYTES);	
 		if(z[i].share) memxor(temp, globalDelta, NNOB_KEY_BYTES);	
 		success &= memcmp(mc[i]+1, temp, NNOB_KEY_BYTES)==0?true:false;
-		assert(success);
+		//assert(success);
 		d[i] = z[i].share^r[i].share;
 	}
 	osend(pd, destparty, d, numLaOTs);
@@ -545,7 +545,7 @@ bool LaOTKeyOfZ(ProtocolDesc* pd, const NnobShareAndMac* x0,
 		BCipherRandomGen* gen, int* nonce, int numLaOTs) {
 
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i, destparty = pd->thisParty==1?1:2;
 	bool success = true;
 	const int XOTBytes = 1+2*NNOB_KEY_BYTES;
@@ -605,41 +605,52 @@ void LaOTCombineShareAndMacOfZ(ProtocolDesc* pd,
 		NnobKey* x10, const NnobKey* x20, 
 		NnobKey* x11, const NnobKey* x21, 
 		NnobShareAndMac* c1, const NnobShareAndMac* c2, 
-		NnobShareAndMac* z1, const NnobShareAndMac* z2) {
-	int destparty = pd->thisParty==1?1:2;
-	bool d;
-	orecv(pd, destparty, &d, 1);
-	nnobShareAndMacXOR(z1, z2);
-	if(d) nnobShareAndMacXOR(z1, c1); 
-	nnobShareAndMacXOR(c1, c2);
-	*x11=*x10; // may be a problem
-	nnobKeyXOR(x11, x21);
-	nnobKeyXOR(x10, x20);
+		NnobShareAndMac* z1, const NnobShareAndMac* z2, 
+		const unsigned* permutation, int n, int k) {
+	int i,pos, destparty = pd->thisParty==1?1:2;
+	bool* d = malloc(n);
+	orecv(pd, destparty, d, n);
+	for(i=0;i<n;i++) {
+		pos = permutation[i+k*n];	
+		nnobShareAndMacXOR(&z1[i], &z2[pos]);
+		if(d[i]) nnobShareAndMacXOR(&z1[i],&c1[i]); 
+		nnobShareAndMacXOR(&c1[i], &c2[pos]);
+		x11[i]=x10[i]; 
+		nnobKeyXOR(&x11[i], &x21[pos]);
+		nnobKeyXOR(&x10[i], &x20[pos]);
+	}
+	free(d);
 }
 
 void LaOTCombineKeyOfZ(ProtocolDesc* pd,  
 		NnobShareAndMac* x10, const NnobShareAndMac* x20, 
 		NnobShareAndMac* x11, const NnobShareAndMac* x21, 
 		NnobKey* c1, const NnobKey* c2, 
-		NnobKey* z1, const NnobKey* z2) {
-	bool d;
-	int destparty = pd->thisParty==1?1:2;
-	d=x10->share^x11->share^
-		x20->share^x21->share;
-	osend(pd, destparty, &d, 1);
-	
-	nnobKeyXOR(z1, z2);
-	if(d) nnobKeyXOR(z1, c1); 
-	nnobKeyXOR(c1, c2);
-
-	*x11=*x10; // may be a problem
-	nnobShareAndMacXOR(x11, x21);
-	nnobShareAndMacXOR(x10, x20);
+		NnobKey* z1, const NnobKey* z2, 
+		const unsigned* permutation, int n, int k) {
+	bool* d = malloc(n);
+	int i,pos,destparty = pd->thisParty==1?1:2;
+	for(i=0;i<n;i++) {
+		pos = permutation[i+k*n];
+		d[i]=x10[i].share^x11[i].share^
+			x20[pos].share^x21[pos].share;
+	}
+	osend(pd, destparty, d, n);
+	for(i=0;i<n;i++) {
+		pos = permutation[i+k*n];
+		nnobKeyXOR(&z1[i], &z2[pos]);
+		if(d[i]) nnobKeyXOR(&z1[i], &c1[i]); 
+		nnobKeyXOR(&c1[i], &c2[pos]);
+		x11[i]=x10[i];
+		nnobShareAndMacXOR(&x11[i], &x21[pos]);
+		nnobShareAndMacXOR(&x10[i], &x20[pos]);
+	}
+	free(d);
 }
 
 bool aOTShareAndMacOfZ(ProtocolDesc *pd, AOTShareAndMacOfZ* sm) {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i,k, bucketSize = npd->bucketSize, n = sm->n, numLaOTs = sm->n*bucketSize, 
 		destparty = pd->thisParty==1?1:2;
 	bool success = true;
@@ -672,12 +683,11 @@ bool aOTShareAndMacOfZ(ProtocolDesc *pd, AOTShareAndMacOfZ* sm) {
 	}
 
 	for(k=1;k<bucketSize;k++) {
-		for(i=0;i<n;i++) {
-			LaOTCombineShareAndMacOfZ(pd, &sm->x0[i], &LaOTx0[permutation[i+k*n]],
-					&sm->x1[i], &LaOTx1[permutation[i+k*n]],
-					&sm->c[i], &LaOTc[permutation[i+k*n]],
-					&sm->z[i], &LaOTz[permutation[i+k*n]]);
-		}
+		LaOTCombineShareAndMacOfZ(pd, sm->x0, LaOTx0,
+				sm->x1, LaOTx1,
+				sm->c, LaOTc,
+				sm->z, LaOTz,
+				permutation, n, k);
 	}
 	free(permutation);
 	releaseBCipherRandomGen(gen);
@@ -692,7 +702,7 @@ bool aOTShareAndMacOfZ(ProtocolDesc *pd, AOTShareAndMacOfZ* sm) {
 
 bool aOTKeyOfZ(ProtocolDesc *pd, AOTKeyOfZ* key) {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i,k,n = key->n, bucketSize = npd->bucketSize,
 		numLaOTs = key->n*bucketSize, destparty = pd->thisParty==1?1:2;
 	bool success = true;
@@ -723,12 +733,11 @@ bool aOTKeyOfZ(ProtocolDesc *pd, AOTKeyOfZ* key) {
 	}
 
 	for(k=1;k<bucketSize;k++) {
-		for(i=0;i<n;i++) {
-			LaOTCombineKeyOfZ(pd, &key->x0[i], &LaOTx0[permutation[i+k*n]],
-					&key->x1[i], &LaOTx1[permutation[i+k*n]],
-					&key->c[i], &LaOTc[permutation[i+k*n]],
-					&key->z[i], &LaOTz[permutation[i+k*n]]);
-		}
+		LaOTCombineKeyOfZ(pd, key->x0, LaOTx0,
+				key->x1, LaOTx1,
+				key->c, LaOTc,
+				key->z, LaOTz,
+				permutation, n, k);
 	}
 	free(permutation);
 	releaseBCipherRandomGen(gen);
@@ -747,8 +756,6 @@ bool LaANDShareAndMac(ProtocolDesc* pd,
 		BCipherRandomGen* padder, BCipherRandomGen* gen, 
 		int* nonce, int numLaANDs) {
 
-	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
 	int i, destparty = pd->thisParty==1?1:2;
 	bool* d = malloc(numLaANDs);
 	char (*U)[NNOB_KEY_BYTES] = malloc(numLaANDs*NNOB_KEY_BYTES);
@@ -766,7 +773,7 @@ bool LaANDShareAndMac(ProtocolDesc* pd,
 	for(i=0;i<numLaANDs;i++) {
 		z[i]=r[i];
 		nnobShareAndMacXORConst(&z[i], d[i]);
-		/*assert(z[i].ShareAndMac.value == (x[i].ShareAndMac.value && y[i].ShareAndMac.value));*/
+		/*//assert(z[i].ShareAndMac.value == (x[i].ShareAndMac.value && y[i].ShareAndMac.value));*/
 	}
 	orecv(pd, destparty, U, NNOB_KEY_BYTES*numLaANDs);
 	for(i=0;i<numLaANDs;i++) {
@@ -793,7 +800,7 @@ bool LaANDKey(ProtocolDesc* pd,
 		int* nonce, int numLaANDs) {
 
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i, destparty = pd->thisParty==1?1:2;
 	bool* d = malloc(numLaANDs);
 	char (*U)[NNOB_KEY_BYTES] = malloc(numLaANDs*NNOB_KEY_BYTES);
@@ -809,7 +816,7 @@ bool LaANDKey(ProtocolDesc* pd,
 	{
 		z[i]=r[i];
 		nnobKeyXORConst(&z[i], d[i], globalDelta);
-		/*assert(z[i].ShareAndMac.value == (x[i].ShareAndMac.value && y[i].ShareAndMac.value));*/
+		/*//assert(z[i].ShareAndMac.value == (x[i].ShareAndMac.value && y[i].ShareAndMac.value));*/
 		memcpy(temp, x[i].key, NNOB_KEY_BYTES);
 		memcpy(temp+NNOB_KEY_BYTES, z[i].key, NNOB_KEY_BYTES);
 		nnobHash(padder, temp, 2*NNOB_KEY_BYTES, *nonce, temp2, zeroes);
@@ -860,7 +867,7 @@ void LaANDCombineKey(ProtocolDesc* pd,
 
 bool aANDShareAndMac(ProtocolDesc *pd, AANDShareAndMac* sm) {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i,k,n = sm->n,bucketSize = npd->bucketSize, numLaANDs = n*bucketSize,
 		nonce = 0, destparty = pd->thisParty==1?1:2;
 	bool success = true;
@@ -880,7 +887,7 @@ bool aANDShareAndMac(ProtocolDesc *pd, AANDShareAndMac* sm) {
 	}
 	success &= LaANDShareAndMac(pd, LaANDx, LaANDy, LaANDr, LaANDz,
 			padder, gen, &nonce, numLaANDs);	
-	assert(success);
+	//assert(success);
 
 	bcRandomPermutation(gen, permutation, numLaANDs);	
 	osend(pd, destparty, permutation, numLaANDs*sizeof(unsigned));
@@ -907,7 +914,7 @@ bool aANDShareAndMac(ProtocolDesc *pd, AANDShareAndMac* sm) {
 
 bool aANDKey(ProtocolDesc *pd, AANDKey* key) {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int i,k,n = key->n,bucketSize = npd->bucketSize, numLaANDs = n*bucketSize,
 		nonce = 0, destparty = pd->thisParty==1?1:2;
 	bool success = true;
@@ -927,7 +934,7 @@ bool aANDKey(ProtocolDesc *pd, AANDKey* key) {
 	}
 	success &= LaANDKey(pd, LaANDx, LaANDy, LaANDr, LaANDz,
 			padder, gen, &nonce, numLaANDs);	
-	assert(success);
+	//assert(success);
 
 	orecv(pd, destparty, permutation, numLaANDs*sizeof(unsigned));
 
@@ -962,8 +969,8 @@ NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs,
 	npd->bucketSize = bucketSize;
 	int n = ((numOTs+7)/8)*8, aOTs = n/allOTs, aANDs = n/allOTs;
 	int	destparty = pd->thisParty==1?1:2;
-	assert(aOTs!=0);
-	assert(aANDs!=0);
+	//assert(aOTs!=0);
+	//assert(aANDs!=0);
 
 	npd->aBitsShareAndMac.counter = 0;
 	npd->aBitsShareAndMac.n = n;
@@ -1062,7 +1069,7 @@ void cleanupNnobProtocol(NnobProtocolDesc* npd)
 void getRandomAOTQuadrupleShareAndMacOfZ(NnobProtocolDesc* npd, 
 		NnobKey* x0, NnobKey* x1, NnobShareAndMac* c, NnobShareAndMac* z) {
 	int counter = npd->FDeal.aOTShareAndMacOfZ.counter;
-	assert(counter<npd->FDeal.aOTShareAndMacOfZ.n);
+	//assert(counter<npd->FDeal.aOTShareAndMacOfZ.n);
 	npd->FDeal.aOTShareAndMacOfZ.counter++;
 	*x0=npd->FDeal.aOTShareAndMacOfZ.x0[counter];
 	*x1=npd->FDeal.aOTShareAndMacOfZ.x1[counter];
@@ -1073,7 +1080,7 @@ void getRandomAOTQuadrupleShareAndMacOfZ(NnobProtocolDesc* npd,
 void getRandomAOTQuadrupleKeyOfZ(NnobProtocolDesc* npd, 
 		NnobShareAndMac* x0, NnobShareAndMac* x1, NnobKey* c, NnobKey* z) {
 	int counter = npd->FDeal.aOTKeyOfZ.counter;
-	assert(counter<npd->FDeal.aOTKeyOfZ.n);
+	//assert(counter<npd->FDeal.aOTKeyOfZ.n);
 	npd->FDeal.aOTKeyOfZ.counter++;
 	*x0=npd->FDeal.aOTKeyOfZ.x0[counter];
 	*x1=npd->FDeal.aOTKeyOfZ.x1[counter];
@@ -1092,7 +1099,7 @@ void getRandomAOTQuadruple(NnobProtocolDesc* npd,
 void getRandomAANDTripleShareAndMac(NnobProtocolDesc* npd, 
 		NnobShareAndMac* x, NnobShareAndMac* y, NnobShareAndMac* z) {
 	int counter = npd->FDeal.aANDShareAndMac.counter;
-	assert(counter<npd->FDeal.aANDShareAndMac.n);
+	//assert(counter<npd->FDeal.aANDShareAndMac.n);
 	npd->FDeal.aANDShareAndMac.counter++;
 	*x=npd->FDeal.aANDShareAndMac.x[counter];
 	*y=npd->FDeal.aANDShareAndMac.y[counter];
@@ -1102,7 +1109,7 @@ void getRandomAANDTripleShareAndMac(NnobProtocolDesc* npd,
 void getRandomAANDTripleKey(NnobProtocolDesc* npd, 
 		NnobKey* x, NnobKey* y, NnobKey* z) {
 	int counter = npd->FDeal.aANDKey.counter;
-	assert(counter<npd->FDeal.aANDKey.n);
+	//assert(counter<npd->FDeal.aANDKey.n);
 	npd->FDeal.aANDKey.counter++;
 	*x=npd->FDeal.aANDKey.x[counter];
 	*y=npd->FDeal.aANDKey.y[counter];
@@ -1120,7 +1127,7 @@ void getRandomAANDTriple(NnobProtocolDesc* npd,
 void nnobANDGetXYShareAndMac(ProtocolDesc* pd,  
 		NnobShareAndMac* xy, const NnobShareAndMac* x, const NnobShareAndMac* y) {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	int destparty=pd->thisParty==1?1:2;
 	
 	NnobShareAndMac u,v,w,f,g;
@@ -1140,7 +1147,7 @@ void nnobANDGetXYShareAndMac(ProtocolDesc* pd,
 bool nnobANDGetXYKey(ProtocolDesc* pd,  
 		NnobKey* xy, const NnobKey* x, const NnobKey* y) {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	bool success = true;
 	int destparty=pd->thisParty==1?1:2;
 
@@ -1155,10 +1162,10 @@ bool nnobANDGetXYKey(ProtocolDesc* pd,
 	orecv(pd, destparty, &other_g, sizeof(NnobShareAndMac));	
 	nnobKeyXORConst(&f, other_f.share, npd->globalDelta);
 	success&=memcmp(f.key, other_f.mac, NNOB_KEY_BYTES)==0?true:false;
-	assert(success);
+	//assert(success);
 	nnobKeyXORConst(&g, other_g.share, npd->globalDelta);
 	success&=memcmp(g.key, other_g.mac, NNOB_KEY_BYTES)==0?true:false;
-	assert(success);
+	//assert(success);
 	*xy = w;
 	if(other_f.share) nnobKeyXOR(xy, y);
 	if(other_g.share) nnobKeyXOR(xy, x);
@@ -1170,7 +1177,7 @@ bool nnobANDGetSKey(ProtocolDesc* pd,
 		NnobKey* s, NnobShareAndMac* r, const NnobShareAndMac* x, const NnobKey* y)
 {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	NnobShareAndMac u0, u1, f, g, other_d;
 	NnobKey c, w, d;
 	bool success = true;
@@ -1181,7 +1188,7 @@ bool nnobANDGetSKey(ProtocolDesc* pd,
 	orecv(pd, destparty, &other_d, sizeof(NnobShareAndMac));
 	nnobKeyXORConst(&d, other_d.share, npd->globalDelta);
 	success&=memcmp(d.key, other_d.mac, NNOB_KEY_BYTES)==0?true:false;
-	assert(success);
+	//assert(success);
 
 	f=u0;
 	nnobShareAndMacXOR(&f, &u1);
@@ -1202,7 +1209,7 @@ bool nnobANDGetSShareAndMac(ProtocolDesc* pd,
 		NnobShareAndMac* s, NnobKey* r, const NnobKey* x, const NnobShareAndMac* y)
 {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	NnobKey u0, u1, f, g;
 	NnobShareAndMac c, w, d, other_f, other_g;
 	bool success = true;
@@ -1221,10 +1228,10 @@ bool nnobANDGetSShareAndMac(ProtocolDesc* pd,
 	orecv(pd, destparty, &other_g, sizeof(NnobShareAndMac));
 	nnobKeyXORConst(&f, other_f.share, npd->globalDelta);
 	success&=memcmp(f.key, other_f.mac, NNOB_KEY_BYTES)==0?true:false;
-	assert(success);
+	//assert(success);
 	nnobKeyXORConst(&g, other_g.share, npd->globalDelta);
 	success&=memcmp(g.key, other_g.mac, NNOB_KEY_BYTES)==0?true:false;
-	assert(success);
+	//assert(success);
 	*s=w;
 	if(other_f.share) nnobShareAndMacXOR(s, &c);
 	nnobShareAndMacXORConst(s, other_g.share);
@@ -1233,7 +1240,7 @@ bool nnobANDGetSShareAndMac(ProtocolDesc* pd,
 
 bool nnobAND(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit *y) {
 	NnobProtocolDesc* npd = pd->extra;
-	assert(npd!=NULL);
+	//assert(npd!=NULL);
 	bool success=true;
 
 	OblivBit r,xy,s;
