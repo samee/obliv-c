@@ -2,6 +2,9 @@
 #include<obliv.h>
 
 #include"hamming.h"
+#ifndef REMOTEHOST
+#define REMOTEHOST "localhost"
+#endif
 
 
 int main(int argc,char *argv[])
@@ -32,7 +35,7 @@ int main(int argc,char *argv[])
     }
   }
   else
-    if(protocolConnectTcp2P(&pd,"localhost",argv[1])!=0)
+    if(protocolConnectTcp2P(&pd,REMOTEHOST,argv[1])!=0)
     { fprintf(stderr,"TCP connect failed\n");
       return 1;
     }

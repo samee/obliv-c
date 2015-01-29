@@ -4,6 +4,10 @@
 #include<time.h>
 
 #include"editdist.h"
+// TODO put this in a header somewhere
+#ifndef REMOTEHOST
+#define REMOTEHOST "localhost"
+#endif
 
 
 int currentParty;
@@ -50,7 +54,7 @@ int main(int argc,char *argv[])
     }
   }
   else
-    if(protocolConnectTcp2P(&pd,"localhost",argv[1])!=0)
+    if(protocolConnectTcp2P(&pd,REMOTEHOST,argv[1])!=0)
     { fprintf(stderr,"TCP connect failed\n");
       return 1;
     }
