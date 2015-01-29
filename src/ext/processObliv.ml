@@ -374,6 +374,7 @@ class typeCheckVisitor = object(self)
   end
 end
 
+(* I should be disallowing ~obliv(en) inside non-obliv blocks TODO *)
 class controlCheckVisitor = object(self)
   inherit nopCilVisitor
   val breakOk = ref false
@@ -736,13 +737,15 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
     if isOblivBlock b then 
       ChangeDoChildrenPost ( { b with battrs = dropAttribute "obliv" b.battrs }
                            , fun x -> x)
-    else match ripOblivEnVar curFunc b with
-    | Some vi -> 
+    else match isRipObliv curFunc b with
+    | NotRipObliv -> DoChildren
+    | RipOblivWithVar vi ->
         let asg = mkStmt (Instr [Set (var vi,Lval curCond,!currentLoc)]) in
-        let b' = { bstmts = asg :: b.bstmts
-                 ; battrs = dropAttribute "~obliv" b.battrs } in 
+        let b' = dropRipOblivAttr { b with bstmts = asg :: b.bstmts } in
         ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b')
-    | None -> DoChildren
+    | RipOblivNoVar ->
+        let b' = dropRipOblivAttr b in
+        ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b')
   end
   method vfunc = dt#wrapVFunc begin fun f ->
     (* if isOblivFunc f.svar.vtype || hasOblivBlocks f then begin *)

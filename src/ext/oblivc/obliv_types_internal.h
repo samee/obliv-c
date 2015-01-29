@@ -19,6 +19,10 @@ typedef struct OblivBit {
       };
       // npSetBitXor, npFlipBit uses assumes the two bools to be aliased
     } yao;
+	struct {
+		NnobKey key;
+		NnobShareAndMac shareAndMac;
+	} nnob;
   };
 } OblivBit;
 

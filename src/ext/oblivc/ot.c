@@ -392,6 +392,7 @@ void npotRecverRelease(NpotRecver* r)
   gcry_mpi_release(r->scratchx);
   gcry_mpi_release(r->scratchy);
   gcry_mpi_release(r->scratchz);
+  gcry_ctx_release(r->ctx);
   free(r);
 }
 
@@ -671,6 +672,7 @@ senderExtensionBoxRelease (SenderExtensionBox* s)
   for(i=0;i<k;++i) releaseBCipherRandomGen(s->keyblock[i]);
   free(s->keyblock);
   free(s->S);
+  free(s->spack);
   free(s);
 }
 
