@@ -57,9 +57,12 @@ typedef struct AANDKey{
 typedef struct NnobProtocolDesc
 {
 	bool error;
-        int bucketSize;
+	int bucketSize, numANDs;
 	nnob_key_t globalDelta;
-	int numANDs;
+	nnob_key_t cumulativeHashCheckKey;
+	nnob_key_t cumulativeHashCheckMac;
+	BCipherRandomGen* gen;
+	int nonce;
 	struct { // Also used to generate OTs
 		bool* share;
 		char (*mac)[NNOB_KEY_BYTES]; // equivalent to c bits
@@ -79,20 +82,33 @@ typedef struct NnobProtocolDesc
 	} FDeal;
 } NnobProtocolDesc;
 
-NnobProtocolDesc* initNnobProtocolDesc(ProtocolDesc* pd, int numOTs, 
-		OTExtValidation validation);
-void cleanupNnobProtocol(NnobProtocolDesc* npd);
-bool nnobAND(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit *y);
+//void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOTs, bool useAltOTExt);
+void nnobSetBitAnd(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit*y );
+void nnobSetBitXor(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit*y );
+void nnobSetBitNot(ProtocolDesc* pd, OblivBit* z, const OblivBit *x); 
+void nnobFlipBit(ProtocolDesc* pd, OblivBit* x);
+void nnobSetBitOr(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit*y );
+void nnobFeedOblivInputs(ProtocolDesc* pd ,OblivInputs* oi, size_t n, int src);
+bool nnobRevealOblivInputs(ProtocolDesc* pd, widest_t* dest,const OblivBit* o,size_t n,int party);
+void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOTs, bool useAltOTExt);
+
+// debugger
+void nnobAND(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit *y);
 bool nnobRevealOblivBit(ProtocolDesc* pd, NnobProtocolDesc* npd, bool* output, 
 		OblivBit* input);
-void nnobSendOblivInput(ProtocolDesc* pd, bool* input, OblivBit* oblivInput, int numOblivInput);
-void nnobRecvOblivInput(ProtocolDesc* pd, OblivBit* oblivInput, int numOblivInput);
+void setupNnobProtocol(ProtocolDesc* pd);
+void mainNnobProtocol(ProtocolDesc* pd, int numOTs, OTExtValidation validation, protocol_run start, void* arg);
+void cleanupNnobProtocol(ProtocolDesc* pd);
 
+void debugNnobSendOblivInput(ProtocolDesc* pd, bool* input, OblivBit* oblivInput, 
+		int numOblivInput);
+void debugNnobRecvOblivInput(ProtocolDesc* pd, OblivBit* oblivInput, int numOblivInput);
 void debugTimer(time_struct* t);
 void debugPrintTime(time_struct* begin, time_struct* end, char* name, int party);
 bool debugMatchingOblivBit(const OblivBit* x, const nnob_key_t globalDeltaToXKey,
 		const OblivBit* y, const nnob_key_t globalDeltaToYKey);
-bool debugMatchinKeyShareMac(const NnobShareAndMac* sm, const NnobKey* k, const char* globalDelta);
+bool debugMatchinKeyShareMac(const NnobShareAndMac* sm, const NnobKey* k, 
+		const char* globalDelta);
 static int* allRows(int n);
 void debugPrintOblivBit(const OblivBit* bit);
 void nl();
