@@ -243,6 +243,8 @@ static int sockSplit(int sock,bool isClient)
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
 {
   tcp2PTransport* t = CAST(tsrc);
+  fflush(t->sockStream); 
+  // I should really rewrite sockSplit to use FILE* sockStream
   int newsock = sockSplit(t->sock,t->isClient);
   if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
 #ifdef PROFILE_NETWORK

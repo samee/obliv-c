@@ -15,7 +15,7 @@
      feedObliv only works from party 2
      input pairs are never permuted (ie. yaoKeyLsb has no significance)
      outputs to party 0 not sent out, just hashed with outcomR
-   prover sends verifier: output hashes
+   prover sends verifier: output hash commitment
    verifier sends prover: generator keys and OT decoms
    yao(generator = prover)                   // exec protocol_run x 2
      Runs everything with known secrets
