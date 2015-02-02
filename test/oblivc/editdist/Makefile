@@ -1,6 +1,7 @@
+CILPATH=../../../
 CFLAGS=-O3
+a.out: editdist.oc editdist.c ../common/util.c $(CILPATH)/obj/x86_LINUX/libobliv.a
+	$(CILPATH)/bin/oblivcc $(CFLAGS) -I . editdist.oc editdist.c ../common/util.c
 
-a.out: editdist.c editdist.oc editdist.h ../../../obj/x86_LINUX/libobliv.a
-	../../../bin/oblivcc -I . editdist.c editdist.oc $(CFLAGS)
 clean:
-	rm -f editdist.oc.cil.c editdist.oc.cil.i editdist.oc.i a.out
+	rm -f a.out editdist.oc.cil.i editdist.oc.i editdist.oc.cil.c

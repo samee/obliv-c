@@ -3,7 +3,7 @@
 
 #include"editdist.h"
 
-void readString(obliv char* dest, int n, const char* src,int party)
+void readString(obliv unsigned char* dest, int n, const char* src,int party)
 {
   OblivInputs specs[MAXN];
   int i;
@@ -15,11 +15,12 @@ typedef obliv int oint;
 // This is where the obliv keyword is just an overhead that can be left out
 oint omin(obliv int a, obliv int b) obliv
 {
-  obliv int res;
-  obliv if(a<b) res=a; else res=b;  // cannot return directly from obliv-if
+  obliv int res = b;
+  obliv if(a<b) res=a;  // cannot return directly from obliv-if
   return res;
 }
 
+obliv int dp[MAXN+1][MAXN+1];
 
 void editDistance(void* args)
 {
@@ -27,13 +28,13 @@ void editDistance(void* args)
   int n1,n2;
   int i,j;
   double lap2;
-  obliv char s1[MAXN], s2[MAXN];
-  obliv int dp[MAXN+1][MAXN+1];
+  obliv unsigned char s1[MAXN], s2[MAXN];
 
   n1 = ocBroadcastInt(io->n,1);
   n2 = ocBroadcastInt(io->n,2);
   readString(s1,n1,io->s,1);
   readString(s2,n2,io->s,2);
+  
   // These really only work with single threaded protocols
   //   namely, YaoProtocol and DebugProtocol
   lap2 = wallClock();
@@ -43,9 +44,18 @@ void editDistance(void* args)
   for(j=0;j<=n2;++j) dp[0][j]=j;
   for(i=1;i<=n1;++i) for(j=1;j<=n2;++j)
   {
+    /*
     obliv int temp = dp[i-1][j-1] + (s1[i-1]!=s2[j-1]);
     obliv int temp2 = omin (dp[i][j-1], dp[i-1][j]) + 1;
     dp[i][j] = omin(temp,temp2);
+    */
+    obliv int temp = omin (dp[i][j-1], dp[i-1][j]);
+    obliv int d = 1;
+    obliv if (temp>=dp[i-1][j-1])
+    { temp = dp[i-1][j-1];
+      d = (s1[i-1]!=s2[j-1]); // FIXME sign extend to 32 bit on compare
+    }
+    dp[i][j] = temp + d;
   }
   revealOblivInt(&io->res,dp[n1][n2],0);
 }

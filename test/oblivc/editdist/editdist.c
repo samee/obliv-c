@@ -1,13 +1,9 @@
 #include<stdio.h>
 #include<obliv.h>
 #include<memory.h>
-#include<time.h>
 
 #include"editdist.h"
-// TODO put this in a header somewhere
-#ifndef REMOTEHOST
-#define REMOTEHOST "localhost"
-#endif
+#include"../common/util.h"
 
 
 int currentParty;
@@ -15,14 +11,6 @@ const char* mySide()
 {
   if(currentParty==1) return "Generator";
   else return "Evaluator";
-}
-
-
-double wallClock()
-{
-  struct timespec t;
-  clock_gettime(CLOCK_REALTIME,&t);
-  return t.tv_sec+1e-9*t.tv_nsec;
 }
 
 double lap;
@@ -47,17 +35,7 @@ int main(int argc,char *argv[])
   }
 
   //protocolUseStdio(&pd);
-  if(argv[2][0]=='1')
-  { if(protocolAcceptTcp2P(&pd,argv[1])!=0)
-    { fprintf(stderr,"TCP accept failed\n");
-      return 1;
-    }
-  }
-  else
-    if(protocolConnectTcp2P(&pd,REMOTEHOST,argv[1])!=0)
-    { fprintf(stderr,"TCP connect failed\n");
-      return 1;
-    }
+  ocTestUtilTcpOrDie(&pd,argv[2][0]=='1',argv[1]);
 
   currentParty = (argv[2][0]=='1'?1:2);
   setCurrentParty(&pd,currentParty);
