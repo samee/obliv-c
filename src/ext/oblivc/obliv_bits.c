@@ -409,7 +409,7 @@ void yaoKeyDouble(yao_key_t d)
 }
 
 // Remove old SHA routines?
-#define DISABLE_FIXED_KEY
+//#define DISABLE_FIXED_KEY
 #ifdef DISABLE_FIXED_KEY
 // d = H(a,k), used by half gate scheme
 void yaoSetHalfMask(YaoProtocolDesc* ypd,
@@ -449,6 +449,35 @@ void yaoSetHalfMask(YaoProtocolDesc* ypd,
   gcry_cipher_encrypt(ypd->fixedKeyCipher,obuf,sizeof(obuf),buf,sizeof(buf));
   yaoKeyCopy(d,obuf);
   yaoKeyXor(d,buf);
+}
+// Same as yaoSetHalfMask(ypd,d1,a1,k); yaoSetHalfMask(ypd,d2,a2,k)
+// Uses a single call to gcry_cipher_encrypt, which is faster.
+// Eliminate a redundant memcpy if
+//      YAO_KEY_BYTES == FIXED_KEY_BLOCKLEN
+//      and d1==d2+FIXED_KEY_BLOCKLEN
+void yaoSetHalfMask2(YaoProtocolDesc* ypd,
+                     yao_key_t d1, const yao_key_t a1,
+                     yao_key_t d2, const yao_key_t a2, uint64_t k)
+{
+  char buf[2*FIXED_KEY_BLOCKLEN];
+  char *obuf;
+  const int blen=FIXED_KEY_BLOCKLEN;
+  int i,j;
+  assert(YAO_KEY_BYTES<=FIXED_KEY_BLOCKLEN);
+
+  if(YAO_KEY_BYTES==blen && d2==d1+YAO_KEY_BYTES)
+    obuf=d1; // eliminate redundant yaoKeyCopy later
+  else obuf=alloca(2*blen);
+
+  for(j=0;j<2;++j)
+    for(i=YAO_KEY_BYTES;i<FIXED_KEY_BLOCKLEN;++i) buf[i+j*blen]=0;
+  yaoKeyCopy(buf     ,a1); yaoKeyDouble(buf);
+  yaoKeyCopy(buf+blen,a2); yaoKeyDouble(buf+blen);
+  for(i=0;i<sizeof(k);++i) for(j=0;j<2;++j) buf[i+j*blen]^=((k>>8*i)&0xff);
+
+  gcry_cipher_encrypt(ypd->fixedKeyCipher,obuf,2*blen,buf,2*blen);
+  if(obuf!=d1) { yaoKeyCopy(d1,obuf); yaoKeyCopy(d2,obuf+blen); }
+  yaoKeyXor(d1,buf); yaoKeyXor(d2,buf+blen);
 }
 void yaoSetHashMask(YaoProtocolDesc* ypd,
                     yao_key_t d,const yao_key_t a,const yao_key_t b,
@@ -686,8 +715,9 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   yaoKeyCopy(wa1,wa0); yaoKeyXor(wa1,ypd->R);
   yaoKeyCopy(wb1,wb0); yaoKeyXor(wb1,ypd->R);
 
-  yaoSetHalfMask(ypd,row,wa0,ypd->gcount);
-  yaoSetHalfMask(ypd,t  ,wa1,ypd->gcount);
+  //yaoSetHalfMask(ypd,row,wa0,ypd->gcount);
+  //yaoSetHalfMask(ypd,t  ,wa1,ypd->gcount);
+  yaoSetHalfMask2(ypd,row,wa0,t,wa1,ypd->gcount);
   yaoKeyCopy(wg,(pa?t:row));
   yaoKeyXor (row,t);
   yaoKeyCondXor(row,(pb!=bc),row,ypd->R);
@@ -695,8 +725,9 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   yaoKeyCondXor(wg,((pa!=ac)&&(pb!=bc))!=rc,wg,ypd->R);
   ypd->gcount++;
 
-  yaoSetHalfMask(ypd,row,wb0,ypd->gcount);
-  yaoSetHalfMask(ypd,t  ,wb1,ypd->gcount);
+  //yaoSetHalfMask(ypd,row,wb0,ypd->gcount);
+  //yaoSetHalfMask(ypd,t  ,wb1,ypd->gcount);
+  yaoSetHalfMask2(ypd,row,wb0,t,wb1,ypd->gcount);
   yaoKeyCopy(we,(pb?t:row));
   yaoKeyXor (row,t);
   yaoKeyXor (row,(ac?wa1:wa0));
@@ -718,6 +749,7 @@ void yaoGenerateOrPair(ProtocolDesc* pd, OblivBit* r,
                        const OblivBit* a, const OblivBit* b)
   { yaoGenerateHalfGatePair(pd,r,1,1,1,a,b); }
 
+// TODO merge these too? Maybe I paired the wrong way
 void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
     const OblivBit* a, const OblivBit* b)
 {
