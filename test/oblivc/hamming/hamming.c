@@ -2,9 +2,7 @@
 #include<obliv.h>
 
 #include"hamming.h"
-#ifndef REMOTEHOST
-#define REMOTEHOST "localhost"
-#endif
+#include"../common/util.h"
 
 
 int main(int argc,char *argv[])
@@ -28,17 +26,7 @@ int main(int argc,char *argv[])
   }
 
   //protocolUseStdio(&pd);
-  if(argv[3][0]=='1')
-  { if(protocolAcceptTcp2P(&pd,argv[1])!=0)
-    { fprintf(stderr,"TCP accept failed\n");
-      return 1;
-    }
-  }
-  else
-    if(protocolConnectTcp2P(&pd,REMOTEHOST,argv[1])!=0)
-    { fprintf(stderr,"TCP connect failed\n");
-      return 1;
-    }
+  ocTestUtilTcpOrDie(&pd,argv[3][0]=='1',argv[1]);
 
   setCurrentParty(&pd,(argv[3][0]=='1'?1:2));
   if(!strcmp("yao",argv[2])) execYaoProtocol(&pd,hammingDistance,&io);
