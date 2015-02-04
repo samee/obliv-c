@@ -3,6 +3,7 @@ Folders:
   editdist/ - Computes Levenstein distance between strings
   hamming/  - Computes hamming distance between strings
   million/  - Compares two int to see which is greater
+  aes/      - Computes AES of a single block (with key expansion)
   ottest/   - Various microbenchmarks for OT protocols
   psi/      - Private set intersection between sets of random ints
 
