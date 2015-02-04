@@ -752,7 +752,7 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
     randomizeBuffer(r->keyblock1[i],key1,rowBytes);
     memxor(key1,key0,rowBytes);
     memxor(key1,mask,rowBytes);
-    osend(r->pd,r->srcParty,keyxor,rowBytes);
+	osend(r->pd,r->srcParty,keyxor,rowBytes);
   }
   free(keyxor);
 }

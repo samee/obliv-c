@@ -91,6 +91,18 @@ void nnobSetBitOr(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivB
 void nnobFeedOblivInputs(ProtocolDesc* pd ,OblivInputs* oi, size_t n, int src);
 bool nnobRevealOblivInputs(ProtocolDesc* pd, widest_t* dest,const OblivBit* o,size_t n,int party);
 void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOTs, bool useAltOTExt);
+void setupFDeal(NnobProtocolDesc* npd, int numOTs);
+bool WaBitBoxGetBitAndMac(ProtocolDesc* pd, bool* b,
+		char* mat, char (*aBitFullMac)[A_BIT_PARAMETER_BYTES],
+		int n, OTExtValidation validation, int destparty);
+bool WaBitBoxGetKey(ProtocolDesc* pd, nnob_key_t globalDelta,
+		char* mat, char (*aBitFullKey)[A_BIT_PARAMETER_BYTES],
+		int n, OTExtValidation validation, int destparty);
+void WaBitToaBit(char (*aBit)[NNOB_KEY_BYTES], char (*WaBit)[A_BIT_PARAMETER_BYTES], char* mat, int n);
+bool aOTKeyOfZ(ProtocolDesc *pd, AOTKeyOfZ* key);
+bool aANDShareAndMac(ProtocolDesc *pd, AANDShareAndMac* sm);
+bool aANDKey(ProtocolDesc *pd, AANDKey* key);
+bool aOTShareAndMacOfZ(ProtocolDesc *pd, AOTShareAndMacOfZ* sm);
 
 // debugger
 void nnobAND(ProtocolDesc* pd, OblivBit* z, const OblivBit *x, const OblivBit *y);
@@ -109,7 +121,7 @@ bool debugMatchingOblivBit(const OblivBit* x, const nnob_key_t globalDeltaToXKey
 		const OblivBit* y, const nnob_key_t globalDeltaToYKey);
 bool debugMatchinKeyShareMac(const NnobShareAndMac* sm, const NnobKey* k, 
 		const char* globalDelta);
-static int* allRows(int n);
+//static int* allRows(int n);
 void debugPrintOblivBit(const OblivBit* bit);
 void nl();
 void print(const char* a);
