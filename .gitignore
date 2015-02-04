@@ -145,6 +145,11 @@
 /test/__scalar2pointer.txt
 /test/cil.log*
 /test/make.out
+/test/oblivc/*/a.out
+/test/oblivc/*/*.oc.cil.c
+/test/oblivc/*/*.oc.cil.i
+/test/oblivc/*/*.oc.i
+/test/oblivc/**/*.log
 
 # /test/llvm/
 /test/llvm/temp

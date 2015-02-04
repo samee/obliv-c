@@ -1,6 +1,9 @@
 // TODO I need to fix some int sizes
 #include <obliv_common.h>
 #include <obliv_bits.h>
+#include <obliv_yao.h>
+#include <commitReveal.h>
+#include <nnob.h>
 #include <assert.h>
 #include <errno.h>      // libgcrypt needs ENOMEM definition
 #include <inttypes.h>
@@ -43,27 +46,28 @@ static int stdioRecv(ProtocolTransport* pt,int src,void* s,size_t n)
   return fread(s,1,n,stdin); 
 }
 
-static ProtocolTransport* stdioSubtransport(ProtocolTransport* pt,int x) 
-  { return NULL; }
-
 static void stdioCleanup(ProtocolTransport* pt) {}
 
 // Extremely simple, no multiplexing: two parties, one connection
 static struct stdioTransport stdioTransport 
-  = {{2, 1, 0, stdioSubtransport, stdioSend, stdioRecv, stdioCleanup},false};
+  = {{2, NULL, stdioSend, stdioRecv, stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
 
 //#define PROFILE_NETWORK
-// TCP connections for 2-Party protocols. Ignorse src/dest parameters
+// TCP connections for 2-Party protocols. Ignores src/dest parameters
 //   since there is only one remote
 typedef struct tcp2PTransport
 { ProtocolTransport cb;
-  int* socks; // size = cb.maxChannels
-  int cursock;
+  int sock;
+  bool isClient;
+  FILE* sockStream;
+  bool needFlush;
+  int sinceFlush;
 #ifdef PROFILE_NETWORK
   size_t bytes;
+  struct tcp2PTransport* parent;
 #endif
 } tcp2PTransport;
 
@@ -76,71 +80,90 @@ size_t tcp2PBytesSent(ProtocolDesc* pd)
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { struct tcp2PTransport* tcpt = CAST(pt);
-  int res = write(tcpt->cursock,s,n); 
-  if(res<0) perror("TCP write error: ");
-  if(res!=n) fprintf(stderr,"TCP write error: only %d bytes of %zd written\n",
-                            res,n);
+  size_t n2=0;
+  tcpt->needFlush=true;
+  /*while(n>n2) {*/
+	/*int res = write(tcpt->sock,n2+(char*)s,n-n2);*/
+	/*if(res<=0) { perror("TCP write error: "); return res; }*/
+	/*n2+=res;*/
+/*#ifdef PROFILE_NETWORK*/
+	/*tcpt->bytes += res;*/
+/*#endif*/
+  /*}*/
+  while(n>n2) {
+	int res = fwrite(n2+(char*)s,1,n-n2,tcpt->sockStream);
+	if(res<0) { perror("TCP write error: "); return res; }
+	n2+=res;
 #ifdef PROFILE_NETWORK
-  tcpt->bytes += n;
+	tcpt->bytes += res;
 #endif
-  return res;
+  }
+  return n2;
 }
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
-{ int res,n2=0;
-  do
-  { res = read(((tcp2PTransport*)pt)->cursock,n2+(char*)s,n-n2); 
-    if(res<0) { perror("TCP read error: "); return res; }
-    n2+=res;
-  } while(n>n2);
+{ int res=0,n2=0;
+	struct tcp2PTransport* tcpt = CAST(pt);
+	if(tcpt->needFlush)
+	{
+		fflush(tcpt->sockStream);	
+		tcpt->needFlush=false;
+	}
+  /*while(n>n2)*/
+  /*{ res = read(((tcp2PTransport*)pt)->sock,n2+(char*)s,n-n2);*/
+	/*if(res<=0) { perror("TCP read error: "); return res; }*/
+	/*n2+=res;*/
+  /*}*/
+  while(n>n2)
+  { res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
+	if(res<0 || feof(tcpt->sockStream)) { perror("TCP read error: "); return res; }
+	n2+=res;
+  }
   return res;
 }
 
 static void tcp2PCleanup(ProtocolTransport* pt)
-{ struct tcp2PTransport* t = CAST(pt);
-  int i;
-  for(i=0;i<t->cb.maxChannels;++i) close(t->socks[i]);
-  free(t->socks);
-  free(t);
+{ 
+	fflush(((tcp2PTransport*)pt)->sockStream);
+	fclose(((tcp2PTransport*)pt)->sockStream);
+	close(((tcp2PTransport*)pt)->sock);
+#ifdef PROFILE_NETWORK
+  tcp2PTransport* t = CAST(pt);
+  if(t->parent==NULL) fprintf(stderr,"Total bytes sent: %zd\n",t->bytes);
+  else t->parent->bytes+=t->bytes;
+#endif
+  free(pt);
 }
-
-static void tcp2PSubCleanup(ProtocolTransport* pt) { free(pt); }
-
-static ProtocolTransport* tcp2PSubtransport(ProtocolTransport* pt,int c)
-{
-  struct tcp2PTransport *t = CAST(pt), *tres;
-  tres = malloc(sizeof(*tres));
-  *tres = *t;
-  tres->socks = t->socks+c;
-  tres->cursock = t->socks[c];
-  tres->cb.maxChannels = 1;
-  tres->cb.curChannel = 0;
-  tres->cb.cleanup = tcp2PSubCleanup;
-  return &tres->cb;
-}
+static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 
 #ifdef PROFILE_NETWORK
 static const tcp2PTransport tcp2PTransportTemplate
-  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, 
-     NULL, 0, 0};
+  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
+      .cleanup = tcp2PCleanup},
+     .sock=0, .isClient=0, .needFlush=false, .bytes=0, .parent=NULL};
 #else
 static const tcp2PTransport tcp2PTransportTemplate
-  = {{2, 0, 0, tcp2PSubtransport, tcp2PSend, tcp2PRecv, tcp2PCleanup}, 
-     NULL, 0};
+  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
+      .cleanup = tcp2PCleanup},
+    .sock=0, .isClient=0, .needFlush=false};
 #endif
 
-void protocolUseTcp2P(ProtocolDesc* pd,int* socks,int sockCount)
-{
-  struct tcp2PTransport* trans;
-  trans = malloc(sizeof(*trans));
+// isClient value will only be used for the split() method, otherwise
+// its value doesn't matter. In that case, it indicates which party should be
+// the server vs. client for the new connections (which is usually the same as
+// the old roles).
+static tcp2PTransport* tcp2PNew(int sock,bool isClient)
+{ tcp2PTransport* trans = malloc(sizeof(*trans));
   *trans = tcp2PTransportTemplate;
-  trans->socks = malloc(sizeof(int)*sockCount);
-  memcpy(trans->socks,socks,sizeof(int)*sockCount);
-  trans->cb.maxChannels = sockCount;
-  trans->cursock = socks[0];
-  trans->cb.curChannel = 0;
-  pd->trans = (ProtocolTransport*)trans;
+  trans->sock = sock;
+  trans->isClient=isClient;
+  trans->sockStream=fdopen(sock, "rb+");
+  trans->sinceFlush = 0;
+  /*setvbuf(trans->sockStream, trans->buffer, _IOFBF, BUFFER_SIZE);*/
+  return trans;
 }
+void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient)
+  { pd->trans = &tcp2PNew(sock,isClient)->cb; }
 
 static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
 {
@@ -151,24 +174,20 @@ static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
   return 0;
 }
 // used as sock=tcpConnect(...); ...; close(sock);
-static int tcpConnect(const char* name, const char* port)
+static int tcpConnect(struct sockaddr_in* sa)
 {
   int outsock;
-  struct sockaddr_in sa;
-
   if((outsock=socket(AF_INET,SOCK_STREAM,0))<0) return -1;
-  getsockaddr(name,port,(struct sockaddr*)&sa);
-  if(connect(outsock,(struct sockaddr*)&sa,sizeof(sa))<0) return -1;
+  if(connect(outsock,(struct sockaddr*)sa,sizeof(*sa))<0) return -1;
   return outsock;
 }
 
-int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port,
-                          int sockCount)
+int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port)
 {
-  int i, *socks = malloc(sizeof(int)*sockCount);
-  for(i=0;i<sockCount;++i) if((socks[i]=tcpConnect(server,port))<0) return -1;
-  protocolUseTcp2P(pd,socks,sockCount);
-  free(socks);
+  struct sockaddr_in sa;
+  if(getsockaddr(server,port,(struct sockaddr*)&sa)<0) return -1; // dns error
+  int sock=tcpConnect(&sa); if(sock<0) return -1;
+  protocolUseTcp2P(pd,sock,true);
   return 0;
 }
 
@@ -185,15 +204,62 @@ static int tcpListenAny(const char* portn)
   if(listen(outsock,SOMAXCONN)<0) return -1;
   return outsock;
 }
-int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port,int sockCount)
+int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port)
 {
-  int i, listenSock, *socks = malloc(sizeof(int)*sockCount);
+  int listenSock, sock;
   listenSock = tcpListenAny(port);
-  for(i=0;i<sockCount;++i) if((socks[i]=accept(listenSock,0,0))<0) return -1;
-  protocolUseTcp2P(pd,socks,sockCount);
+  if((sock=accept(listenSock,0,0))<0) return -1;
+  protocolUseTcp2P(pd,sock,false);
   close(listenSock);
-  free(socks);
   return 0;
+}
+
+/*
+   If two parties connected over a given socket execute this function
+   (one with isClient true and the other with false), they both end up with
+   a new socket that they can use in parallel with the old one. This is useful
+   just before two parties are planning to spawn a new thread each, such that
+   the two threads can have an independent channel with the corresponding thread
+   on the remote side. Meant to work on TCP sockets only.
+   */
+static int sockSplit(int sock,bool isClient)
+{
+  struct sockaddr_in sa; socklen_t sz=sizeof(sa);
+  if(isClient)
+  {
+    if(getpeername(sock,(struct sockaddr*)&sa,&sz)<0) return -1;
+    int rres=read(sock,&sa.sin_port,sizeof(sa.sin_port));
+    if(rres<0) { fprintf(stderr,"Socket read error\n"); return -1; }
+    if(rres<sizeof(sa.sin_port))
+      { fprintf(stderr,"BUG: fix with repeated reads\n"); return -1; }
+    return tcpConnect(&sa);
+  }
+  else
+  { // any change here should also change PROFILE_NETWORK in tcp2PSplit()
+    int listenSock=tcpListenAny("0");
+    if(getsockname(listenSock,(struct sockaddr*)&sa,&sz)<0) return -1;
+    if(write(sock,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
+    int newsock = accept(listenSock,0,0);
+    close(listenSock);
+    return newsock;
+  }
+}
+
+static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
+{
+  tcp2PTransport* t = CAST(tsrc);
+  fflush(t->sockStream); 
+  // I should really rewrite sockSplit to use FILE* sockStream
+  int newsock = sockSplit(t->sock,t->isClient);
+  if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
+#ifdef PROFILE_NETWORK
+  if(!t->isClient) t->bytes+=sizeof(in_port_t);
+#endif
+  tcp2PTransport* tnew = tcp2PNew(newsock,t->isClient);
+#ifdef PROFILE_NETWORK
+  tnew->parent=t;
+#endif
+  return CAST(tnew);
 }
 
 typedef struct 
@@ -228,9 +294,6 @@ static void sizeCheckCleanup(ProtocolTransport* pt)
   free(pt);
 }
 
-static ProtocolTransport* sizeCheckSubtransport(ProtocolTransport* pt,int ch)
-  { return NULL; }
-
 void protocolAddSizeCheck(ProtocolDesc* pd)
 {
   SizeCheckTransportAdapter* t = malloc(sizeof(SizeCheckTransportAdapter));
@@ -239,7 +302,6 @@ void protocolAddSizeCheck(ProtocolDesc* pd)
   t->cb.send=sizeCheckSend;
   t->cb.recv=sizeCheckRecv;
   t->cb.cleanup=sizeCheckCleanup;
-  t->cb.subtransport=sizeCheckSubtransport;
 }
 // ---------------------------------------------------------------------------
 
@@ -333,14 +395,6 @@ static void debugOblivBit(const OblivBit* o)
 }
 */
 
-void yaoKeyCopy(yao_key_t d, const yao_key_t s) { memcpy(d,s,YAO_KEY_BYTES); }
-void yaoKeyZero(yao_key_t d) { memset(d,0,YAO_KEY_BYTES); }
-bool yaoKeyLsb(const yao_key_t k) { return k[0]&1; }
-void yaoKeyXor(yao_key_t d, const yao_key_t s)
-{ int i;
-  for(i=0;i<YAO_KEY_BYTES;++i) d[i]^=s[i];
-}
-
 const char yaoFixedKey[] = "\x61\x7e\x8d\xa2\xa0\x51\x1e\x96"
                            "\x5e\x41\xc2\x9b\x15\x3f\xc7\x7a";
 const int yaoFixedKeyAlgo = GCRY_CIPHER_AES128;
@@ -360,7 +414,7 @@ void yaoKeyDouble(yao_key_t d)
 }
 
 // Remove old SHA routines?
-#define DISABLE_FIXED_KEY
+//#define DISABLE_FIXED_KEY
 #ifdef DISABLE_FIXED_KEY
 // d = H(a,k), used by half gate scheme
 void yaoSetHalfMask(YaoProtocolDesc* ypd,
@@ -401,6 +455,35 @@ void yaoSetHalfMask(YaoProtocolDesc* ypd,
   yaoKeyCopy(d,obuf);
   yaoKeyXor(d,buf);
 }
+// Same as yaoSetHalfMask(ypd,d1,a1,k); yaoSetHalfMask(ypd,d2,a2,k)
+// Uses a single call to gcry_cipher_encrypt, which is faster.
+// Eliminate a redundant memcpy if
+//      YAO_KEY_BYTES == FIXED_KEY_BLOCKLEN
+//      and d1==d2+FIXED_KEY_BLOCKLEN
+void yaoSetHalfMask2(YaoProtocolDesc* ypd,
+                     yao_key_t d1, const yao_key_t a1,
+                     yao_key_t d2, const yao_key_t a2, uint64_t k)
+{
+  char buf[2*FIXED_KEY_BLOCKLEN];
+  char *obuf;
+  const int blen=FIXED_KEY_BLOCKLEN;
+  int i,j;
+  assert(YAO_KEY_BYTES<=FIXED_KEY_BLOCKLEN);
+
+  if(YAO_KEY_BYTES==blen && d2==d1+YAO_KEY_BYTES)
+    obuf=d1; // eliminate redundant yaoKeyCopy later
+  else obuf=alloca(2*blen);
+
+  for(j=0;j<2;++j)
+    for(i=YAO_KEY_BYTES;i<FIXED_KEY_BLOCKLEN;++i) buf[i+j*blen]=0;
+  yaoKeyCopy(buf     ,a1); yaoKeyDouble(buf);
+  yaoKeyCopy(buf+blen,a2); yaoKeyDouble(buf+blen);
+  for(i=0;i<sizeof(k);++i) for(j=0;j<2;++j) buf[i+j*blen]^=((k>>8*i)&0xff);
+
+  gcry_cipher_encrypt(ypd->fixedKeyCipher,obuf,2*blen,buf,2*blen);
+  if(obuf!=d1) { yaoKeyCopy(d1,obuf); yaoKeyCopy(d2,obuf+blen); }
+  yaoKeyXor(d1,buf); yaoKeyXor(d2,buf+blen);
+}
 void yaoSetHashMask(YaoProtocolDesc* ypd,
                     yao_key_t d,const yao_key_t a,const yao_key_t b,
                     uint64_t k,int ii)
@@ -420,6 +503,7 @@ void yaoSetHashMask(YaoProtocolDesc* ypd,
 }
 #endif
 
+// Why am I using SHA1 as a PRG? Not necessarily safe. TODO change to AES
 void yaoKeyNewPair(YaoProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
 {
   unsigned* ic = &pd->icount;
@@ -454,25 +538,12 @@ void yaoFlipBit(ProtocolDesc* pd,OblivBit* r)
 void yaoSetBitNot(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
   { *r = *a; yaoFlipBit(pd,r); }
 
-// Java-style iterator over bits in OblivInput array, assumes all sizes > 0
-typedef struct { int i,j; OblivInputs* oi; size_t n; } OIBitSrc;
-static bool hasBit (OIBitSrc* s) { return s->i<s->n; }
-static bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1<<s->j); }
-static OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
-static void nextBit(OIBitSrc* s) 
-  { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
-static int bitCount(OIBitSrc* s) 
-{ int res=0,i;
-  for(i=0;i<s->n;++i) res+=s->oi[i].size;
-  return res;
-}
-
 void yaoGenrFeedOblivInputs(ProtocolDesc* pd
                            ,OblivInputs* oi,size_t n,int src)
 { 
   YaoProtocolDesc* ypd = pd->extra;
   yao_key_t w0,w1;
-  OIBitSrc it = {0,0,oi,n};
+  OIBitSrc it = oiBitSrc(oi,n);
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
     yaoKeyNewPair(ypd,w0,w1);
@@ -502,7 +573,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
 }
 void yaoEvalFeedOblivInputs(ProtocolDesc* pd
                            ,OblivInputs* oi,size_t n,int src)
-{ OIBitSrc it = {0,0,oi,n};
+{ OIBitSrc it = oiBitSrc(oi,n);
   YaoProtocolDesc* ypd = pd->extra;
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
@@ -514,13 +585,10 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
     char *buf = malloc(bc*YAO_KEY_BYTES), **dest = malloc(bc*sizeof(char*));
     bool* sel = malloc(bc*sizeof(bool));
     int bp=0,i;
-    // XXX we are currently using NPOT, so it can be used with any protocol
-    //   later on if we change it (to use e.g. passive-secure OT-extension)
-    //   we might have to use different functions for each protocol
     for(;hasBit(&it);nextBit(&it))
     { OblivBit* o = curDestBit(&it);
       dest[bp]=o->yao.w;
-      sel[bp]=curBit(&it);
+      sel[bp]=o->yao.value=curBit(&it);
       o->unknown = true; // Known to me, but not to both parties
       ypd->icount++;
       ++bp;
@@ -652,8 +720,9 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   yaoKeyCopy(wa1,wa0); yaoKeyXor(wa1,ypd->R);
   yaoKeyCopy(wb1,wb0); yaoKeyXor(wb1,ypd->R);
 
-  yaoSetHalfMask(ypd,row,wa0,ypd->gcount);
-  yaoSetHalfMask(ypd,t  ,wa1,ypd->gcount);
+  //yaoSetHalfMask(ypd,row,wa0,ypd->gcount);
+  //yaoSetHalfMask(ypd,t  ,wa1,ypd->gcount);
+  yaoSetHalfMask2(ypd,row,wa0,t,wa1,ypd->gcount);
   yaoKeyCopy(wg,(pa?t:row));
   yaoKeyXor (row,t);
   yaoKeyCondXor(row,(pb!=bc),row,ypd->R);
@@ -661,8 +730,9 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   yaoKeyCondXor(wg,((pa!=ac)&&(pb!=bc))!=rc,wg,ypd->R);
   ypd->gcount++;
 
-  yaoSetHalfMask(ypd,row,wb0,ypd->gcount);
-  yaoSetHalfMask(ypd,t  ,wb1,ypd->gcount);
+  //yaoSetHalfMask(ypd,row,wb0,ypd->gcount);
+  //yaoSetHalfMask(ypd,t  ,wb1,ypd->gcount);
+  yaoSetHalfMask2(ypd,row,wb0,t,wb1,ypd->gcount);
   yaoKeyCopy(we,(pb?t:row));
   yaoKeyXor (row,t);
   yaoKeyXor (row,(ac?wa1:wa0));
@@ -684,6 +754,7 @@ void yaoGenerateOrPair(ProtocolDesc* pd, OblivBit* r,
                        const OblivBit* a, const OblivBit* b)
   { yaoGenerateHalfGatePair(pd,r,1,1,1,a,b); }
 
+// TODO merge these too? Maybe I paired the wrong way
 void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
     const OblivBit* a, const OblivBit* b)
 {
@@ -706,9 +777,29 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   r->unknown = true;
 }
 
-unsigned yaoGateCount() // returns half-gate count for half-gate scheme
-  { return ((YaoProtocolDesc*)currentProto->extra)->gcount; }
+unsigned yaoGateCount()
+{ int rv = ((YaoProtocolDesc*)currentProto->extra)->gcount;
+  if(currentProto->setBitAnd==yaoGenerateAndPair
+      || currentProto->setBitAnd==yaoEvaluateHalfGatePair) // halfgate
+    return rv/2;
+  else return rv;
+}
 
+// FIXME don't like this convention: OT should have used transport
+// objects directly, instead of being wrapped in ProtocolDesc
+void yaoUseNpot(ProtocolDesc* pd,int me)
+{ YaoProtocolDesc* ypd = pd->extra;
+  if(me==1) ypd->sender =
+    npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,pd,2));
+  else ypd->recver =
+    npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,pd,1));
+}
+// Used with yaoUseNpot
+void yaoReleaseOt(ProtocolDesc* pd,int me)
+{ YaoProtocolDesc* ypd = pd->extra;
+  if(me==1) otSenderRelease(&ypd->sender);
+  else otRecverRelease(&ypd->recver);
+}
 /* execYaoProtocol is divided into 2 parts which are reused by other
    protocols such as DualEx */
 void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
@@ -716,6 +807,9 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   YaoProtocolDesc* ypd = malloc(sizeof(YaoProtocolDesc));
   int me = pd->thisParty;
   pd->extra = ypd;
+  pd->error = 0;
+  ypd->protoType = OC_PD_TYPE_YAO;
+  ypd->extra = NULL;
   pd->partyCount = 2;
   pd->currentParty = ocCurrentPartyDefault;
   pd->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
@@ -739,33 +833,39 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   gcry_cipher_open(&ypd->fixedKeyCipher,yaoFixedKeyAlgo,GCRY_CIPHER_MODE_ECB,0);
   gcry_cipher_setkey(ypd->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
 }
-void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+
+// point_and_permute should always be true.
+// It is false only in the NP protocol, where evaluator knows everything
+void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
+                     protocol_run start, void* arg)
 {
   YaoProtocolDesc* ypd = pd->extra;
   int me = pd->thisParty;
-  int tailind,tailpos;
+  bool ownOT=false;
   ypd->gcount = ypd->icount = ypd->ocount = 0;
   if(me==1)
   {
     gcry_randomize(ypd->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
     gcry_randomize(ypd->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
-    ypd->R[0] |= 1;   // flipper bit
+    if(point_and_permute) ypd->R[0] |= 1;   // flipper bit
 
-    tailind=YAO_KEY_BYTES-1;
-    tailpos=8-(8*YAO_KEY_BYTES-YAO_KEY_BITS);
-    ypd->R[tailind] &= (1<<tailpos)-1;
-    ypd->I[tailind] &= (1<<tailpos)-1;
     if(ypd->sender.sender==NULL)
+    { ownOT=true;
       ypd->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
+    }
   }else 
     if(ypd->recver.recver==NULL)
+    { ownOT=true;
       ypd->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,1));
+    }
 
   currentProto = pd;
   start(arg);
 
-  if(me==1) ypd->sender.release(ypd->sender.sender);
-  else ypd->recver.release(ypd->recver.recver);
+  if(ownOT)
+  { if(me==1) otSenderRelease(&ypd->sender);
+    else otRecverRelease(&ypd->recver);
+  }
 }
 
 void cleanupYaoProtocol(ProtocolDesc* pd)
@@ -778,15 +878,151 @@ void cleanupYaoProtocol(ProtocolDesc* pd)
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   setupYaoProtocol(pd,true);
-  mainYaoProtocol(pd,start,arg);
+  mainYaoProtocol(pd,true,start,arg);
   cleanupYaoProtocol(pd);
 }
 
 void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   setupYaoProtocol(pd,false);
-  mainYaoProtocol(pd,start,arg);
+  mainYaoProtocol(pd,true,start,arg);
   free(pd->extra);
+}
+
+/*void nnobAndGatesCount(ProtocolDesc* pd, protocol_run start, void* arg)*/
+/*{*/
+  /*pd->currentParty = ocCurrentPartyDefault;*/
+  /*pd->error = 0;*/
+  /*pd->feedOblivInputs = dbgProtoFeedOblivInputs;*/
+  /*pd->revealOblivBits = dbgProtoRevealOblivBits;*/
+  /*pd->setBitAnd = dbgProtoSetBitAnd;*/
+  /*pd->setBitOr  = dbgProtoSetBitOr;*/
+  /*pd->setBitXor = dbgProtoSetBitXor;*/
+  /*pd->setBitNot = dbgProtoSetBitNot;*/
+  /*pd->flipBit   = dbgProtoFlipBit;*/
+  /*pd->partyCount= 2;*/
+  /*pd->extra = NULL;*/
+  /*currentProto = pd;*/
+  /*currentProto->debug.mulCount = currentProto->debug.xorCount = 0;*/
+  /*start(arg);*/
+/*}*/
+
+void setupNnobProtocol(ProtocolDesc* pd) {
+	NnobProtocolDesc* npd = malloc(sizeof(NnobProtocolDesc));
+	pd->extra=npd;
+	pd->error = 0;
+	pd->partyCount = 2;
+	pd->currentParty = ocCurrentPartyDefault;
+	pd->feedOblivInputs = nnobFeedOblivInputs; 
+	pd->revealOblivBits = nnobRevealOblivInputs; 
+	pd->setBitAnd = nnobSetBitAnd;
+	pd->setBitOr  = nnobSetBitOr; 
+	pd->setBitXor = nnobSetBitXor;
+	pd->setBitNot = nnobSetBitNot;
+	pd->flipBit   = nnobFlipBit;
+}
+
+
+void mainNnobProtocol(ProtocolDesc* pd, int numOTs, OTExtValidation validation, protocol_run start, void* arg) {
+	/*int denom = logfloor(numOTs, 2)+1;*/
+	/*int bucketSize = (int)(1 + (NNOB_KEY_BYTES*8)/denom);*/
+	int bucketSize = BUCKET_SIZE;
+	NnobProtocolDesc* npd = pd->extra; 
+	npd->bucketSize = bucketSize;
+	int n = ((numOTs+7)/8)*8;
+	int	destparty = pd->thisParty==1?1:2;
+	memset(npd->cumulativeHashCheckKey, 0, NNOB_KEY_BYTES);
+	memset(npd->cumulativeHashCheckMac, 0, NNOB_KEY_BYTES);
+	char dummy[NNOB_HASH_ALGO_KEYBYTES];
+	dhRandomInit();
+	npd->gen= newBCipherRandomGenByAlgoKey(NNOB_HASH_ALGO, dummy);
+	npd->nonce = 0;
+
+	npd->aBitsShareAndMac.counter = 0;
+	npd->aBitsShareAndMac.n = n;
+	npd->aBitsShareAndMac.share = malloc(n*NNOB_KEY_BYTES);
+	npd->aBitsShareAndMac.mac = malloc(n*NNOB_KEY_BYTES);
+
+	npd->aBitsKey.key = malloc(n*NNOB_KEY_BYTES);
+	npd->aBitsKey.counter = 0;
+	npd->aBitsKey.n = n;
+
+	setupFDeal(npd, numOTs);
+
+	npd->error = false;
+
+	char mat1[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
+	char mat2[8*A_BIT_PARAMETER_BYTES*NNOB_KEY_BYTES];
+	char (*aBitFullMac)[A_BIT_PARAMETER_BYTES] = malloc(numOTs*A_BIT_PARAMETER_BYTES);
+	char (*aBitFullKey)[A_BIT_PARAMETER_BYTES] = malloc(numOTs*A_BIT_PARAMETER_BYTES);
+	if(destparty==1)
+	{
+		npd->error |= !WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share, 
+				mat1, aBitFullMac, numOTs, validation, destparty);
+		npd->error |= !WaBitBoxGetKey(pd, npd->globalDelta, 
+				mat2, aBitFullKey, numOTs, validation, destparty);
+		WaBitToaBit(npd->aBitsShareAndMac.mac, aBitFullMac, mat1, numOTs);
+		WaBitToaBit(npd->aBitsKey.key, aBitFullKey, mat2, numOTs);
+		npd->error |= !aOTKeyOfZ(pd, &npd->FDeal.aOTKeyOfZ);
+		npd->error |= !aOTShareAndMacOfZ(pd, &npd->FDeal.aOTShareAndMacOfZ);
+		npd->error |= !aANDShareAndMac(pd, &npd->FDeal.aANDShareAndMac);
+		npd->error |= !aANDKey(pd, &npd->FDeal.aANDKey);
+	}
+	else
+	{
+		npd->error |= !WaBitBoxGetKey(pd, npd->globalDelta, 
+				mat1, aBitFullKey, numOTs, validation, destparty);
+		npd->error |= !WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share, 
+				mat2, aBitFullMac, numOTs, validation, destparty);
+		WaBitToaBit(npd->aBitsShareAndMac.mac, aBitFullMac, mat2, numOTs);
+		WaBitToaBit(npd->aBitsKey.key, aBitFullKey, mat1, numOTs);
+		npd->error |= !aOTShareAndMacOfZ(pd, &npd->FDeal.aOTShareAndMacOfZ);
+		npd->error |= !aOTKeyOfZ(pd, &npd->FDeal.aOTKeyOfZ);
+		npd->error |= !aANDKey(pd, &npd->FDeal.aANDKey);
+		npd->error |= !aANDShareAndMac(pd, &npd->FDeal.aANDShareAndMac);
+	}
+	free(aBitFullKey);
+	free(aBitFullMac);
+	currentProto = pd;
+	start(arg);
+}
+
+void cleanupNnobProtocol(ProtocolDesc* pd)
+{
+	NnobProtocolDesc* npd = pd->extra;
+	releaseBCipherRandomGen(npd->gen);
+	free(npd->aBitsShareAndMac.share);
+	free(npd->aBitsShareAndMac.mac); 
+	free(npd->aBitsKey.key); 
+	free(npd->FDeal.aOTShareAndMacOfZ.x0); 
+	free(npd->FDeal.aOTShareAndMacOfZ.x1); 
+	free(npd->FDeal.aOTShareAndMacOfZ.c); 
+	free(npd->FDeal.aOTShareAndMacOfZ.z); 
+	free(npd->FDeal.aOTKeyOfZ.x0);
+	free(npd->FDeal.aOTKeyOfZ.x1);
+	free(npd->FDeal.aOTKeyOfZ.c);
+	free(npd->FDeal.aOTKeyOfZ.z);
+	free(npd->FDeal.aANDShareAndMac.x);
+	free(npd->FDeal.aANDShareAndMac.y);
+	free(npd->FDeal.aANDShareAndMac.z);
+	free(npd->FDeal.aANDKey.x);
+	free(npd->FDeal.aANDKey.y);
+	free(npd->FDeal.aANDKey.z);
+	free(npd);
+}
+
+void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOTs, bool useAltOTExt) {
+	OTExtValidation validation = useAltOTExt?OTExtValidation_byPair:OTExtValidation_hhash;
+	setupNnobProtocol(pd);
+	mainNnobProtocol(pd, numOTs, validation, start, arg);
+
+	NnobProtocolDesc* npd = pd->extra;
+	int numANDGates = npd->FDeal.aANDKey.n;
+	fprintf(stderr, "num of ANDs: %d\n", numANDGates);
+	fprintf(stderr, "OTs per AND: %d\n", numOTs/numANDGates);
+	fprintf(stderr, "OTs left: %d\n", npd->aBitsShareAndMac.n-npd->aBitsKey.counter);
+	fprintf(stderr, "Bucket Size: %d\n", npd->bucketSize);
+	cleanupNnobProtocol(pd);
 }
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
@@ -886,6 +1122,7 @@ static void broadcastBits(int source,void* p,size_t n)
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   pd->currentParty = ocCurrentPartyDefault;
+  pd->error = 0;
   pd->feedOblivInputs = dbgProtoFeedOblivInputs;
   pd->revealOblivBits = dbgProtoRevealOblivBits;
   pd->setBitAnd = dbgProtoSetBitAnd;
@@ -894,6 +1131,7 @@ void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pd->setBitNot = dbgProtoSetBitNot;
   pd->flipBit   = dbgProtoFlipBit;
   pd->partyCount= 2;
+  pd->extra = NULL;
   currentProto = pd;
   currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
   start(arg);
@@ -908,6 +1146,8 @@ int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
 
 ProtocolDesc* ocCurrentProto() { return currentProto; }
 void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
+
+bool ocInDebugProto(void) { return ocCurrentProto()->extra==NULL; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)

@@ -6,10 +6,14 @@
 #include<obliv_common.h>
 
 typedef struct 
-{ int bytesPerAnd;
+{ char protoType;
+  int bytesPerAnd;
   char* buffer;
   YaoProtocolDesc* ypd; // need the fixed key cipher for crypto test
 } NetStressProtocolDesc;
+
+#define OC_PD_TYPE_NSP 2
+
 
 static void netStressFeedOblivBool(ProtocolDesc* pd,
     OblivBit* dest, int party, bool value)
@@ -115,6 +119,8 @@ void execNetworkStressProtocol(ProtocolDesc* pd, int bytecount,
   nspd->bytesPerAnd = bytecount;
   nspd->buffer = malloc(bytecount);
   nspd->ypd = ypd;
+  nspd->protoType = OC_PD_TYPE_NSP;
+  pd->error = 0;
   pd->currentParty = ocCurrentPartyDefault;
   pd->extra = nspd;
   pd->feedOblivInputs = netStressFeedOblivInputs;

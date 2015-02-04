@@ -17,7 +17,8 @@
 ECHO = @
 
 # It is important to build quickbuild first,to generate the proper dependencies
-all:  quickbuild setup
+#all:  quickbuild setup
+all: quickbuild
 
 # Now add the defines for the CIL features
 include Makefile.features
@@ -37,6 +38,7 @@ configure: configure.in aclocal.m4
 
 ifdef RELEASE
   NATIVECAML := 1
+  RELEASELIB := 1
   UNSAFE     := 1
 endif
 
@@ -142,7 +144,7 @@ $(OBJDIR)/cilly$(EXE) : $(CILLY_MODULES:%=$(OBJDIR)/%.$(CMO))
 
 # ------ these lines were added for obliv-C runtime -----------
 OCSRCDIR = src/ext/oblivc
-OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils
+OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils bcrandom privacy-free psi nnob
 
 oblivruntime: $(OBJDIR)/libobliv.a
 	

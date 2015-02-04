@@ -7,25 +7,7 @@
 #include<obliv.h>
 #include<obliv_bits.h> // needed for OblivBit.*
 #include<obliv_common.h>
-
-// Create a temporary ProtocolTransport that uses only one of the 
-//   available channels. Becomes invalid when the parent transport is cleaned up
-inline static ProtocolTransport* 
-  subtransport(ProtocolTransport* trans, int newChannel)
-  { return trans->subtransport(trans,newChannel); }
-
-// Yao protocol functions to be reused here
-extern void setupYaoProtocol(ProtocolDesc* pd,bool halfgates);
-extern void mainYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
-extern void cleanupYaoProtocol(ProtocolDesc* pd);
-extern bool yaoGenrRevealOblivBits(ProtocolDesc* pd,
-                widest_t* dest,const OblivBit* o,size_t n,int party);
-extern bool yaoEvalRevealOblivBits(ProtocolDesc* pd,
-                widest_t* dest,const OblivBit* o,size_t n,int party);
-extern void yaoGenrFeedOblivInputs(ProtocolDesc* pd
-               ,OblivInputs* oi,size_t n,int src);
-extern void yaoEvalFeedOblivInputs(ProtocolDesc* pd
-               ,OblivInputs* oi,size_t n,int src);
+#include<obliv_yao.h>
 
 // TODO merge these two structs, and fix confusing pd/ypd parameters
 typedef struct {
@@ -110,20 +92,20 @@ void* dualexThread(void* varg)
 { DualexThreadArgs* arg = varg;
   DualexHalfPD* pd = arg->pd;
   setupYaoProtocol(&pd->ypd,true);
+  int role = pd->ypd.thisParty;
 
   if(pd->thisThread==2) pd->ypd.currentParty = flipParty;
 
   pd->yFeedOblivInputs = pd->ypd.feedOblivInputs;
-  if(pd->ypd.thisParty==1) ((YaoProtocolDesc*)pd->ypd.extra)->sender = 
-    npotSenderAbstract(npotSenderNew(1<<NPOT_BATCH_SIZE,&pd->ypd,2));
-  else ((YaoProtocolDesc*)pd->ypd.extra)->recver =
-    npotRecverAbstract(npotRecverNew(1<<NPOT_BATCH_SIZE,&pd->ypd,1));
-  
+  //yaoUseNpot(&pd->ypd,role);
+  yaoUseFullOTExt(&pd->ypd,role);
+
   pd->ypd.feedOblivInputs = dualexFeedOblivInputs;
   // In this function, pd->ypd.thisParty == 1 always means generator
-  pd->ypd.revealOblivBits = (pd->ypd.thisParty==1
-                            ?dualexGenrRevealOblivBits:dualexEvalRevealOblivBits);
-  mainYaoProtocol(&pd->ypd,arg->start,arg->startargs);
+  pd->ypd.revealOblivBits = (role==1?dualexGenrRevealOblivBits
+                                    :dualexEvalRevealOblivBits);
+  mainYaoProtocol(&pd->ypd,true,arg->start,arg->startargs);
+  yaoReleaseOt(&pd->ypd,role);
   cleanupYaoProtocol(&arg->pd->ypd);
   return NULL;
 }
@@ -140,7 +122,8 @@ bool dualexEqualityCheck(ProtocolDesc* pd,gcry_md_hd_t h1,gcry_md_hd_t h2)
   gcry_md_write(h,gcry_md_read(h1,0),HASH_LEN);
   gcry_md_write(h,gcry_md_read(h2,0),HASH_LEN);
   BCipherRandomGen* gen = newBCipherRandomGen();
-  bool res = ocEqualityCheck(pd,gen,gcry_md_read(h,0),HASH_LEN,3-pd->thisParty);
+  bool res = ocPrivateEqualityCheck_halfAuth(pd,gen,
+      gcry_md_read(h,0),HASH_LEN,3-pd->thisParty);
   releaseBCipherRandomGen(gen);
   gcry_md_close(h);
   return res;
@@ -161,8 +144,8 @@ bool execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 
   // Assign transport channels: assumes Yao protocol never invokes 
   //   setSubtransport, only uses the default channel
-  round1.ypd.trans = subtransport(trans,0);
-  round2.ypd.trans = subtransport(trans,1);
+  round1.ypd.trans = trans->split(trans);
+  round2.ypd.trans = trans->split(trans);
 
   // These will be used in the final equality tests
   gcryDefaultLibInit();
@@ -177,10 +160,11 @@ bool execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
   pthread_join(t1,NULL); 
   pthread_join(t2,NULL);
 
+  pd->error = (round1.ypd.error?round1.ypd.error:round2.ypd.error);
   atomic_queue_release(q);
   bool res = dualexEqualityCheck(pd,round1.threadhash,round2.threadhash);
 
   gcry_md_close(round1.threadhash);
   gcry_md_close(round2.threadhash);
-  return res;
+  return !pd->error && res;
 }

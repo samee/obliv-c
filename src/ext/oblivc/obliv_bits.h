@@ -7,26 +7,9 @@ void* memset(void* s, int c, unsigned long n); // Hack, had to declare memset
 // This file gets included in every C intermediate file generated from obliv-C
 
 // import common types
-#include<obliv_types.h>
+#include<obliv_types_internal.h>
 
 void ocSetCurrentProto(ProtocolDesc* pd);
-
-typedef struct OblivBit {
-  bool unknown; // Will be default initialized with memset(0), 
-                //   so this field is 'unknown' rather than 'known'
-                //   so that the default 0 means 'known'
-  union {
-    // a struct for each protocol we support goes here
-    bool knownValue;
-    struct {
-      // FIXME Couldn't generator just XOR R with this on a NOT?
-      // generator: w is label for 0 value if inverted == false, 1 otherwise
-      // evaluator: w is current label
-      yao_key_t w;
-      bool inverted; // inverted: generator use only
-    } yao;
-  };
-} OblivBit;
 
 #define bitsize(type) (8*sizeof(type))
 

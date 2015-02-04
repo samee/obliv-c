@@ -88,8 +88,8 @@ bool ocEqualityCheck(ProtocolDesc* pd,BCipherRandomGen* gen,
   free(buf);
   return rv;
 }
-bool ocRandomBytes(ProtocolDesc* pd,BCipherRandomGen* gen,
-                   void* dest,int n,int party)
+bool ocRandomBytes_impl(ProtocolDesc* pd,BCipherRandomGen* gen,
+                        void* dest,int n,int party)
 {
   char* buf = malloc(n);
   int i;
@@ -99,4 +99,87 @@ bool ocRandomBytes(ProtocolDesc* pd,BCipherRandomGen* gen,
   if(rv) for(i=0;i<n;++i) *((char*)dest+i) ^= buf[i];
   free(buf);
   return rv;
+}
+bool ocRandomBytes(ProtocolDesc* pd,BCipherRandomGen* gen,
+                   void* dest,int n,int party)
+{
+  if(n<=BC_SEEDLEN_DEFAULT)
+    return ocRandomBytes_impl(pd,gen,dest,n,party);
+  char buf[BC_SEEDLEN_DEFAULT];
+  if(!ocRandomBytes_impl(pd,gen,buf,sizeof(buf),party)) return false;
+  randomizeBufferByKey(buf,dest,n);
+  return true;
+}
+
+// Copied from ot.c
+void dhSerialize(char* buf,gcry_mpi_point_t u,
+    gcry_ctx_t ctx,gcry_mpi_t x,gcry_mpi_t y);
+void dhDeserialize(gcry_mpi_point_t* p, const char* buf);
+
+static bool
+ocXchgPoints(ProtocolDesc* pd, BCipherRandomGen* gen, gcry_ctx_t ctx,
+    gcry_mpi_point_t* src, gcry_mpi_point_t* dest,int n,int party)
+{
+  char buf1[n][DHEltSerialBytes], buf2[n][DHEltSerialBytes];
+  gcry_mpi_t x = gcry_mpi_new(0), y = gcry_mpi_new(0);
+  int i;
+  for(i=0;i<n;++i) dhSerialize(buf1[i],src[i],ctx,x,y);
+  bool res = ocXchgBytes(pd,gen,buf1,buf2,sizeof(buf1),party);
+  if(res) for(i=0;i<n;++i) dhDeserialize(dest+i,buf2[i]);
+  gcry_mpi_release(x); gcry_mpi_release(y);
+  return res;
+}
+// simply compares to ec points
+static bool
+ocPointsEqual(gcry_ctx_t curve,gcry_mpi_point_t a, gcry_mpi_point_t b)
+{
+  gcry_mpi_t ax = gcry_mpi_new(0);
+  gcry_mpi_t ay = gcry_mpi_new(0);
+  gcry_mpi_t bx = gcry_mpi_new(0);
+  gcry_mpi_t by = gcry_mpi_new(0);
+  gcry_mpi_ec_get_affine(ax,ay,a,curve);
+  gcry_mpi_ec_get_affine(bx,by,b,curve);
+  bool eq;
+  eq = !gcry_mpi_cmp(ax,bx);
+  if(eq) eq = !gcry_mpi_cmp(ay,by);
+  gcry_mpi_release(ax);
+  gcry_mpi_release(ay);
+  gcry_mpi_release(bx);
+  gcry_mpi_release(by);
+  return eq;
+}
+static gcry_mpi_t mpiFromHash(const char* data,size_t len)
+{
+  char hash[COMMIT_HASH_BYTES+1];
+  hash[0]=0;
+  gcry_md_hash_buffer(COMMIT_HASH_ALGO,hash+1,data,len);
+  gcry_mpi_t res;
+  gcry_mpi_scan(&res,GCRYMPI_FMT_STD,hash,1+COMMIT_HASH_BYTES,NULL);
+  return res;
+}
+bool ocPrivateEqualityCheck_halfAuth(ProtocolDesc* pd,BCipherRandomGen* gen,
+    const void* data, int n,int party)
+{
+  bool res = false;
+  gcry_ctx_t curve;
+  gcry_mpi_ec_new(&curve,NULL,DHCurveName);
+  gcry_mpi_point_t g = gcry_mpi_ec_get_point("g",curve,1);
+  gcry_mpi_point_t yab, xab;
+
+  gcry_mpi_t x = mpiFromHash(data,n), a = dhRandomExp(gen);
+  gcry_mpi_ec_mul(g,x,g,curve);
+  gcry_mpi_ec_mul(g,a,g,curve);
+
+  if(!ocXchgPoints(pd,gen,curve,&g,&yab,1,party)) goto error1;
+  gcry_mpi_ec_mul(yab,a,yab,curve);
+  if(!ocXchgPoints(pd,gen,curve,&yab,&xab,1,party)) goto error2;
+  res = ocPointsEqual(curve,xab,yab);
+  gcry_mpi_point_release(xab);
+error2:
+  gcry_mpi_point_release(yab);
+error1:
+  gcry_mpi_release(x); gcry_mpi_release(a);
+  gcry_mpi_point_release(g);
+  gcry_ctx_release(curve);
+  return res;
 }

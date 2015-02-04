@@ -873,6 +873,12 @@ statement:
 |   comma_expression SEMICOLON
 	        	{COMPUTATION (smooth_expression (fst $1), (*handleLoc*)(snd $1))}
 |   block               {BLOCK (fst3 $1, (*handleLoc*)(snd3 $1))}
+|   TILDE OBLIV LPAREN RPAREN statement
+                        {BLOCK ({ blabels = []
+                                ; battrs = [("~obliv",[VARIABLE ""])]
+                                ; bstmts = [$5] }
+                               ,$2)
+                        }
 |   TILDE OBLIV LPAREN IDENT RPAREN statement
                         {BLOCK ({ blabels = []
                                 ; battrs = [("~obliv",[VARIABLE (fst $4)])]

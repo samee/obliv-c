@@ -4,6 +4,13 @@
 struct ProtocolDesc* ocCurrentProto(void);
 int ocCurrentParty(void);
 
+// Runtime type info: these functions are no longer used anywhere. Remove?
+// All the protoType fields and DYN_FUN macros will also be unnecessary.
+bool ocInDebugProto(void);
+bool ocInNpProto(void);
+void ocNpSetBroadcast1(bool v);
+bool ocNpGetBroadcast1(void);
+
 void setupOblivBool(OblivInputs* spec, obliv bool* dest, bool v);
 void setupOblivChar(OblivInputs* spec, obliv char* dest, char v);
 void setupOblivInt(OblivInputs* spec, obliv int* dest, int v);
