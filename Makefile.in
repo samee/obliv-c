@@ -17,7 +17,8 @@
 ECHO = @
 
 # It is important to build quickbuild first,to generate the proper dependencies
-all:  quickbuild setup
+#all:  quickbuild setup
+all: quickbuild
 
 # Now add the defines for the CIL features
 include Makefile.features
@@ -37,6 +38,7 @@ configure: configure.in aclocal.m4
 
 ifdef RELEASE
   NATIVECAML := 1
+  RELEASELIB := 1
   UNSAFE     := 1
 endif
 

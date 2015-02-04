@@ -1,2 +1,2 @@
-testName=editdist
+testName=aes
 include ../common/Makefile.simple

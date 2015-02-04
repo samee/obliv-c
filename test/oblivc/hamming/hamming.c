@@ -2,6 +2,7 @@
 #include<obliv.h>
 
 #include"hamming.h"
+#include"../common/util.h"
 
 
 int main(int argc,char *argv[])
@@ -25,8 +26,7 @@ int main(int argc,char *argv[])
   }
 
   //protocolUseStdio(&pd);
-  if(argv[3][0]=='1') protocolAcceptTcp2P(&pd,argv[1]);
-  else protocolConnectTcp2P(&pd,"augusta.cs.virginia.edu",argv[1]);
+  ocTestUtilTcpOrDie(&pd,argv[3][0]=='1',argv[1]);
 
   setCurrentParty(&pd,(argv[3][0]=='1'?1:2));
   if(!strcmp("yao",argv[2])) execYaoProtocol(&pd,hammingDistance,&io);
