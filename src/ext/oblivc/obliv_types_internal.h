@@ -32,7 +32,7 @@ typedef struct { int i,j; OblivInputs* oi; size_t n; } OIBitSrc;
 static inline OIBitSrc oiBitSrc(OblivInputs* oi,size_t n) 
   { return (OIBitSrc){.i = 0, .j = 0, .oi = oi, .n = n}; }
 static inline bool hasBit (OIBitSrc* s) { return s->i<s->n; }
-static inline bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1<<s->j); }
+static inline bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1LL<<s->j); }
 static inline OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
 static inline void nextBit(OIBitSrc* s) 
   { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
