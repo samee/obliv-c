@@ -765,6 +765,11 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
 #define CHECK_HASH_BITS_LOGCEIL 7
 #define SECURITY_CONSTANT (2*CHECK_HASH_BITS+CHECK_HASH_BITS_LOGCEIL)
 
+static bool transCanThread(ProtocolTransport* trans)
+  { return trans->split!=NULL; }
+static bool protoCanThread(ProtocolDesc* pd)
+  { return transCanThread(pd->trans); }
+
 /*
   Inputs:
   mat is char[rows][cols/8]
@@ -833,7 +838,7 @@ senderExtensionBoxValidate_hhash(SenderExtensionBox* s,BCipherRandomGen* gen,
   int i,done=0,tc;
   BitMatMulThread args[OT_THREAD_COUNT];
   pthread_t hasht[OT_THREAD_COUNT];
-  if(8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
+  if(!protoCanThread(s->pd) || 8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
   else tc=OT_THREAD_COUNT;
   for(i=0;i<tc;++i)
   {
@@ -872,7 +877,7 @@ recverExtensionBoxValidate_hhash(RecverExtensionBox* r,BCipherRandomGen* gen,
   int i,done=0,tc;
   BitMatMulThread args[OT_THREAD_COUNT];
   pthread_t hasht[OT_THREAD_COUNT];
-  if(8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
+  if(!protoCanThread(r->pd) || 8*rowBytes<=OT_THREAD_THRESHOLD) tc=1;
   else tc=OT_THREAD_COUNT;
   for(i=0;i<tc;++i)
   {
@@ -1146,7 +1151,7 @@ static void* senderExtensionBoxSendMsgs_thread(void* va)
 void
 senderExtensionBoxSendMsgs(SendMsgArgs* a)
 {
-  if(a->n<=OT_THREAD_THRESHOLD)
+  if(!transCanThread(a->trans) || a->n<=OT_THREAD_THRESHOLD)
     senderExtensionBoxSendMsgs_thread(a);
 
   else
@@ -1189,7 +1194,7 @@ static void* recverExtensionBoxRecvMsgs_thread(void* va)
 void
 recverExtensionBoxRecvMsgs(RecvMsgArgs* a)
 {
-  if(a->n<=OT_THREAD_THRESHOLD)
+  if(!transCanThread(a->trans) || a->n<=OT_THREAD_THRESHOLD)
     recverExtensionBoxRecvMsgs_thread(a);
   else
   {
