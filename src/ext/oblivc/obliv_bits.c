@@ -169,6 +169,8 @@ static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
 {
   struct addrinfo* list;
   if(getaddrinfo(name,port,NULL,&list) < 0) return -1;
+  for(;list!=NULL && list->ai_family!=AF_INET;list=list->ai_next);
+  if(!list) return -1;
   memcpy(res,list->ai_addr,list->ai_addrlen);
   freeaddrinfo(list);
   return 0;
