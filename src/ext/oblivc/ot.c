@@ -1289,40 +1289,59 @@ honestOTExtRecverRelease(HonestOTExtRecver* r)
   free(r);
 }
 
+// This one helps limit memory usage for large input data
+#define HONEST_OT_MAX_SIZE (1<<23)
+static inline int min(int x,int y) { return x<y?x:y; }
 void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
     int n,int len)
 {
-  int rowBytes = (n+7)/8;
+  int rowBytes = min(HONEST_OT_MAX_SIZE,(n+7))/8;
+  const int batch = HONEST_OT_MAX_SIZE;
   const int k = 8*s->box->keyBytes;
   char *box = malloc(k*rowBytes);
   int *all = allRows(k);
-  senderExtensionBox(s->box,box,rowBytes);
-  SendMsgArgs args = {
-    .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
-    .k=k, .nonce=s->nonce, .opt0=opt0, .opt1=opt1, .len=len,
-    .destParty=s->box->destParty, .spack=s->box->spack, .trans=s->box->pd->trans
-  };
-  senderExtensionBoxSendMsgs(&args);
-  s->nonce=args.nonce;
+  int round;
+  for(round=0;round*batch<n;round++)
+  {
+    const int done=round*batch;
+    senderExtensionBox(s->box,box,rowBytes);
+    SendMsgArgs args = {
+      .cipher=s->padder, .box=box, .n=min(batch,n-done),
+      .rowBytes=rowBytes, .rows=all, .k=k, .nonce=s->nonce,
+      .opt0=opt0+done*len, .opt1=opt1+done*len, .len=len,
+      .destParty=s->box->destParty, .spack=s->box->spack,
+      .trans=s->box->pd->trans
+    };
+    senderExtensionBoxSendMsgs(&args);
+    s->nonce=args.nonce;
+  }
   free(all);
   free(box);
 }
 void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len)
 {
-  int rowBytes = (n+7)/8;
+  int rowBytes = min(HONEST_OT_MAX_SIZE,(n+7))/8;
+  const int batch = HONEST_OT_MAX_SIZE;
   const int k = 8*r->box->keyBytes;
   char *box = malloc(k*rowBytes);
   int *all = allRows(k);
-  char *mask = malloc(rowBytes); packBytes(mask,sel,n);
-  recverExtensionBox(r->box,box,mask,rowBytes);
-  RecvMsgArgs args = {
-    .cipher=r->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
-    .k=k, .nonce=r->nonce, .msg=dest, .mask=mask, .len=len,
-    .srcParty=r->box->srcParty, .trans=r->box->pd->trans
-  };
-  recverExtensionBoxRecvMsgs(&args);
-  r->nonce=args.nonce;
+  char *mask = malloc(rowBytes);
+  int round;
+  for(round=0;round*batch<n;round++)
+  {
+    const int done = round*batch;
+    const int rem  = min(batch,n-done);
+    packBytes(mask,sel+done,rem);
+    recverExtensionBox(r->box,box,mask,rowBytes);
+    RecvMsgArgs args = {
+      .cipher=r->padder, .box=box, .n=rem, .rowBytes=rowBytes, .rows=all,
+      .k=k, .nonce=r->nonce, .msg=dest+done*len, .mask=mask, .len=len,
+      .srcParty=r->box->srcParty, .trans=r->box->pd->trans
+    };
+    recverExtensionBoxRecvMsgs(&args);
+    r->nonce=args.nonce;
+  }
   free(mask);
   free(all);
   free(box);
