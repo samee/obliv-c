@@ -540,6 +540,8 @@ void yaoFlipBit(ProtocolDesc* pd,OblivBit* r)
 void yaoSetBitNot(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
   { *r = *a; yaoFlipBit(pd,r); }
 
+#define YAO_FEED_MAX_BATCH 1000000
+
 void yaoGenrFeedOblivInputs(ProtocolDesc* pd
                            ,OblivInputs* oi,size_t n,int src)
 { 
@@ -548,28 +550,33 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
   OIBitSrc it = oiBitSrc(oi,n);
   if(src==1) for(;hasBit(&it);nextBit(&it))
   { OblivBit* o = curDestBit(&it);
-    yaoKeyNewPair(ypd,w0,w1);
+    yaoKeyNewPair(ypd,w0,w1); // does ypd->icount++
     if(curBit(&it)) osend(pd,2,w1,YAO_KEY_BYTES);
     else osend(pd,2,w0,YAO_KEY_BYTES);
     o->yao.inverted = false; o->unknown = true;
     yaoKeyCopy(o->yao.w,w0);
-    ypd->icount++;
   }else 
   { int bc = bitCount(&it);
-    char *buf0 = malloc(bc*YAO_KEY_BYTES), *buf1 = malloc(bc*YAO_KEY_BYTES);
+    // limit memory usage
+    int batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
+    char *buf0 = malloc(batch*YAO_KEY_BYTES),
+         *buf1 = malloc(batch*YAO_KEY_BYTES);
     int bp=0;
     for(;hasBit(&it);nextBit(&it))
     { 
       OblivBit* o = curDestBit(&it);
-      yaoKeyNewPair(ypd,w0,w1);
+      yaoKeyNewPair(ypd,w0,w1); // does ypd->icount++
       yaoKeyCopy(buf0+bp*YAO_KEY_BYTES,w0);
       yaoKeyCopy(buf1+bp*YAO_KEY_BYTES,w1);
       o->yao.inverted = false; o->unknown = true;
       yaoKeyCopy(o->yao.w,w0);
-      ypd->icount++;
       ++bp;
+      if(bp>=batch) // flush out every now and then
+      { ypd->sender.send(ypd->sender.sender,buf0,buf1,bp,YAO_KEY_BYTES);
+        bp=0;
+      }
     }
-    ypd->sender.send(ypd->sender.sender,buf0,buf1,bc,YAO_KEY_BYTES);
+    if(bp) ypd->sender.send(ypd->sender.sender,buf0,buf1,bp,YAO_KEY_BYTES);
     free(buf0); free(buf1);
   }
 }
@@ -584,8 +591,11 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
     ypd->icount++;
   }else 
   { int bc = bitCount(&it);
-    char *buf = malloc(bc*YAO_KEY_BYTES), **dest = malloc(bc*sizeof(char*));
-    bool* sel = malloc(bc*sizeof(bool));
+    // limit memory usage
+    int batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
+    char *buf = malloc(batch*YAO_KEY_BYTES),
+         **dest = malloc(batch*sizeof(char*));
+    bool *sel = malloc(batch*sizeof(bool));
     int bp=0,i;
     for(;hasBit(&it);nextBit(&it))
     { OblivBit* o = curDestBit(&it);
@@ -594,9 +604,16 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
       o->unknown = true; // Known to me, but not to both parties
       ypd->icount++;
       ++bp;
+      if(bp>=batch)
+      { ypd->recver.recv(ypd->recver.recver,buf,sel,bp,YAO_KEY_BYTES);
+        for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
+        bp=0;
+      }
     }
-    ypd->recver.recv(ypd->recver.recver,buf,sel,bc,YAO_KEY_BYTES);
-    for(i=0;i<bc;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
+    if(bp) // flush out every now and then
+    { ypd->recver.recv(ypd->recver.recver,buf,sel,bp,YAO_KEY_BYTES);
+      for(i=0;i<bp;++i) yaoKeyCopy(dest[i],buf+i*YAO_KEY_BYTES);
+    }
     free(buf); free(dest); free(sel);
   }
 }
