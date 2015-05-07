@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Obliv-C</title><link href="http://oblivc.org/" rel="alternate"></link><link href="http://oblivc.org/feeds/paper.atom.xml" rel="self"></link><id>http://oblivc.org/</id><updated>2015-05-07T00:00:00+02:00</updated><entry><title>Paper</title><link href="http://oblivc.org/paper.html" rel="alternate"></link><updated>2015-05-07T00:00:00+02:00</updated><author><name>Samee Zahur</name></author><id>tag:oblivc.org,2015-05-07:paper.html</id><summary type="html">&lt;ul&gt;
+&lt;li&gt;Samee Zahur, David Evans. &lt;a href="/downloads/oblivc.pdf"&gt;Obliv-C: A Language for Extensible Data-Oblivious Computation&lt;/a&gt;. 7th May, 2015..&lt;/li&gt;
+&lt;/ul&gt;</summary></entry></feed>
