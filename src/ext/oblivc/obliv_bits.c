@@ -1086,7 +1086,7 @@ static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
   dest->unknown=true;
   if(party==1) { if(curparty==1) dest->knownValue=a; }
   else if(party==2 && curparty == 1) 
-    orecv(currentProto,1,&dest->knownValue,sizeof(bool));
+    orecv(currentProto,2,&dest->knownValue,sizeof(bool));
   else if(party==2 && curparty == 2) osend(currentProto,1,&a,sizeof(bool));
   else fprintf(stderr,"Error: This is a 2 party protocol\n");
 }
