@@ -83,17 +83,17 @@ let compute_idom (flowgraph: cfgInfo): idomInfo =
   let nnodes  = size + 1 in
   let nodeSet = B.init nnodes (fun i -> true) in
   
-  let ndfs     = Array.create nnodes 0 in (* mapping from depth-first 
+  let ndfs     = Array.make nnodes 0 in (* mapping from depth-first 
                                          * number to nodes. DForder 
                                          * starts at 1, with 0 used as 
                                          * an invalid entry  *)
-  let parent   = Array.create nnodes 0 in (* the parent in depth-first 
+  let parent   = Array.make nnodes 0 in (* the parent in depth-first 
                                          * spanning tree  *) 
 
       (* A semidominator of w is the node v with the minimal DForder such 
        * that there is a path from v to w containing only nodes with the 
        * DForder larger than w.  *)
-  let sdno     = Array.create nnodes 0 in (* depth-first number of 
+  let sdno     = Array.make nnodes 0 in (* depth-first number of 
                                          * semidominator  *)
   
                                         (* The set of nodes whose 
@@ -105,10 +105,10 @@ let compute_idom (flowgraph: cfgInfo): idomInfo =
           * the forest. Label(v) is the node in the ancestor chain with the 
           * smallest depth-first number of its semidominator. Child and Size 
           * are used to keep the trees in the forest balanced  *)
-  let ancestor = Array.create nnodes 0 in 
-  let label    = Array.create nnodes 0 in
-  let child    = Array.create nnodes 0 in
-  let size     = Array.create nnodes 0 in
+  let ancestor = Array.make nnodes 0 in 
+  let label    = Array.make nnodes 0 in
+  let child    = Array.make nnodes 0 in
+  let size     = Array.make nnodes 0 in
   
   
   let n = ref 0 in                  (* depth-first scan and numbering. 
@@ -208,7 +208,7 @@ let compute_idom (flowgraph: cfgInfo): idomInfo =
 let dominance_frontier (flowgraph: cfgInfo) : dfInfo = 
   let idom = compute_idom flowgraph in
   let size = flowgraph.size in
-  let children = Array.create size [] in 
+  let children = Array.make size [] in 
   for i = 0 to size - 1 do
     if (idom.(i) != -1) then children.(idom.(i)) <- i :: children.(idom.(i));
   done; 
@@ -217,7 +217,7 @@ let dominance_frontier (flowgraph: cfgInfo) : dfInfo =
   let start  = flowgraph.start in
   let successors = flowgraph.successors in
   
-  let df = Array.create size [] in
+  let df = Array.make size [] in
                                         (* Compute the dominance frontier  *)
   
   let bottom = Array.make size true in  (* bottom of the dominator tree *)
@@ -270,8 +270,8 @@ let add_phi_functions_info (flowgraph: cfgInfo) : unit =
       flowgraph.blocks.(i).instrlist
   done;
   let iterCount = ref 0 in
-  let hasAlready = Array.create size 0 in 
-  let work = Array.create size 0 in 
+  let hasAlready = Array.make size 0 in 
+  let work = Array.make size 0 in 
   let w = ref ([]) in 
   let dfPlus = Array.init nrRegs (
     fun i -> 
@@ -299,7 +299,7 @@ let add_phi_functions_info (flowgraph: cfgInfo) : unit =
       (* res := List.filter (fun blkId -> B.test liveIn.(blkId) i) !res; *)
       !res
    ) in
-  let result = Array.create size ([]) in
+  let result = Array.make size ([]) in
   for i = 0 to nrRegs - 1 do
     List.iter (fun node -> result.(node) <- i::result.(node);) dfPlus.(i) 
   done;
@@ -321,7 +321,7 @@ let add_dom_def_info (f: cfgInfo): unit =
   let nrRegs = f.nrRegs in
 
   let idom = compute_idom f in
-  let children = Array.create size [] in 
+  let children = Array.make size [] in 
   for i = 0 to size - 1 do
     if (idom.(i) != -1) then children.(idom.(i)) <- i :: children.(idom.(i));
   done; 
@@ -670,7 +670,7 @@ let stronglyConnectedComponents (f: cfgInfo) (debug: bool): sccInfo =
   
   (* Order nodes of each SCC. The graph is a SCC here.*)
   let scclist = Util.list_map (fun i -> 
-    let successors = Array.create size [] in
+    let successors = Array.make size [] in
     for j = 0 to size - 1 do 
       successors.(j) <- List.filter (fun x -> IntSet.mem x (snd all_sccArray.(i))) f.successors.(j);
     done;

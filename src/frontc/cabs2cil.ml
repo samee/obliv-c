@@ -1885,7 +1885,7 @@ let rec setOneInit (this: preInit)
       let pMaxIdx, pArray = 
         match this  with 
           NoInitPre  -> (* No initializer so far here *)
-            ref idx, ref (Array.create (max 32 (idx + 1)) NoInitPre)
+            ref idx, ref (Array.make (max 32 (idx + 1)) NoInitPre)
               
         | CompoundPre (pMaxIdx, pArray) -> 
             if !pMaxIdx < idx then begin 
