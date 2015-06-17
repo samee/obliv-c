@@ -1014,7 +1014,7 @@ void hashMacCheckShareAndMac(NnobProtocolDesc* npd, const NnobShareAndMac* sm) {
 
 void hashMacCheckKey(NnobProtocolDesc* npd, const NnobKey* key, bool b) {
 	if(b) {
-		const nnob_key_t* checkKey = malloc(sizeof(nnob_key_t));
+		nnob_key_t* checkKey = malloc(sizeof(nnob_key_t));
 		memcpy(checkKey, key->key, NNOB_KEY_BYTES);
 		memxor(checkKey, npd->globalDelta, NNOB_KEY_BYTES);
 		hashMacCheck(npd->gen, &npd->nonce, &npd->cumulativeHashCheckKey, checkKey);
