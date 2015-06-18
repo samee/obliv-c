@@ -262,7 +262,7 @@ let growTheArray (ga: 'a growArray) (len: int)
     let data' = begin match ga.gaFill with
       Elem x ->
 
-	let data'' = Array.make newlen x in
+	let data'' = Array.create newlen x in
 	Array.blit ga.gaData 0 data'' 0 len;
 	data''
     | Susp f -> Array.init newlen
@@ -290,7 +290,7 @@ let newGrowArray (initsz: int) (fill: 'a growArrayFill) : 'a growArray =
   { gaFill = fill;
     gaMaxInitIndex = -1;
     gaData = begin match fill with
-      Elem x -> Array.make initsz x
+      Elem x -> Array.create initsz x
     | Susp f -> Array.init initsz f
     end; }
 

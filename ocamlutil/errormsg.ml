@@ -217,9 +217,9 @@ let cleanFileName str =
      else 
        let c = String.get str1 i in
        if c <> '\\' then begin
-          Bytes.set str1 copyto c; loop (copyto + 1) (i + 1)
+          String.set str1 copyto c; loop (copyto + 1) (i + 1)
        end else begin
-          Bytes.set str1 copyto '/';
+          String.set str1 copyto '/';
           if i < l - 2 && String.get str1 (i + 1) = '\\' then
               loop (copyto + 1) (i + 2)
           else 

@@ -273,7 +273,7 @@ static int sizeCheckSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { int sent = osend(&((SizeCheckTransportAdapter*)pt)->pd,dest,s,n);
   if(sent==n) return n;
   else 
-  { fprintf(stderr,"Was going to send %zu bytes to %d, sent %d\n",
+  { fprintf(stderr,"Was going to send %lu bytes to %d, sent %d\n",
                    n,dest,sent);
     if(sent<0) fprintf(stderr,"That means %s\n",strerror(sent));
     exit(-1);
@@ -284,7 +284,7 @@ static int sizeCheckRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { int recv = orecv(&((SizeCheckTransportAdapter*)pt)->pd,src,s,n);
   if(recv==n) return n;
   else 
-  { fprintf(stderr,"Was going to recv %zu bytes from %d, received %d\n",
+  { fprintf(stderr,"Was going to recv %lu bytes from %d, received %d\n",
                     n,src,recv);
     if(recv<0) fprintf(stderr,"That means %s\n",strerror(recv));
     exit(-1);

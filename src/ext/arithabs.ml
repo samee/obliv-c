@@ -1053,7 +1053,7 @@ let feature : featureDescr =
                                            S.livevars = [];
                                            S.reachable = true };
          S.nrRegs = 0;
-         S.regToVarinfo = Array.make 0 dummyFunDec.svar;
+         S.regToVarinfo = Array.create 0 dummyFunDec.svar;
         }
       in
       let ci = ci in

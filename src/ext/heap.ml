@@ -9,7 +9,7 @@ type ('a) t = {
 } 
 
 let create size = {
-  elements = Array.make (size+1) (max_int,None) ;
+  elements = Array.create (size+1) (max_int,None) ;
   size = 0 ;
   capacity = size ; 
 } 
