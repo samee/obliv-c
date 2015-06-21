@@ -14,45 +14,57 @@ points-to analyses.
 Quick start
 -----------
 
+Install the latest release of CIL with [opam][]:
+
+    opam install cil
+
 Read the excellent [CIL tutorial][tuto] by Zachary Anderson, and
 check out the accompanying [project template][template].
 
-[tuto]: http://www.inf.ethz.ch/personal/azachary/teaching/ciltut.pdf
+[tuto]: https://bitbucket.org/zanderso/cil-template/downloads/ciltut.pdf
 [template]: https://bitbucket.org/zanderso/cil-template
 
 Installation
 -----------
 
+To build and install CIL, you need the OCaml compiler, perl, and
+[ocamlfind][findlib].  (Of course, you also need some C compiler,
+preferably gcc.)
+
 Run the following commands to build and install CIL:
 
     ./configure
     make
-    make check      # very quick check, optionnal
+    make test       # regression test suite, optionnal
     make install    # as root or using sudo
 
-You only need the OCaml compiler, perl, and [ocamlfind][findlib] for the
-installation.  (Of course, you also need some C compiler.)
+If you want to install to some other directory, you can tweak the prefix
+during the configure step.  For instance, to install in your local [opam][]
+directory:
+
+    ./configure --prefix=`opam config var prefix`
 
 [findlib]: http://projects.camlcity.org/projects/findlib.html
+[opam]: http://opam.ocamlpro.com/
 
 Usage
 -----
 
-You can use cilly (installed in /usr/local/bin by default) as a drop in
+You can use cilly (installed in /usr/local/bin by default) as a drop-in
 replacement for gcc to compile and link your programs.
 
 You can also use CIL as a library to write your own programs.  For
 instance in the OCaml toplevel using [findlib][]:
 
     $ ocaml
-            Objective Caml version 3.12.0
+            Objective Caml version 4.00.1
 
     # #use "topfind";;
     [...]
     # #require "cil";;
     [...]
     # Cil.cilVersion;;           
-    - : string = "1.6.0"
+    - : string = "1.7.3"
 
 
 More documentation
@@ -70,19 +82,10 @@ You can also [browse the documentation online][doc].
 [hevea]: http://hevea.inria.fr/ "Hevea - LaTex to HTML translator"
 [doc]:   http://kerneis.github.com/cil/doc/html/cil "Cil online doc"
 
-Test suite
-----------
-
-CIL comes with a test suite.  You need perl and [Hevea][] (because one
-of the tests builds the documentation):
-
-    cd test
-    ./testcil --run
-
-Resources
+Ressources
 ----------
 
 * [Mailing list](https://lists.sourceforge.net/lists/listinfo/cil-users)
-* [Bug tracker](http://sourceforge.net/tracker/?group_id=138953&atid=742140)
+* [Bug tracker](http://sourceforge.net/p/cil/bugs/)
 
-CIL is maintained by Gabriel Kerneis <kerneis@pps.univ-paris-diderot.fr> 
+CIL is maintained by Gabriel Kerneis <gabriel@kerneis.info>

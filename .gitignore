@@ -41,16 +41,10 @@
 /TEMP_cil-bindistrib
 /_build
 /_log
-/META
 /README
 /index.html
-
-# /bin/
-/bin/scaninfer.bat
-/bin/ccured.bat
-/bin/cilly.bat
-/bin/patcher.bat
-/bin/CilConfig.pm
+/stamp-h
+/META
 
 # /debian/
 /debian/build-stamp
@@ -88,26 +82,35 @@
 # /doc/html/
 /doc/html/*
 
-# /lib/
-/lib/splay
-/lib/*.patch2.i*
-/lib/topformflat
-/lib/topformflat.c
-/lib/getrusage
-/lib/Cilly.pm
+# /lib/perl5/
+/lib/perl5/App/Cilly/CilConfig.pm
+/lib/perl5/App/Cilly.pm
+/lib/perl5/Makefile
+/lib/perl5/Makefile.old
+/lib/perl5/MYMETA.yml
+/lib/perl5/MYMETA.json
+/lib/perl5/blib/*
+/lib/perl5/pm_to_blib
 
-# /obj/
-/obj/x86_*
-/obj/.depend
+# /lib/cil
+/lib/cil
 
-# /obj/.depend/
-/obj/.depend/*.d
-/obj/.depend/*.di
+# /share
+/share/cil/ocamlpath
+
+# /bin/
+/bin/cilly.*
+
+# /_build/
+/_build/*
 
 # /src/
 /src/*.output
 /src/ChangeLog
 /src/machdep-ml.c
+/src/cilversion.ml
+/src/feature_config.ml
+/src/machdep.ml
 
 # /src/frontc/
 /src/frontc/*.output
@@ -138,7 +141,6 @@
 /test/*.stackdump
 /test/*_all.c
 /test/testingcil.c
-/test/testcil.random
 /test/__log*
 /test/testsafec.smlog
 /test/Makefile
@@ -396,8 +398,3 @@
 /test/small2/merge-ar
 /test/small2/libmerge.a
 
-
-# /ocamlutil
-/ocamlutil/perfcount.c
-/ocamlutil/profile.c
-/ocamlutil/Makefile

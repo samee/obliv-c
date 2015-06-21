@@ -2,12 +2,12 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SRC=$1
 
-if [ -e $DIR/../obj/x86_LINUX/cilly.asm.exe ]; then
-  CILLY=$DIR/../obj/x86_LINUX/cilly.asm.exe
-elif [ -e $DIR/../obj/x86_LINUX/cilly.byte.exe ]; then
-  CILLY=$DIR/../obj/x86_LINUX/cilly.byte.exe
+if [ -e $DIR/cilly.native ]; then
+  CILLY=$DIR/cilly.native
+elif [ -e $DIR/cilly.byte ]; then
+  CILLY=$DIR/cilly.byte
 else
-  echo "$DIR/../obj/x86_LINUX/cilly.asm.exe not found." >&2
+  echo "$DIR/cilly.native not found." >&2
   echo "Please run 'make RELEASE=1' in Obliv-C source folder" >&2
   exit 1
 fi
@@ -16,7 +16,7 @@ shift
 
 TMP=`mktemp --suffix='.c'`
 sed "1 i#include<obliv_bits.h>\\n#line 1 \"$SRC\"" $SRC > $TMP
-gcc -D_GNUCC -E -DCIL=1 $TMP -o ${SRC%.c}.i $@ &&
+gcc -D_GNUCC -E -DCIL=1 $TMP -o ${SRC%.c}.i $@ && 
 $CILLY --out ${SRC%.c}.cil.c ${SRC%.c}.i --doprocessObliv --keepunused --markImplicitCasts &&
 gcc -D_GNUCC -E ${SRC%.c}.cil.c -o ${SRC%.c}.cil.i $@
 CODE=$?

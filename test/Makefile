@@ -12,19 +12,7 @@ include ../config.mk
 
 TESTDIR := .
 
-ifneq ($(ARCHOS), x86_WIN32)
-ifneq ($(ARCHOS), x86_LINUX) 
-ifneq ($(ARCHOS), x86_DARWIN) 
-ifneq ($(ARCHOS), sparc_SOLARIS) 
-   $(error You must set the ARCHOS variable to x86_WIN32, x86_LINUX, x86_DARWIN, or sparc_SOLARIS)
-endif
-endif
-endif
-endif
-
-ifndef BIG_EXAMPLES
- BIG_EXAMPLES := ../../big-examples/
-endif
+unexport CIL_FEATURES
 
 defaulttarget:
 	@echo "This Makefile is intended to be run with an explicit target."
@@ -40,7 +28,11 @@ clean:
 		-name '*.a' -o \
 		-name '*.stackdump' -o \
 		-name '*.exe' -o \
-		-name '*.i' -o \
+		\( -name '*.i' -a -not -name 'lineno.i' -a -not -name 'empty.i' \) -o \
+		-name '*.cmi' -o \
+		-name '*.cmo' -o \
+		-name '*.err' -o \
+		-name '*.out' -o \
 		-name '*_ppp.c' -o \
 		-name '*.origi' -o \
 		-name '*.o' -o \
@@ -48,56 +40,24 @@ clean:
 		-name '*.cabs.c' -o \
 	        -name "*-tmp.c" -o \
 		-name '*_comb*.c' -o \
-		-name 'libmerge.a*' \
+		-name 'libmerge.a*' -o \
+		-name 'merge-ar' \
 	\) -exec rm -f {} \;
 	-find . -name '*.browser' -exec rm -rf {} \;
 
+distclean: clean
+	rm -f cil.log*
 
-# sm: infer CILHOME when not set, to ease having multiple trees
-ifndef CILHOME
-  ifeq ($(ARCHOS), x86_WIN32)
-    $(error You have not defined the CILHOME variable)
-  else
-    export CILHOME := $(shell pwd)/..
-  endif
-endif
-
+CILHOME := $(CURDIR)/..
 CILLY := $(CILHOME)/bin/cilly
-PATCHER := $(CILHOME)/bin/patcher
 
-# Now do the user-specific customization
-# It is Ok if this file does not exist
--include $(CILHOME)/.cilrc
-
-# as a convenience, let RELEASE=1 on the command line imply
-# all options designed to make things fast (at least when not in
-# the middle of development)
-ifdef RELEASE
-  # use native code tools
-  export NATIVECAML := 1
-  export CILLY += -O2
-endif
-
-# By default we are on Linux
-ifndef ARCHOS
-  ARCHOS := x86_WIN32
-endif
-
-# By default use the old patcher
-ifndef NEWPATCH
-  OLDPATCH := 1
-endif
-
-
-# Now include the compiler specific stuff
 ifdef _MSVC
-  include ../Makefile.msvc
+	include Makefile.msvc
 else
-  ifdef _GNUCC
-    include ../Makefile.gcc
-  endif
+ifdef _GNUCC
+	include Makefile.gcc
 endif
-
+endif
 
 CILLY += --mode=$(COMPILERNAME) --decil
 
@@ -126,11 +86,11 @@ ifdef COMMLINES
   CILLY+= --commPrintLn
 endif
 
+ifdef USECFG
+	CILLY+= --domakeCFG
+endif
 ifdef USECABS
   CILLY+= --usecabs
-endif
-ifndef NATIVECAML
-  CILLY+= --bytecode
 endif
 ifdef VERBOSE
   CILLY+= --verbose --warnall
@@ -149,6 +109,9 @@ ifdef COMPUTEDGOTO
 endif
 ifdef LOCALINIT
   CILLY+= --noMakeStaticGlobal
+endif
+ifdef OPTIMIZE
+	CILLY+= $(OPT_O2)
 endif
 
 
@@ -189,6 +152,12 @@ ifdef PROFILE
   CILLY+= -pg
 endif
 
+ifdef SHELL_ESCAPE
+	INCLUDE_DEF := -DSTDIO=<stdio.h>
+	INCLUDE_DEF2 := -DTEST="testharness.h"
+	CFLAGS += "$(INCLUDE_DEF)" '$(INCLUDE_DEF2)'
+endif
+
 # sm: use this instead of "sh ./testit" for those self-tests which can't
 # be made to work on windows; it does nothing, and has no output
 UNIXTESTIT := sh ./testit
@@ -206,12 +175,6 @@ mustbegcc :
 ifndef _GNUCC
 	@echo This test case works only with _GNUCC=1; exit 3
 endif
-
-mustbelinux:
-ifneq ($(ARCHOS), x86_LINUX)
-	@echo This test case works only on Linux; exit 3
-endif
-
 
 ############ Small tests
 SMALL1 := $(TESTDIR)/small1
@@ -289,14 +252,13 @@ scott-nolink/%: $(TESTDIR)/small2/%.c $(TARGET_DEP)
 
 
 
-ARCHOS := $(ARCHOS)
-OBJDIR := $(CILHOME)/obj/$(ARCHOS)
+OBJDIR := $(CILHOME)/_build/src
 ifdef NATIVECAML
  CMXA := cmxa
  CAMLC := ocamlopt
 else
  CMXA := cma
- CAMLC := ocamlc -custom
+ CAMLC := ocamlc
 endif
 
 testrun/% : $(SMALL1)/%.ml
@@ -333,19 +295,13 @@ structs : mustbemanju
 # sm: yet another failure-test target, this time utilizing a nomerge
 # script capable of testing multiple failures per file
 test-bad/%: $(TESTDIR)/small2/%.c $(TARGET_DEP)
-ifdef _MSVC
-ifndef RELEASE
-	@echo ">>>>> Set RELEASE=1 when using MSVC to avoid those\
-	pesky dialog boxes. <<<<<"
-endif
-endif
 	cd $(TESTDIR)/small2; \
 	  CILHOME="$(CILHOME)" \
 	  CILLY="$(CILLY) --nomerge --commPrintLn" \
 	  CFLAGS="$(CFLAGS) $(WARNALL)" \
           TESTBADONCE="$(TESTBADONCE)" \
 	  _MSVC="$(_MSVC)" \
-	  bash ../../bin/test-bad $*.c
+	  bash ../test-bad $*.c
 
 test-bad1/%: $(TESTDIR)/small1/%.c $(TARGET_DEP)
 	cd $(TESTDIR)/small1; \
@@ -354,7 +310,7 @@ test-bad1/%: $(TESTDIR)/small1/%.c $(TARGET_DEP)
 	  CFLAGS=" $(CFLAGS) $(WARNALL)" \
           TESTBADONCE="$(TESTBADONCE)" \
 	  _MSVC="$(_MSVC)" \
-	  bash ../../bin/test-bad $*.c
+	  bash ../test-bad $*.c
 
 
 #CCURED_NO_SIGABRT prevents cygwin from doing a memory dump on every failure
@@ -366,7 +322,7 @@ runall/%: $(TESTDIR)/small2/%.c $(TARGET_DEP)
 	   $(CFLAGS) $(WARNALL) __FILE__  $(EXEOUT)__BASENAME__.exe \
 	   && ./__BASENAME__.exe" \
 	COMMENT="//" \
-	 perl ../../ocamlutil/runall.pl $*.c
+	 perl ../runall.pl $*.c
 
 
 runall_syntax/%: $(TESTDIR)/small2/%.c $(TARGET_DEP)
@@ -376,7 +332,7 @@ runall_syntax/%: $(TESTDIR)/small2/%.c $(TARGET_DEP)
 	   $(CFLAGS) $(WARNALL) __FILE__  $(EXEOUT)__BASENAME__.exe \
 	   && ./__BASENAME__.exe && cat __BASENAME__.cured.c" \
 	COMMENT="//" \
-	 perl ../../ocamlutil/runall.pl $*.c
+	 perl ../runall.pl $*.c
 
 # sm: trivial test of combiner
 MYSAFECC := $(CILLY)

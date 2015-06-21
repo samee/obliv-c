@@ -308,6 +308,10 @@ and typeMatch (t1: typ) (t2: typ) =
         TInt (ik, _), TEnum (ei, _) when ik = ei.ekind -> ()
       | TEnum (ei, _), TInt (ik, _) when ik = ei.ekind -> ()
           
+      (* Allow unspecified array lengths - this happens with
+       * flexible array members *)
+      | TArray (t, None, _), TArray (t', _, _)
+      | TArray (t, _, _), TArray (t', None, _) -> typeMatch t t'
       | _, _ -> ignore (warn "Type mismatch:@!    %a@!and %a@!"
                            d_type t1 d_type t2)
   end else begin
@@ -623,14 +627,16 @@ and checkInit  (i: init) : typ =
       | CompoundInit (ct, initl) -> begin
           checkType ct CTSizeof;
           (match unrollType ct with
-            TArray(bt, Some elen, _) -> 
-              ignore (checkExp true elen);
+            TArray(bt, elen, _) -> 
               let len =
-                match isInteger (constFold true elen) with
+                match elen with
+                | None -> 0L
+                | Some e -> (ignore (checkExp true e);
+                match isInteger (constFold true e) with
                   Some len -> len
                 | None -> 
                     ignore (warn "Array length is not a constant");
-                    0L
+                    0L)
               in
               let rec loopIndex i = function
                   [] -> 
@@ -647,8 +653,6 @@ and checkInit  (i: init) : typ =
                     ignore (warn "Malformed initializer for array element")
               in
               loopIndex Int64.zero initl
-          | TArray(_, None, _) -> 
-              ignore (warn "Malformed initializer for array")
           | TComp (comp, _) -> 
               if comp.cstruct then
                 let rec loopFields 
@@ -717,6 +721,13 @@ and checkStmt (s: stmt) =
         | Case (e, _) -> 
            let t = checkExp true e in
            if not (isIntegralType t) then
+               E.s (bug "Type of case expression is not integer");
+        | CaseRange (e1, e2, _) ->
+           let t1 = checkExp true e1 in
+           if not (isIntegralType t1) then
+               E.s (bug "Type of case expression is not integer");
+           let t2 = checkExp true e2 in
+           if not (isIntegralType t2) then
                E.s (bug "Type of case expression is not integer");
         | _ -> () (* Not yet implemented *)
       in

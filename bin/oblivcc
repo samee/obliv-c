@@ -7,6 +7,9 @@ CILLYARGS=""
 OCSRC=()
 GCRYPT="-lgcrypt"
 
+$OCCPATH/bin/cilly --keepunused --doprocessObliv --markImplicitCasts -include obliv_bits.h -I $OCLIB -L$OCCPATH/_build -lobliv -lgcrypt -pthread $*
+
+if false; then
 while [ $# -ge 1 ]; do
   if [ "$1" = "-c" ]; then
     COMPILE_ONLY=1
@@ -40,4 +43,6 @@ for src in ${OCSRC[*]}; do
   $OCCPATH/bin/cilobliv $src -I $OCLIB $CILLYARGS || exit
 done
 
-gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/obj/x86_LINUX $GCRYPT -pthread
+gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/_build $GCRYPT -pthread
+fi
+

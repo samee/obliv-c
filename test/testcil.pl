@@ -11,14 +11,12 @@ use File::Basename;         # File name parsing
 use Cwd;                    # Directory navigation
 use strict;
 # use Data::Dumper;
-use FindBin;
-use lib "$FindBin::Bin/../ocamlutil";
 
 use RegTest;
 
 $ENV{LANG} = 'C';
 
-print "Test infrastructure for CIL\n";
+print "Test infrastructure for CIL on $^O\n";
 
 # Create our customized test harness
 my $TEST = CilRegTest->new(AvailParams => { 'RUN' => 1,
@@ -36,7 +34,7 @@ my $inferbox="none";
 my $win32 = ($^O eq 'MSWin32' || $^O eq 'cygwin');
 my $unix = !$win32;
 my $solaris = $^O eq 'solaris';
-
+my $freebsd = $^O eq 'freebsd';
 
 # operating modes
 my $gcc =       "_GNUCC=1";     # sm: not sure where/why this is needed
@@ -49,7 +47,7 @@ my $egcs = $unix && system("gcc -v 2>&1 | grep egcs >/dev/null")==0;
 my $manju = $unix && system("hostname | grep manju >/dev/null")==0;
 
 my $make;
-if ($solaris) {
+if ($solaris || $freebsd) {
     $make = "gmake";
 } else {
     $make = "make";
@@ -165,12 +163,12 @@ sub addToGroup {
 $TEST->newTest(
     Name => "!inittests0",
     Dir => "..",
-    Cmd => "$make setup",
+    Cmd => "$make all",
     Group => ['ALWAYS']);
 $TEST->newTest(
     Name => "!inittests2",
     Dir => "..",
-    Cmd => "$make setup _GNUCC=1",
+    Cmd => "$make all _GNUCC=1",
     Group => ['ALWAYS']);
 
 
@@ -310,7 +308,6 @@ addTest("testrun/init15 _GNUCC=1");
 addTest("testrun/init16 ");
 addTest("testrun/init17 ");
 addTest("testrun/init18 ");
-addBadComment("testrun/init18", "Bug. Outstanding since 1.3.6 at least");
 addTest("testrun/init19 WARNINGS_ARE_ERRORS=1");
 addTest("testrun/init20 _GNUCC=1");
 addTest("testrun/init21 _GNUCC=1");
@@ -394,6 +391,10 @@ addTest("testrun/memcpy1");
 
 addTest("test/noreturn ");
                 
+addTest("test/constrexpr ");
+
+addTest("testrun/flexible-array-member ");
+addTest("test-bad1/flexible-array-member-bad ");
 
 addTest("testrun/label1");
 addTest("testrun/label2");
@@ -494,6 +495,9 @@ addTest("testrun/voidarg ");
 addTest("testrun/union2 ");
 addTest("testrun/union3 ");
 addTest("test/union5 ");
+addTest("testrun/union6 ");
+addBadComment("testrun/union6",
+  "Bug. Unsupported C11 implicit initialization of union padding.");
 addTest("runall/extinline ");
 
 addTest("testrun/rmtmps-attr ");
@@ -567,13 +571,14 @@ addTest("merge-ar ");
 
 addTest("testrun/sizeof1");
 addTest("testrun/sizeof2");
-addTest("testrun/sizeof3");
+addTest("test/sizeof3");
+addBadComment("test/sizeof3", "Bug. Constant-folding of very large arrays does not work on 32-bit machines.");
 addTest("test/outofmem ");
 addTest("testrun/builtin ");
 addTest("test/builtin2 ");
 addTest("testrun/builtin3 ");
 addTest("testrun/builtin_choose_expr");
-addTest("testrungcc/builtin_object_size _GNUCC=1");
+addTest("testrungcc/builtin_object_size _GNUCC=1 OPTIMIZE=1");
 addTest("testrun/builtin4 ");
 addTest("test/builtin5 ");
 addTest("test/sync-1 _GNUCC=1");
@@ -618,7 +623,8 @@ addTest("scott/open $gcc");
 addTest("scott/constfold");
 addTest("scott/mode_sizes $gcc");       # mode(__QI__) stuff
 addTest("scott-nolink/brlock $gcc");
-addTest("scott/regparm0 $gcc");         # this works, unfortunately... but the bug has been fixed nonetheless
+addTest("scott/regparm0 $gcc");         # this works, unfortunately...  but the bug has been fixed in CIL
+addBadComment("scott/regparm0", "Notbug. Some gcc versions fail to compile this test on i386");
 addTest("scott/unscomp");               # kernel/fs/buffer.c
 addTest("scott/thing");
 
@@ -698,7 +704,7 @@ addTest("scott/enumerator_sizeof");
 addTest("testrun/decl_mix_stmt");
 addTest("scott/enumattr");
 addTest("runall/alpha");
-addTest("testrun/blockattr2");
+addTest("testrun/blockattr2 USECFG=1");
 addTest("testrun/extinline2");
 addTest("test/extinline3");
 addTest("testrun/bool");
@@ -708,6 +714,7 @@ addTest("testrun/compound1");
 addBadComment("testrun/compound1", "Notbug. Undefined behavior (probably).");
 addTest("testrun/compound2");
 
+addTest("test/shell-escape SHELL_ESCAPE=1");
 
 # ---------------- c-torture -------------
 ## if we have the c-torture tests add them
@@ -856,9 +863,7 @@ sub testCommandExtras {
     my ($self, $extraargs) = @_;
 
     # (sm: pulled this out of addTests so I could write my own addTests)
-    my $theargs = defined($self->{option}->{cildebug})
-        ? " " : " RELEASE=1 ";
-    $theargs .= " $extraargs ";
+    my $theargs = " $extraargs ";
     if(defined $self->{option}->{noremake}) {
         $theargs .= " NOREMAKE=1";
     }

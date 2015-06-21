@@ -79,10 +79,11 @@ let useLogicalOperators = ref false
 
 let useComputedGoto = ref false
 
+let useCaseRange = ref false
 
 module M = Machdep
 (* Cil.initCil will set this to the current machine description.
-   Makefile.cil generates the file obj/@ARCHOS@/machdep.ml,
+   Makefile.cil generates the file src/machdep.ml,
    which contains the descriptions of gcc and msvc. *)
 let envMachine : M.mach option ref = ref None
 
@@ -724,6 +725,8 @@ and label =
            * input source program. If the bool is "false", the label was 
            * created by CIL or some other transformation *)
   | Case of exp * location              (** A case statement *)
+  | CaseRange of exp * exp * location   (** A case statement corresponding to a
+                                            range of values *)
   | Default of location                 (** A default statement *)
 
 
@@ -859,36 +862,9 @@ and typsig =
     TSArray of typsig * int64 option * attribute list
   | TSPtr of typsig * attribute list
   | TSComp of bool * string * attribute list
-  | TSFun of typsig * typsig list * bool * attribute list
+  | TSFun of typsig * typsig list option * bool * attribute list
   | TSEnum of string * attribute list
   | TSBase of typ
-
-
-
-(** To be able to add/remove features easily, each feature should be packaged 
-   * as an interface with the following interface. These features should be *)
-type featureDescr = {
-    fd_enabled: bool ref; 
-    (** The enable flag. Set to default value  *)
-
-    fd_name: string; 
-    (** This is used to construct an option "--doxxx" and "--dontxxx" that 
-     * enable and disable the feature  *)
-
-    fd_description: string; 
-    (* A longer name that can be used to document the new options  *)
-
-    fd_extraopt: (string * Arg.spec * string) list; 
-    (** Additional command line options.  The description strings should
-        usually start with a space for Arg.align to print the --help nicely. *)
-
-    fd_doit: (file -> unit);
-    (** This performs the transformation *)
-
-    fd_post_check: bool; 
-    (* Whether to perform a CIL consistency checking after this stage, if 
-     * checking is enabled (--check is passed to cilly) *)
-}
 
 let locUnknown = { line = -1; 
 		   file = ""; 
@@ -1267,6 +1243,7 @@ let stringLiteralType = ref charPtrType
 let voidPtrType = TPtr(voidType, [])
 let intPtrType = TPtr(intType, [])
 let uintPtrType = TPtr(uintType, [])
+let boolPtrType = TPtr(boolType, [])
 
 let doubleType = TFloat(FDouble, [])
 
@@ -1415,7 +1392,7 @@ let attributeHash: (string, attributeClass) H.t =
 
   List.iter (fun a -> H.add table a (AttrFunType false))
     [ "format"; "regparm"; "longcall"; 
-      "noinline"; "always_inline"; "leaf";
+      "noinline"; "always_inline"; "gnu_inline"; "leaf";
       "artificial"; "warn_unused_result"; "nonnull";
     ];
 
@@ -2974,6 +2951,7 @@ let initGccBuiltins () : unit =
     with Not_found ->
       ()
   in
+  addSwap 16;
   addSwap 32;
   addSwap 64;
 
@@ -3002,6 +2980,9 @@ let initGccBuiltins () : unit =
   H.add h "__builtin_expl" (longDoubleType, [ longDoubleType ], false);
 
   H.add h "__builtin_expect" (longType, [ longType; longType ], false);
+
+  H.add h "__builtin_trap" (voidType, [], false);
+  H.add h "__builtin_unreachable" (voidType, [], false);
 
   H.add h "__builtin_fabs" (doubleType, [ doubleType ], false);
   H.add h "__builtin_fabsf" (floatType, [ floatType ], false);
@@ -3081,6 +3062,8 @@ let initGccBuiltins () : unit =
   H.add h "__builtin_prefetch" (voidType, [ voidConstPtrType ], true);
   H.add h "__builtin_return" (voidType, [ voidConstPtrType ], false);
   H.add h "__builtin_return_address" (voidPtrType, [ uintType ], false);
+  H.add h "__builtin_extract_return_addr" (voidPtrType, [ voidPtrType ], false);
+  H.add h "__builtin_frob_return_address" (voidPtrType, [ voidPtrType ], false);
 
   H.add h "__builtin_sin" (doubleType, [ doubleType ], false);
   H.add h "__builtin_sinf" (floatType, [ floatType ], false);
@@ -3126,9 +3109,10 @@ let initGccBuiltins () : unit =
   H.add h "__builtin_ia32_unpcklps" (v4sfType, [v4sfType; v4sfType], false);
   H.add h "__builtin_ia32_maxps" (v4sfType, [v4sfType; v4sfType], false);
 
-  (* Atomic Builtins *)
-  (* These builtins are overloaded, hence the "magic" void type with
-     __overloaded__ attribute, used to suppress warnings in cabs2cil.ml.
+  (* Atomic Builtins
+     These builtins have an overloaded return type, hence the "magic" void type
+     with __overloaded__ attribute, used to infer return type from parameters in
+     cabs2cil.ml.
      For the same reason, we do not specify the type of the parameters. *)
   H.add h "__sync_fetch_and_add" (TVoid[Attr("overloaded",[])], [ ], true);
   H.add h "__sync_fetch_and_sub" (TVoid[Attr("overloaded",[])], [ ], true);
@@ -3148,6 +3132,62 @@ let initGccBuiltins () : unit =
   H.add h "__sync_synchronize" (voidType, [ ], true);
   H.add h "__sync_lock_test_and_set" (TVoid[Attr("overloaded",[])], [ ], true);
   H.add h "__sync_lock_release" (voidType, [ ], true);
+
+  (* __atomic builtins for various bit widths
+
+     Most __atomic functions are offered for various bit widths, using
+     a different suffix for each concrete bit width:  "_1", "_2", and
+     so on up to "_16".  Each of these functions also exists in a form
+     with no bit width specified, and occasionally with a bit width
+     suffix of "_n".
+
+     Note that these __atomic functions are not really va_arg, but we
+     set the va_arg flag nonetheless because it prevents CIL from
+     trying to check the type of parameters against the prototype.
+   *)
+
+  let addAtomicForWidths baseName ?n ~none ~num () =
+    (* ?n gives the return type to be used with the "_n" suffix, if any *)
+    (* ~none gives the return type to be used with no suffix *)
+    (* ~num gives the return type to be used with the "_1" through "_16" suffixes *)
+    let addWithSuffix suffix returnType =
+      let identifier = "__atomic_" ^ baseName ^ suffix in
+      H.add h identifier (returnType, [], true)
+    in
+    List.iter begin
+	fun bitWidth ->
+	let suffix = "_" ^ (string_of_int bitWidth) in
+	addWithSuffix suffix num
+      end [1; 2; 4; 8; 16];
+    addWithSuffix "" none;
+    match n with
+    | None -> ()
+    | Some typ -> addWithSuffix "_n" typ
+  in
+
+  let anyType = TVoid [Attr("overloaded", [])] in
+
+  (* binary operations combined with a fetch of either the old or new value *)
+  List.iter begin
+      fun operation ->
+      addAtomicForWidths ("fetch_" ^ operation) ~none:anyType ~num:anyType ();
+      addAtomicForWidths (operation ^ "_fetch") ~none:anyType ~num:anyType ()
+    end ["add"; "and"; "nand"; "or"; "sub"; "xor"];
+
+  (* other atomic operations provided at various bit widths *)
+  addAtomicForWidths "compare_exchange" ~none:boolType ~n:boolType ~num:boolType ();
+  addAtomicForWidths "exchange" ~none:voidType ~n:anyType ~num:anyType ();
+  addAtomicForWidths "load" ~none:voidType ~n:anyType ~num:anyType ();
+  addAtomicForWidths "store" ~none:voidType ~n:voidType ~num:voidType ();
+
+  (* Some atomic builtins actually have a decent, C-compatible type *)
+  H.add h "__atomic_test_and_set" (boolType, [voidPtrType; intType], false);
+  H.add h "__atomic_clear" (voidType, [boolPtrType; intType], false);
+  H.add h "__atomic_thread_fence" (voidType, [intType], false);
+  H.add h "__atomic_signal_fence" (voidType, [intType], false);
+  H.add h "__atomic_always_lock_free" (boolType, [sizeType; voidPtrType], false);
+  H.add h "__atomic_is_lock_free" (boolType, [sizeType; voidPtrType], false);
+  H.add h "__atomic_feraiseexcept" (voidType, [intType], false);
 
   if hasbva then begin
     H.add h "__builtin_va_end" (voidType, [ TBuiltin_va_list [] ], false);
@@ -3759,6 +3799,8 @@ class defaultCilPrinterClass : cilPrinter = object (self)
       Label (s, _, true) -> text (s ^ ": ")
     | Label (s, _, false) -> text (s ^ ": /* CIL Label */ ")
     | Case (e, _) -> text "case " ++ self#pExp () e ++ text ": "
+    | CaseRange (e1, e2, _) -> text "case " ++ self#pExp () e1 ++ text " ... "
+        ++ self#pExp () e2 ++ text ": "
     | Default _ -> text "default: "
 
   (* The pBlock will put the unalign itself *)
@@ -4015,7 +4057,8 @@ class defaultCilPrinterClass : cilPrinter = object (self)
 
     | GEnumTagDecl (enum, l) -> (* This is a declaration of a tag *)
         self#pLineDirective l ++
-          text ("enum " ^ enum.ename ^ ";\n")
+          text "enum " ++ text enum.ename ++ chr ' '
+          ++ self#pAttrs () enum.eattr ++ text ";\n"
 
     | GCompTag (comp, l) -> (* This is a definition of a tag *)
         let n = comp.cname in
@@ -4035,8 +4078,12 @@ class defaultCilPrinterClass : cilPrinter = object (self)
           (self#pAttrs () rest_attr) ++ text ";\n"
 
     | GCompTagDecl (comp, l) -> (* This is a declaration of a tag *)
-        self#pLineDirective l ++
-          text (compFullName comp) ++ text ";\n"
+        let su = if comp.cstruct then "struct " else "union " in
+        let sto_mod, rest_attr = separateStorageModifiers comp.cattr in
+        self#pLineDirective l
+          ++ text su ++ self#pAttrs () sto_mod
+          ++ text comp.cname ++ chr ' '
+          ++ self#pAttrs () rest_attr ++ text ";\n"
 
     | GVar (vi, io, l) ->
         self#pLineDirective ~forcefile:true l ++
@@ -4868,9 +4915,14 @@ let rec d_typsig () = function
         (if iss then "struct" else "union") name
         d_attrlist al
   | TSFun (rt, args, isva, al) -> 
-      dprintf "TSFun(@[%a,@?%a,%b,@?%a@])"
+      dprintf "TSFun(@[%a,@?%a,%B,@?%a@])"
         d_typsig rt
-        (docList ~sep:(chr ',' ++ break) (d_typsig ())) args isva
+        insert
+        (match args with
+        | None -> text "None"
+        | Some args ->
+            docList ~sep:(chr ',' ++ break) (d_typsig ()) () args)
+        isva
         d_attrlist al
   | TSEnum (n, al) -> 
       dprintf "TSEnum(@[%s,@?%a@])"
@@ -5148,21 +5200,25 @@ let doVisit (vis: cilVisitor)
 
 (* mapNoCopy is like map but avoid copying the list if the function does not 
  * change the elements. *)
-let rec mapNoCopy (f: 'a -> 'a) = function
-    [] -> []
-  | (i :: resti) as li -> 
+let mapNoCopy (f: 'a -> 'a) l =
+  let rec aux acc changed = function
+    [] -> if changed then List.rev acc else l
+  | i :: resti -> 
       let i' = f i in
-      let resti' = mapNoCopy f resti in
-      if i' != i || resti' != resti then i' :: resti' else li 
+      aux (i' :: acc) (changed || i != i') resti
+  in aux [] false l
 
-let rec mapNoCopyList (f: 'a -> 'a list) = function
-    [] -> []
-  | (i :: resti) as li -> 
+let rec mapNoCopyList (f: 'a -> 'a list) l =
+  let rec aux acc changed = function
+    [] -> if changed then List.rev acc else l
+  | i :: resti -> 
       let il' = f i in
-      let resti' = mapNoCopyList f resti in
-      match il' with
-        [i'] when i' == i && resti' == resti -> li
-      | _ -> il' @ resti'
+      let has_changed =
+        match il' with
+          [i'] when i' == i -> false
+        | _ -> true in
+      aux (List.rev_append il' acc) (changed || has_changed) resti
+  in aux [] false l
 
 (* A visitor for lists *)
 let doVisitList  (vis: cilVisitor)
@@ -5425,6 +5481,10 @@ and childrenStmt (toPrepend: instr list ref) : cilVisitor -> stmt -> stmt =
         Case (e, l) as lb -> 
           let e' = fExp e in
           if e' != e then Case (e', l) else lb
+        | CaseRange (e1, e2, l) as lb ->
+          let e1' = fExp e1 in
+          let e2' = fExp e2 in
+          if e1' != e1 || e2' != e2 then CaseRange (e1', e2', l) else lb
         | lb -> lb
     in
     mapNoCopy fLabel s.labels
@@ -5833,7 +5893,6 @@ let mapGlobals (fl: file)
 
 let dumpFile (pp: cilPrinter) (out : out_channel) (outfile: string) file =
   printDepth := 99999;  (* We don't want ... in the output *)
-  (* If we are in RELEASE mode then we do not print indentation *)
 
   Pretty.fastMode := true;
 
@@ -6004,9 +6063,7 @@ let rec typeSigWithAttrs ?(ignoreSign=false) doattr t =
   | TComp (comp, a) -> 
       TSComp (comp.cstruct, comp.cname, doattr (addAttributes comp.cattr a))
   | TFun(rt,args,isva,a) -> 
-      TSFun(typeSig rt, 
-            Util.list_map (fun (_, atype, _) -> (typeSig atype)) (argsToList args),
-            isva, doattr a)
+      TSFun(typeSig rt, (Util.list_map_opt (fun (_, atype, _) -> (typeSig atype)) args), isva, doattr a)
   | TNamed(t, a) -> typeSigAddAttrs (doattr a) (typeSig t.ttype)
   | TBuiltin_va_list al -> TSBase (TBuiltin_va_list (doattr al))      
 
@@ -6204,7 +6261,7 @@ let rec makeZeroInit (t: typ) : init =
   match unrollType t with
     TInt (ik, _) -> SingleInit (Const(CInt64(Int64.zero, ik, None)))
   | TFloat(fk, _) -> SingleInit(Const(CReal(0.0, fk, None)))
-  | TEnum _ -> SingleInit zero
+  | TEnum (e, _) -> SingleInit (kinteger e.ekind 0)
   | TComp (comp, _) as t' when comp.cstruct -> 
       let inits = 
         List.fold_right
@@ -6588,6 +6645,26 @@ and succpred_stmt s fallthrough rlabels =
   | TryExcept _ | TryFinally _ -> 
       failwith "computeCFGInfo: structured exception handling not implemented"
 
+let caseRangeFold (l: label list) =
+  let rec fold acc = function
+  | ((Case _ | Default _ | Label _) as x) :: xs -> fold (x :: acc) xs
+  | CaseRange(el, eh, loc) :: xs ->
+      let il, ih, ik =
+        match constFold true el, constFold true eh with
+          Const(CInt64(il, ilk, _)), Const(CInt64(ih, ihk, _)) ->
+            mkCilint ilk il, mkCilint ihk ih, commonIntKind ilk ihk
+        | _ -> E.s (error "Cannot understand the constants in case range")
+      in
+      if compare_cilint il ih > 0 then
+        E.s (error "Empty case range");
+      let rec mkAll (i: cilint) acc =
+        if compare_cilint i ih > 0 then acc
+        else mkAll (add_cilint i one_cilint) (Case(kintegerCilint ik i, loc) :: acc)
+      in
+      fold (mkAll il acc) xs
+   | [] -> List.rev acc
+   in fold [] l
+
 (* [weimer] Sun May  5 12:25:24 PDT 2002
  * This code was pulled from ext/switch.ml because it looks like we really
  * want it to be part of CIL. 
@@ -6610,20 +6687,21 @@ let freshLabel (base:string) =
   fst (A.newAlphaName labelAlphaTable None base ())
 
 let rec xform_switch_stmt s break_dest cont_dest = begin
+  let suffix e = match getInteger e with
+  | Some value ->
+      if compare_cilint value zero_cilint < 0 then
+        "neg_" ^ string_of_cilint (neg_cilint value)
+        else
+          string_of_cilint value
+  | None -> "exp"
+  in
   s.labels <- Util.list_map (fun lab -> match lab with
     Label _ -> lab
   | Case(e,l) ->
-      let suffix =
-	match getInteger e with
-	| Some value -> 
-	    if compare_cilint value zero_cilint < 0 then
-	      "neg_" ^ string_of_cilint (neg_cilint value)
-	    else
-	      string_of_cilint value
-	| None ->
-	    "exp"
-      in
-      let str = "case_" ^ suffix in
+      let str = Printf.sprintf "case_%s" (suffix e) in
+      Label(freshLabel str,l,false)
+  | CaseRange(e1,e2,l) ->
+      let str = Printf.sprintf "caserange_%s_%s" (suffix e1) (suffix e2) in
       Label(freshLabel str,l,false)
   | Default(l) -> Label(freshLabel "switch_default",l,false)
   ) s.labels ; 
@@ -6694,27 +6772,38 @@ let rec xform_switch_stmt s break_dest cont_dest = begin
         with
         Not_found -> (* this is a list of specific cases *)
           match cases with
-          | Case (ce,cl) :: lab_tl ->
-              (* assume that integer promotion and type conversion of cases is
-               * performed by cabs2cil. *)
-              let make_eq exp =  BinOp(Eq, e, exp, typeOf e) in
-              let make_or_from_cases =
-                List.fold_left
-                    (fun pred label -> match label with
-                           Case (exp, _) -> BinOp(LOr, pred, make_eq exp, intType)
-                         | _ -> E.s (bug "Unexpected pattern-matching failure"))
-                    (make_eq ce)
+          | ((Case (_, cl) | CaseRange (_, _, cl)) as lab) :: lab_tl ->
+            (* assume that integer promotion and type conversion of cases is
+             * performed by cabs2cil. *)
+            let comp_case_range e1 e2 =
+                  BinOp(Ge, e, e1, intType), BinOp(Le, e, e2, intType) in
+            let make_comp lab = begin match lab with
+              | Case (exp, _) -> BinOp(Eq, e, exp, intType)
+              | CaseRange (e1, e2, _) when !useLogicalOperators ->
+                  let c1, c2 = comp_case_range e1 e2 in
+                  BinOp(LAnd, c1, c2, intType)
+              | _ -> E.s (bug "Unexpected pattern-matching failure")
+            end in
+            let make_or_from_cases () =
+              List.fold_left
+                  (fun pred label -> BinOp(LOr, pred, make_comp label, intType))
+                  (make_comp lab) lab_tl
             in
             let make_if_stmt pred cl =
               let then_block = mkBlock [ mkStmt (Goto(ref stmt,cl)) ] in
               let else_block = mkBlock [] in
               mkStmt(If(pred,then_block,else_block,cl)) in
+            let make_double_if_stmt (pred1, pred2) cl =
+              let then_block = mkBlock [ make_if_stmt pred2 cl ] in
+              let else_block = mkBlock [] in
+              mkStmt(If(pred1,then_block,else_block,cl)) in
             if !useLogicalOperators then
-              [make_if_stmt (make_or_from_cases lab_tl) cl]
+              [make_if_stmt (make_or_from_cases ()) cl]
             else
-              List.map
-                (function Case (ce,cl) -> make_if_stmt (make_eq ce) cl
-                         | _ -> E.s (bug "Unexpected pattern-matching failure"))
+              List.map (function
+                | Case _ as lab -> make_if_stmt (make_comp lab) cl
+                | CaseRange (e1, e2, _) -> make_double_if_stmt (comp_case_range e1 e2) cl
+                | _ -> E.s (bug "Unexpected pattern-matching failure"))
                 cases
           | Default _ :: _ | Label _ :: _ ->
               E.s (bug "Unexpected pattern-matching failure")

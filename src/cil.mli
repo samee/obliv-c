@@ -44,8 +44,7 @@
 
 open Cilint
 
-(** {b CIL API Documentation.}  An html version of this document 
- *  can be found at http://hal.cs.berkeley.edu/cil *)
+(** {b CIL API Documentation.} *)
 
 (** Call this function to perform some initialization. Call if after you have 
  * set {!Cil.msvcMode}.  *)
@@ -431,10 +430,6 @@ and enuminfo = {
       * should always be IInt, but gcc allows other integer kinds *)
 }
 
-(** {b Enumerations.} Information about an enumeration. This is shared by all 
- * references to an enumeration. Make sure you have a [GEnumTag] for each of 
- * of these. *)
-
 (** Information about a defined type *)
 and typeinfo = {
     mutable tname: string;              
@@ -614,6 +609,8 @@ and exp =
      * one to use. *)
 
   | AddrOfLabel of stmt ref
+    (** The address of a label, using GCC's label-as-value extension.  If you
+     * want to use these, you must set {!Cil.useComputedGoto}. *)
 
   | StartOf    of lval   
     (** Conversion from an array to a pointer to the beginning of the array. 
@@ -931,6 +928,13 @@ and label =
                                          * is lowered into a constant if 
                                          * {!Cil.lowerConstants} is set to 
                                          * true. *)
+  | CaseRange of exp * exp * location   (** A case statement corresponding to a
+                                         * range of values (GCC's extension).
+                                         * Both expressions are lowered into
+                                         * constants if {!Cil.lowerConstants} is
+                                         * set to true. If you want to use
+                                         * these, you must set
+                                         * {!Cil.useCaseRange}. *)
   | Default of location                 (** A default statement *)
 
 
@@ -952,6 +956,8 @@ and stmtkind =
     * statement. The target statement MUST have at least a label. *)
 
   | ComputedGoto of exp * location         
+  (** A computed goto using GCC's label-as-value extension.  If you want to use
+   * these, you must set {!Cil.useComputedGoto}. *)
 
   | Break of location                   
    (** A break to the end of the nearest enclosing Loop or Switch *)
@@ -1103,7 +1109,7 @@ and typsig =
     TSArray of typsig * int64 option * attribute list
   | TSPtr of typsig * attribute list
   | TSComp of bool * string * attribute list
-  | TSFun of typsig * typsig list * bool * attribute list
+  | TSFun of typsig * typsig list option * bool * attribute list
   | TSEnum of string * attribute list
   | TSBase of typ
 
@@ -1116,32 +1122,6 @@ val lowerConstants: bool ref
 
 val insertImplicitCasts: bool ref
     (** Do insert implicit casts (default true) *)
-
-(** To be able to add/remove features easily, each feature should be package 
-   * as an interface with the following interface. These features should be *)
-type featureDescr = {
-    fd_enabled: bool ref; 
-    (** The enable flag. Set to default value  *)
-
-    fd_name: string; 
-    (** This is used to construct an option "--doxxx" and "--dontxxx" that 
-     * enable and disable the feature  *)
-
-    fd_description: string; 
-    (** A longer name that can be used to document the new options  *)
-
-    fd_extraopt: (string * Arg.spec * string) list; 
-    (** Additional command line options.  The description strings should
-        usually start with a space for Arg.align to print the --help nicely. *)
-
-    fd_doit: (file -> unit);
-    (** This performs the transformation *)
-
-    fd_post_check: bool; 
-    (** Whether to perform a CIL consistency checking after this stage, if 
-     * checking is enabled (--check is passed to cilly). Set this to true if 
-     * your feature makes any changes for the program. *)
-}
 
 (** Comparison function for locations.
  ** Compares first by filename, then line, then byte *)
@@ -1367,7 +1347,7 @@ val doubleType: typ
  *  and is set when you call {!Cil.initCIL}. *)
 val upointType: typ ref
 
-(** An unsigned integer type that fits pointer difference. Depends on
+(** An signed integer type that fits pointer difference. Depends on
  *  {!Cil.msvcMode} and is set when you call {!Cil.initCIL}. *)
 val ptrdiffType: typ ref
 
@@ -1489,6 +1469,7 @@ val existsType: (typ -> existsAction) -> typ -> bool
  * a function type *)
 val splitFunctionType: 
     typ -> typ * (string * typ * attributes) list option * bool * attributes
+
 (** Same as {!Cil.splitFunctionType} but takes a varinfo. Prints a nicer 
  * error message if the varinfo is not for a function *)
 val splitFunctionTypeVI: 
@@ -2034,6 +2015,15 @@ val useLogicalOperators: bool ref
 (** Whether to use GCC's computed gotos.  By default, do not use them and
  * replace them by a switch. *)
 val useComputedGoto: bool ref
+
+(** Whether to expand ranges of values in case statements.  By default, expand
+ * them and do not use the CaseRange constructor. *)
+val useCaseRange: bool ref
+
+(** Fold every {!CaseRange} in a list of labels into the corresponding list of
+ * {!Case} labels.  Raises {!Errormsg.Error} if one of the ranges cannot be
+ * constant folded. *)
+val caseRangeFold: label list -> label list
 
 (** Set this to true to get old-style handling of gcc's extern inline C extension:
    old-style: the extern inline definition is used until the actual definition is
