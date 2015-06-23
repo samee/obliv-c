@@ -9,6 +9,14 @@ Step 2) Initialize Opam for first use. Use `opam --version` to check Opam versio
 
   * If it is 1.2 or higher, you can just run `opam init`
   * If it is 1.1, run `opam init https://opam.ocaml.org/1.1`
+ 
+It will ask you to add a line on your `~/.bashrc`. Say 'y', do *not* just press enter. If you do press enter by mistake, either rerun the `init` command as above, or manually add the following line:
+
+```
+. ~/.opam/opam-init/init.sh > /dev/null 2> /dev/null || true
+```
+ 
+Or, you can of course just run this command each time you do a `./configure`.
 
 Step 3) Install findlib: `opam install ocamlfind`
 
