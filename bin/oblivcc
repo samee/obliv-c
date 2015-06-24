@@ -7,7 +7,7 @@ CILLYARGS=""
 OCSRC=()
 GCRYPT="-lgcrypt"
 
-$OCCPATH/bin/cilly --keepunused --doprocessObliv --markImplicitCasts -include obliv_bits.h -I $OCLIB -L$OCCPATH/_build -lobliv -lgcrypt -pthread $*
+$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations  --keepunused --doprocessObliv --markImplicitCasts -include obliv_bits.h -I $OCLIB -L$OCCPATH/_build -lobliv -lgcrypt -pthread $*
 
 if false; then
 while [ $# -ge 1 ]; do

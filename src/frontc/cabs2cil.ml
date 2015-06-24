@@ -1251,7 +1251,7 @@ let defaultArgumentPromotion (t : typ) : typ = (* c.f. ISO 6.5.2.2:6 *)
   | TFloat (FFloat, a) -> TFloat (FDouble, a)
   | _ -> if isIntegralType t then integralPromotion t else t
 
-let arithmeticConversion    (* c.f. ISO 6.3.1.8 *)
+let arithmeticConversionBasic    (* c.f. ISO 6.3.1.8 *)
     (t1: typ)
     (t2: typ) : typ =
   match unrollType t1, unrollType t2 with
@@ -1313,6 +1313,15 @@ let arithmeticConversion    (* c.f. ISO 6.3.1.8 *)
       | _, _ -> E.s (error "arithmeticConversion")
 
   end
+
+let propagateOblivArithmetic (t1: typ) (t2: typ) (tr: typ) : typ =
+  if isOblivSimple (unrollType t1) || isOblivSimple (unrollType t2)
+    then addOblivType tr
+    else tr
+
+let arithmeticConversion (t1: typ) (t2: typ) : typ =
+  let tr = arithmeticConversionBasic t1 t2 in
+  propagateOblivArithmetic t1 t2 tr
 
   
 (* Specify whether the cast is from the source code *)
