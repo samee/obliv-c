@@ -1,3 +1,5 @@
+Variable length arrays are failing, because alloca() is non-obliv. We should have a way to re-declare existing functions as obliv, so compiler can shut up.
+
 Integrate test suite into make test, make it all a separate target that builds only binary.
 
 Cast to obliv on return needs to go through known() functions
