@@ -1,0 +1,111 @@
+// Samuel Havron <havron@virginia.edu>
+// https://www.github.com/samuelhavron
+// MIT License
+// WARNING: CURRENTLY IN DEVELOPMENT, WILL NOT SUCCESSFULLY COMPUTE DATA
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <obliv.oh>
+#include "linReg.h"
+
+// Forward declarations
+void linear_regression(protocolIO *io, obliv int x[MAXN], obliv int y[MAXN], obliv int om, obliv int ob, obliv int or);
+void check_input_count(protocolIO *io);
+void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN]);
+
+
+void linReg(void* args) {
+  protocolIO *io = (protocolIO*) args;
+  
+  int x[MAXN];
+  int y[MAXN];
+  obliv int ox[MAXN];
+  obliv int oy[MAXN];
+
+  obliv int om = 0;
+  obliv int ob = 0;
+  obliv int or = 0;
+  
+  load_data(io, x, y, ocCurrentParty());
+  check_input_count(io);
+  toObliv(io, ox, x);
+  toObliv(io, oy, y);
+
+  
+  // Unsuccessful attempt to check elements of ox array
+  int res[MAXN];
+  int i;
+  for (i = 0; i < io->n; i++) { // io->n already up-to-date from load_data()
+   revealOblivInt(&res[i], ox[i], 0);
+   printf("%d\n", res[i]);
+  }
+
+  exit(1); //!!! placeholder before modifying the incomplete linear_regression() function
+  linear_regression(io, ox, oy, om, ob, or);
+  revealOblivInt(&io->m, om, 0);
+  revealOblivInt(&io->b, ob, 0);
+  revealOblivInt(&io->r, or, 0);
+}
+
+void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN]) {
+ int party = ocCurrentParty();
+ int i;
+ for(i = 0; i < io->n; i++) {
+  oa[i] = feedOblivInt(a[i], party);
+ }
+}
+
+void linear_regression(protocolIO *io, obliv int ox[MAXN], obliv int oy[MAXN], obliv int om, obliv int ob, obliv int or) {
+ 
+  int n = io->n;
+  int x[MAXN] = io->x[MAXN]; // placeholder, must be removed
+  int y[MAXN] = io->y[MAXN]; // placeholder, must be removed
+
+  double sumx = DESCALE(sum(x, n)); // sum of x
+  double sumxx = DESCALE(dotProd(x, x, n)); // sum of each x squared
+  double sumy = DESCALE(sum(y, n)); // sum of y
+  double sumyy = DESCALE(dotProd(y, y, n)); // sum of each y squared
+  double sumxy = DESCALE(dotProd(x, y, n)); // sum of each x * y
+  
+  double m, b, r;
+  // Compute least-squares best fit straight line
+  m = (n * sumxy - sumx * sumy) / (n * sumxx - sqr(sumx)); // slope
+  b = (sumy * sumxx - (sumx * sumxy)) / (n * sumxx - sqr(sumx)); // y-intercept
+  r = (sumxy - sumx * sumy / n) / sqrt((sumxx - sqr(sumx) / n) * (sumyy - sqr(sumy)/ n)); // correlation
+
+  om = feedOblivInt(m, 1); // these lines will not be needed once computation is obliv
+  ob = feedOblivInt(b, 1); //
+  or = feedOblivInt(r, 1); //
+}
+
+int sqr(int x) {
+  return x * x;
+}
+
+int dotProd(int a[MAXN], int b[MAXN], int n) { // implement with obliv int and no integer overflow
+  double dotProd = 0;
+  int result = 0;
+  int i;
+  for (i = 0; i < n; i++) {
+    dotProd += DESCALE(a[i]) * DESCALE(b[i]); // int overflow if not descaled
+  }
+  result = dotProd * SCALE;
+  return result;
+}
+
+int sum(int a[MAXN], int n) {
+  int sum = 0;
+  int i;
+  for (i = 0; i < n; i++) {
+    sum += a[i];
+  }
+  return sum;
+}
+
+void check_input_count(protocolIO *io) {
+ if (ocBroadcastInt(io->n, 1) != ocBroadcastInt(io->n, 2)) {
+    printf("ERROR: Unequal amount of data points.\n");
+    exit(1);
+  }
+}
