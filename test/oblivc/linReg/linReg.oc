@@ -30,7 +30,6 @@ void linReg(void* args) {
   
   load_data(io, x, y, ocCurrentParty());
   check_input_count(io);
-  int party = ocCurrentParty();
   toOblivX(io, ox, x);
   toOblivY(io, oy, y);
   
