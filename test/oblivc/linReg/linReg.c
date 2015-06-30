@@ -25,9 +25,9 @@ int main(int argc, char *argv[]) {
     io.src = argv[3]; // filename
     execYaoProtocol(&pd, linReg, &io); // start linReg.oc
 
-    fprintf(stderr, "\nSlope   \tm = %15.6e\n", DESCALE(io.m)); // print slope
-    fprintf(stderr, "y-intercept\tb = %15.6e\n", DESCALE(io.b)); // print y-intercept
-    fprintf(stderr, "Correlation\tr = %15.6e\n", DESCALE(io.r)); // print correlation
+    //fprintf(stderr, "\nSlope   \tm = %15.6e\n", DESCALE(io.m)); // print slope
+    //fprintf(stderr, "y-intercept\tb = %15.6e\n", DESCALE(io.b)); // print y-intercept
+    //fprintf(stderr, "Correlation\tr = %15.6e\n", DESCALE(io.r)); // print correlation
     cleanupProtocol(&pd);
   } else {
     printf("Usage: %s <port> <1|2> <filename>\n", argv[0]);

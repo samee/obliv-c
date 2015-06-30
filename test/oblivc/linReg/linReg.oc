@@ -12,7 +12,8 @@
 // Forward declarations
 void linear_regression(protocolIO *io, obliv int x[MAXN], obliv int y[MAXN], obliv int om, obliv int ob, obliv int or);
 void check_input_count(protocolIO *io);
-void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN]);
+void toOblivX(protocolIO *io, obliv int ox[MAXN], int x[MAXN]);
+void toOblivY(protocolIO *io, obliv int oy[MAXN], int y[MAXN]);
 
 
 void linReg(void* args) {
@@ -29,30 +30,33 @@ void linReg(void* args) {
   
   load_data(io, x, y, ocCurrentParty());
   check_input_count(io);
-  toObliv(io, ox, x);
-  toObliv(io, oy, y);
-
+  int party = ocCurrentParty();
+  toOblivX(io, ox, x);
+  toOblivY(io, oy, y);
   
-  // Unsuccessful attempt to check elements of ox array
-  int res[MAXN];
-  int i;
-  for (i = 0; i < io->n; i++) { // io->n already up-to-date from load_data()
-   revealOblivInt(&res[i], ox[i], 0);
-   printf("%d\n", res[i]);
-  }
-
-  exit(1); //!!! placeholder before modifying the incomplete linear_regression() function
-  linear_regression(io, ox, oy, om, ob, or);
-  revealOblivInt(&io->m, om, 0);
-  revealOblivInt(&io->b, ob, 0);
-  revealOblivInt(&io->r, or, 0);
+  //linear_regression(io, ox, oy, om, ob, or); // not yet ready
+  //revealOblivInt(&io->m, om, 0);
+  //revealOblivInt(&io->b, ob, 0);
+  //revealOblivInt(&io->r, or, 0);
 }
 
-void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN]) {
- int party = ocCurrentParty();
- int i;
+void toOblivX(protocolIO *io, obliv int ox[MAXN], int x[MAXN]) {
+ int i, res;
+ printf("\nx data\n\n");
  for(i = 0; i < io->n; i++) {
-  oa[i] = feedOblivInt(a[i], party);
+  ox[i] = feedOblivInt(x[i], 1);
+  revealOblivInt(&res, ox[i], 0);	
+  printf("%lf\n", DESCALE(res));
+ }
+}
+
+void toOblivY(protocolIO *io, obliv int oy[MAXN], int y[MAXN]) {
+ int i, res;
+ printf("\ny data\n\n");
+ for(i = 0; i < io->n; i++) {
+  oy[i] = feedOblivInt(y[i], 2);
+  revealOblivInt(&res, oy[i], 0);	
+  printf("%lf\n", DESCALE(res));
  }
 }
 
