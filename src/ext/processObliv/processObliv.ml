@@ -786,7 +786,7 @@ class typeFixVisitor wasObliv : cilVisitor = object(self)
   inherit nopCilVisitor
   method vtype t = 
     let t' = typeRemoveAttributes ["implicitCast";frozen] t in
-    ChangeDoChildrenPost (t', fun t -> match t with
+    ChangeDoChildrenPost (t', fun t -> match unrollType t with
     | TInt(k,a) when hasOblivAttr a -> 
         let a2 = dropOblivAttr a in
         setTypeAttrs (intTargetType k) a2
