@@ -1,20 +1,14 @@
 // Samuel Havron <havron@virginia.edu>
 // https://www.github.com/samuelhavron
 // MIT License
-// WARNING: CURRENTLY IN DEVELOPMENT, WILL NOT SUCCESSFULLY COMPUTE DATA
+// WARNING: CURRENTLY IN DEVELOPMENT
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <obliv.oh>
 #include "linReg.h"
-
-// Forward declarations
-void linear_regression(protocolIO *io, obliv int x[MAXN], obliv int y[MAXN], obliv int om, obliv int ob, obliv int or);
-void check_input_count(protocolIO *io);
-void toOblivX(protocolIO *io, obliv int ox[MAXN], int x[MAXN]);
-void toOblivY(protocolIO *io, obliv int oy[MAXN], int y[MAXN]);
-
+#include "linReg.oh"
 
 void linReg(void* args) {
   protocolIO *io = (protocolIO*) args;
@@ -30,91 +24,77 @@ void linReg(void* args) {
   
   load_data(io, x, y, ocCurrentParty());
   check_input_count(io);
-  toOblivX(io, ox, x);
-  toOblivY(io, oy, y);
+  toObliv(io, ox, x, 1);
+  toObliv(io, oy, y, 2);
   
   linear_regression(io, ox, oy, om, ob, or); // functional as non-obliv only
 }
 
-void toOblivX(protocolIO *io, obliv int ox[MAXN], int x[MAXN]) {
+void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN], int party) {
  int i, res;
- printf("\nX data:\n"); // REMOVE WHEN COMPLETE
+ printf("\nParty %d data:\n", party); // REMOVE WHEN COMPLETE
  for(i = 0; i < io->n; i++) {
-  ox[i] = feedOblivInt(x[i], 1);
-  revealOblivInt(&res, ox[i], 0); // REMOVE WHEN COMPLETE	
-  printf("%lf\n", DESCALE(res)); // REMOVE WHEN COMPLETE
- }
-}
-
-void toOblivY(protocolIO *io, obliv int oy[MAXN], int y[MAXN]) {
- int i, res;
- printf("\nY data:\n"); // REMOVE WHEN COMPLETE
- for(i = 0; i < io->n; i++) {
-  oy[i] = feedOblivInt(y[i], 2);
-  revealOblivInt(&res, oy[i], 0); // REMOVE WHEN COMPLETE	
-  printf("%lf\n", DESCALE(res)); // REMOVE WHEN COMPLETE
+  oa[i] = feedOblivInt(a[i], party);
+  revealOblivInt(&res, oa[i], 0); // REMOVE WHEN COMPLETE	
+  printf("[%d] %lf\n", i, (double) DESCALE(res)); // REMOVE WHEN COMPLETE
  }
 }
 
 void linear_regression(protocolIO *io, obliv int ox[MAXN], obliv int oy[MAXN], obliv int om, obliv int ob, obliv int or) {
  
   int n = io->n;
-  int *x = malloc(sizeof(int) * n);
-  int *y = malloc(sizeof(int) * n);
-  printf("\nRead data:\n"); // NON-OBLIV COMPUTATION COMPLETE
-  int i;
-  for (i = 0; i < n; i++) {
-   x[i] = ocBroadcastInt(io->x[i], 1);
-   y[i] = ocBroadcastInt(io->y[i], 2);
-   printf("x[%d]\t%lf\t", i, DESCALE(x[i]));
-   printf("y[%d]\t%lf\n", i, DESCALE(y[i]));
-  }
-
-  double sumx = DESCALE(sum(x, n)); // sum of x
-  double sumxx = DESCALE(dotProd(x, x, n)); // sum of each x squared
-  double sumy = DESCALE(sum(y, n)); // sum of y
-  double sumyy = DESCALE(dotProd(y, y, n)); // sum of each y squared
-  double sumxy = DESCALE(dotProd(x, y, n)); // sum of each x * y
+  obliv int sumx = sum(ox, n); // sum of x
+  obliv int sumxx = dotProd(ox, ox, n); // sum of each x squared
+  obliv int sumy = sum(oy, n); // sum of y
+  obliv int sumyy = dotProd(oy, oy, n); // sum of each y squared
+  obliv int sumxy = dotProd(ox, oy, n); // sum of each x * y
   
-  double m, b, r;
   // Compute least-squares best fit straight line
-  m = (n * sumxy - sumx * sumy) / (n * sumxx - sqr(sumx)); // slope
-  b = (sumy * sumxx - (sumx * sumxy)) / (n * sumxx - sqr(sumx)); // y-intercept
-  r = (sumxy - sumx * sumy / n) / sqrt((sumxx - sqr(sumx) / n) * (sumyy - sqr(sumy)/ n)); // correlation
+  om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - sqr(sumx)); // slope
+  ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - sqr(sumx)); // y-intercept
+  //or = fixed_div((sumxy - fixed_mul(sumx, sumy)) / n, osqrt(fixed_mul(sumxx - sqr(sumx) / n, sumyy - sqr(sumy) / n))); // correlation MUST IMPLEMENT OSQRT() FIX
 
-  om = feedOblivInt(m * SCALE, 1); // these lines will not be needed once computation is obliv
-  ob = feedOblivInt(b * SCALE, 1); // 1 is used since both are the same, does not matter
-  or = feedOblivInt(r * SCALE, 1); //
-  
-  free(x);
-  free(y);
   revealOblivInt(&io->m, om, 0);
   revealOblivInt(&io->b, ob, 0);
-  revealOblivInt(&io->r, or, 0);
+  revealOblivInt(&io->r, or, 0); // currently returns 0
 }
 
-int sqr(int x) {
-  return x * x;
+obliv int sqr(obliv int x) {
+  return fixed_mul(x, x);
 }
 
-int dotProd(int a[MAXN], int b[MAXN], int n) { // implement with obliv int and no integer overflow
-  double dotProd = 0;
-  int result = 0;
+obliv int dotProd(obliv int oa[MAXN], obliv int ob[MAXN], int n) {
+  obliv int dotProd = 0;
   int i;
   for (i = 0; i < n; i++) {
-    dotProd += DESCALE(a[i]) * DESCALE(b[i]); // int overflow if not descaled
+    dotProd += fixed_mul(oa[i], ob[i]);
   }
-  result = dotProd * SCALE;
-  return result;
+  return dotProd;
 }
 
-int sum(int a[MAXN], int n) {
-  int sum = 0;
+obliv int sum(obliv int a[MAXN], int n) {
+  obliv int sum = 0;
   int i;
   for (i = 0; i < n; i++) {
     sum += a[i];
   }
   return sum;
+}
+
+obliv int fixed_mul(obliv int oa, obliv int ob) { // prevent overflow of scaled values
+ obliv int res = 0;
+ obliv long long int lloa = (obliv long long int) oa;
+ obliv long long int llob = (obliv long long int) ob;
+ res = DESCALE((lloa*llob));
+ return res;
+}
+
+obliv int fixed_div(obliv int oa, obliv int ob) {
+ obliv int res = 0;
+ obliv long long int lloa = (obliv long long int) oa;
+ obliv long long int llob = (obliv long long int) ob;
+ res = (lloa*SCALE/llob);
+ return res;
 }
 
 void check_input_count(protocolIO *io) {
@@ -126,4 +106,10 @@ void check_input_count(protocolIO *io) {
     printf("Y data points (party 2): %d\n", ny);
     exit(1);
   }
+}
+
+obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data
+ obliv int res = 0;
+ // Use Newton's method!
+ return res;
 }

@@ -1,13 +1,11 @@
 // Fixed point arithmetic
-#define SCALE (int) (1 << 16) // 2^16
-#define DESCALE(x) (double) x / SCALE
+#define SCALE (1 << 16) // 2^16
+#define DESCALE(x) x / SCALE // for use in multiplication
 #define MAXN 100
 
 typedef struct {
   char *src; // filename for data read
-  int x[MAXN];
-  int y[MAXN];
-  int n;
+  int n; // number of data points
   int m; // slope
   int b; // y-intercept
   int r; // correlation

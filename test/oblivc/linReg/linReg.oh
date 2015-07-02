@@ -1,0 +1,24 @@
+void linear_regression(protocolIO *io, obliv int x[MAXN], obliv int y[MAXN], obliv int om, obliv int ob, obliv int or);
+void check_input_count(protocolIO *io);
+void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN], int party);
+obliv int sqr(obliv int x);
+obliv int dotProd(obliv int a[MAXN], obliv int b[MAXN], int n);
+obliv int sum(obliv int a[MAXN], int n);
+obliv int fixed_mul(obliv int oa, obliv int ob);
+obliv int fixed_div(obliv int oa, obliv int ob);
+obliv int osqrt(obliv int oa);
+
+// All code below will be removed, stashed here for now
+
+  //or = fixed_div((n*sumxy - fixed_mul(sumx, sumy)), fixed_mul(pow((n*sumxx) - sqr(sumx), 0.5), pow((n*sumyy) - sqr(sumy), 0.5))); // correlation SQUARE ROOT FUNCTION ERROR
+
+ // int *x = malloc(sizeof(int) * n);
+ // int *y = malloc(sizeof(int) * n);
+ // printf("\nRead data:\n"); // NON-OBLIV COMPUTATION COMPLETE
+ // int i;
+ // for (i = 0; i < n; i++) {
+ //  x[i] = ocBroadcastInt(io->x[i], 1);
+ //  y[i] = ocBroadcastInt(io->y[i], 2);
+ //  printf("x[%d]\t%lf\t", i, DESCALE(x[i]));
+ //  printf("y[%d]\t%lf\n", i, DESCALE(y[i]));
+ // } free(x) and free(y)
