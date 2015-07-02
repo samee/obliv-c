@@ -1,6 +1,15 @@
 Variable length arrays are failing, because alloca() is non-obliv. We should have a way to re-declare existing functions as obliv, so compiler can shut up.
 
+Logical && and || operators.
+
+DOxygen docs
+
+Document calloc, and how sizeof(int)==sizeof(obliv int) is most definitely false.
+
 Integrate test suite into make test, make it all a separate target that builds only binary.
+
+CIL can't handle variable x in: void* calloc(); int (*arr)[x] = calloc(..); 
+GCC handles it gracefully. Fix this upstream. Google for "cil variable length array" to get some interesting results.
 
 Cast to obliv on return needs to go through known() functions
 
