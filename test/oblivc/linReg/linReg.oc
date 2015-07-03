@@ -1,24 +1,21 @@
 // Samuel Havron <havron@virginia.edu>
 // https://www.github.com/samuelhavron
 // MIT License
-// WARNING: CURRENTLY IN DEVELOPMENT
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include <obliv.oh>
 #include "linReg.h"
 #include "linReg.oh"
 
 void linReg(void* args) {
   protocolIO *io = (protocolIO*) args;
-  
-  int x[MAXN];
+
+  int x[MAXN]; // DATA
   int y[MAXN];
   obliv int ox[MAXN];
   obliv int oy[MAXN];
 
-  obliv int om = 0;
+  obliv int om = 0; // RESULTS
   obliv int ob = 0;
   obliv int or = 0;
   
@@ -31,11 +28,11 @@ void linReg(void* args) {
 
 void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN], int party) {
  int i, res;
- printf("\nParty %d data:\n", party); // REMOVE WHEN COMPLETE
+ // printf("\nParty %d data:\n", party); // REMOVE AFTER TESTING
  for(i = 0; i < io->n; i++) {
   oa[i] = feedOblivInt(a[i], party);
-  revealOblivInt(&res, oa[i], 0); // REMOVE WHEN COMPLETE	
-  printf("[%d] %lf\n", i, (double) DESCALE(res)); // REMOVE WHEN COMPLETE
+  // revealOblivInt(&res, oa[i], 0); // REMOVE AFTER TESTING	
+  // printf("[%d] %lf\n", i, (double) DESCALE(res)); // REMOVE AFTER TESTING
  }
 }
 
@@ -51,12 +48,11 @@ void linear_regression(protocolIO *io, obliv int ox[MAXN], obliv int oy[MAXN], o
   // Compute least-squares best fit straight line
   om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - sqr(sumx)); // slope
   ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - sqr(sumx)); // y-intercept
-  //or = fixed_div((sumxy - fixed_mul(sumx, sumy)) / n, osqrt(fixed_mul(sumxx - sqr(sumx) / n, sumyy - sqr(sumy) / n))); 
-  // correlation MUST IMPLEMENT OSQRT() FIX
+  or = fixed_div((n*sumxy - fixed_mul(sumx, sumy)), fixed_mul(osqrt((n*sumxx) - sqr(sumx)), osqrt((n*sumyy) - sqr(sumy)))); // correlation coefficient
 
   revealOblivInt(&io->m, om, 0);
   revealOblivInt(&io->b, ob, 0);
-  revealOblivInt(&io->r, or, 0); // currently returns 0
+  revealOblivInt(&io->r, or, 0);
 }
 
 obliv int sqr(obliv int x) {
@@ -108,8 +104,21 @@ void check_input_count(protocolIO *io) {
   }
 }
 
-obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data
- obliv int res = 0;
- // Use Newton's method!
- return res;
+obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 places after radix
+ // Newton's Method  
+ obliv int prior = SEED * SCALE; // initial seed, see linReg.h to adjust
+ obliv int current = 0;
+ 
+ //int x; // REMOVE AFTER TESTING
+ //printf("Square root:\n"); // REMOVE AFTER TESTING
+
+ int i;
+ for (i = 0; i < 6; i++) { // 6 found to be threshold for many computations before redundency
+  current = prior - (fixed_div(fixed_mul(prior, prior) - oa, 2*prior));
+  prior = current;
+  //revealOblivInt(&x, current, 0); // REMOVE AFTER TESTING
+  //printf("[%d] %lf\n", i, (double) DESCALE(x)); // REMOVE AFTER TESTING
+ }
+ 
+ return current;
 }

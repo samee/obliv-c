@@ -1,11 +1,8 @@
 // Samuel Havron <havron@virginia.edu>
 // https://www.github.com/samuelhavron
 // MIT License
-// WARNING: CURRENTLY IN DEVELOPMENT
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include "linReg.h"
 #include <obliv.h>
 #include "../common/util.h"
