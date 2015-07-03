@@ -1593,15 +1593,15 @@ void __obliv_c__condSub(const void* vc,void* vdest
 void setupOblivBool(OblivInputs* spec, __obliv_c__bool* dest, bool v)
   { __obliv_c__setupOblivBits(spec,dest->bits,v,1); }
 void setupOblivChar(OblivInputs* spec, __obliv_c__char* dest, char v)
-  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 void setupOblivInt(OblivInputs* spec, __obliv_c__int* dest, int v)
-  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 void setupOblivShort(OblivInputs* spec, __obliv_c__short* dest, short v)
-  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 void setupOblivLong(OblivInputs* spec, __obliv_c__long* dest, long v)
-  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 void setupOblivLLong(OblivInputs* spec, __obliv_c__lLong* dest, long long v)
-  { __obliv_c__setupOblivBits(spec,dest->bits,v,bitsize(v)); }
+  { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
   { currentProto->feedOblivInputs(currentProto,spec,count,party); }
@@ -1633,31 +1633,31 @@ bool revealOblivBool(bool* dest,__obliv_c__bool src,int party)
 }
 bool revealOblivChar(char* dest, __obliv_c__char src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(char),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(char),party)) 
     { *dest=(char)wd; return true; }
   return false;
 }
 bool revealOblivInt(int* dest, __obliv_c__int src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(int),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(int),party)) 
     { *dest=(int)wd; return true; }
   return false;
 }
 bool revealOblivShort(short* dest, __obliv_c__short src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(short),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(short),party)) 
     { *dest=(short)wd; return true; }
   return false;
 }
 bool revealOblivLong(long* dest, __obliv_c__long src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(long),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(long),party)) 
     { *dest=(long)wd; return true; }
   return false;
 }
 bool revealOblivLLong(long long* dest, __obliv_c__lLong src,int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,bitsize(long long),party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(long long),party)) 
     { *dest=(long long)wd; return true; }
   return false;
 }

@@ -11,16 +11,18 @@ void* memset(void* s, int c, size_t n); // Hack, had to declare memset
 
 void ocSetCurrentProto(ProtocolDesc* pd);
 
-#define bitsize(type) (8*sizeof(type))
+#define __bitsize(type) (8*sizeof(type))
 
 // Note: these structs are often freely casted to and from OblivBit* and void*
 //   Works great in C, but may fail if we add more fields here.
 typedef struct { OblivBit bits[1]; } __obliv_c__bool;
-typedef struct { OblivBit bits[bitsize(char)];  } __obliv_c__char;
-typedef struct { OblivBit bits[bitsize(int)];   } __obliv_c__int;
-typedef struct { OblivBit bits[bitsize(short)]; } __obliv_c__short;
-typedef struct { OblivBit bits[bitsize(long)];  } __obliv_c__long;
-typedef struct { OblivBit bits[bitsize(long long)]; } __obliv_c__lLong;
+typedef struct { OblivBit bits[__bitsize(char)];  } __obliv_c__char;
+typedef struct { OblivBit bits[__bitsize(int)];   } __obliv_c__int;
+typedef struct { OblivBit bits[__bitsize(short)]; } __obliv_c__short;
+typedef struct { OblivBit bits[__bitsize(long)];  } __obliv_c__long;
+typedef struct { OblivBit bits[__bitsize(long long)]; } __obliv_c__lLong;
+
+#define ocBitSize(type) (sizeof(type)/sizeof(__obliv_c__bool))
 
 static const __obliv_c__bool __obliv_c__trueCond = {{{false,{true}}}};
 
@@ -157,7 +159,7 @@ static inline
 void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size
                                ,widest_t val)
 {
-  OblivBit ov[bitsize(widest_t)];
+  OblivBit ov[__bitsize(widest_t)];
   __obliv_c__setSignedKnown(ov,size,val);
   __obliv_c__ifThenElse(dest,ov,dest,size,cond);
 }
