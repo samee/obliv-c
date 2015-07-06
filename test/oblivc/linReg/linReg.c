@@ -7,6 +7,14 @@
 #include <obliv.h>
 #include "../common/util.h"
 
+double lap;
+int currentParty;
+
+const char* mySide() {
+  if (currentParty == 1) return "Generator";
+  else return "Evaluator";
+}
+
 int main(int argc, char *argv[]) {
   printf("Linear Regression\n");
   printf("=================\n\n");
@@ -17,15 +25,19 @@ int main(int argc, char *argv[]) {
   // Check args
   if (argc == 4) {
     ocTestUtilTcpOrDie(&pd, argv[2][0]=='1', argv[1]);
-    setCurrentParty(&pd, (argv[2][0]=='1'?1:2)); // only checks for a '1'
+    currentParty = (argv[2][0]=='1'?1:2);
+    setCurrentParty(&pd, currentParty); // only checks for a '1'
     
     io.src = argv[3]; // filename
+    lap = wallClock();
     execYaoProtocol(&pd, linReg, &io); // start linReg.oc
+    cleanupProtocol(&pd);
 
-    fprintf(stderr, "\nSlope   \tm = %15.6e\n", (double) DESCALE(io.m)); // print slope
+    fprintf(stderr, "%s total time: %lf seconds\n", mySide(), wallClock() - lap);
+    fprintf(stderr, "Yao Gate Count: %u\n\n", yaoGateCount());
+    fprintf(stderr, "Slope   \tm = %15.6e\n", (double) DESCALE(io.m)); // print slope
     fprintf(stderr, "y-intercept\tb = %15.6e\n", (double) DESCALE(io.b)); // print y-intercept
     fprintf(stderr, "Correlation\tr = %15.6e\n", (double) DESCALE(io.r)); // print correlation
-    cleanupProtocol(&pd);
   } else {
     printf("Usage: %s <port> <1|2> <filename>\n", argv[0]);
 
@@ -38,7 +50,7 @@ void load_data(protocolIO *io, int x[MAXN], int y[MAXN], int party) {
 
   if (inputFile == NULL) {
    perror(io->src);
-   exit(1);
+   exit(1); // causes TCP error for non-null party
   }
   
   io->n = 0;

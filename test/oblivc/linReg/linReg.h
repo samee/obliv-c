@@ -12,5 +12,10 @@ typedef struct {
   int r; // correlation
 } protocolIO;
 
+// Collect runtime information
+extern double lap;
+double wallClock();
+const char* mySide();
+
 void linReg(void* args);
 void load_data(protocolIO *io, int x[MAXN], int y[MAXN], int party);

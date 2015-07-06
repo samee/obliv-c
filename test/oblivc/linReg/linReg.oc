@@ -46,16 +46,16 @@ void linear_regression(protocolIO *io, obliv int ox[MAXN], obliv int oy[MAXN], o
   obliv int sumxy = dotProd(ox, oy, n); // sum of each x * y
   
   // Compute least-squares best fit straight line
-  om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - sqr(sumx)); // slope
-  ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - sqr(sumx)); // y-intercept
-  or = fixed_div((n*sumxy - fixed_mul(sumx, sumy)), fixed_mul(osqrt((n*sumxx) - sqr(sumx)), osqrt((n*sumyy) - sqr(sumy)))); // correlation coefficient
+  om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - osqr(sumx)); // slope
+  ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - osqr(sumx)); // y-intercept
+  or = fixed_div((n*sumxy - fixed_mul(sumx, sumy)), fixed_mul(osqrt((n*sumxx) - osqr(sumx)), osqrt((n*sumyy) - osqr(sumy)))); // correlation coefficient
 
   revealOblivInt(&io->m, om, 0);
   revealOblivInt(&io->b, ob, 0);
   revealOblivInt(&io->r, or, 0);
 }
 
-obliv int sqr(obliv int x) {
+obliv int osqr(obliv int x) {
   return fixed_mul(x, x);
 }
 
@@ -77,7 +77,7 @@ obliv int sum(obliv int a[MAXN], int n) {
   return sum;
 }
 
-obliv int fixed_mul(obliv int oa, obliv int ob) { // prevent overflow of scaled values
+obliv int fixed_mul(obliv int oa, obliv int ob) { // prevent overflow of scaled values and maintain SCALE factor
  obliv int res = 0;
  obliv long long int lloa = (obliv long long int) oa;
  obliv long long int llob = (obliv long long int) ob;
@@ -85,7 +85,7 @@ obliv int fixed_mul(obliv int oa, obliv int ob) { // prevent overflow of scaled 
  return res;
 }
 
-obliv int fixed_div(obliv int oa, obliv int ob) {
+obliv int fixed_div(obliv int oa, obliv int ob) { // maintain SCALE factor
  obliv int res = 0;
  obliv long long int lloa = (obliv long long int) oa;
  obliv long long int llob = (obliv long long int) ob;
@@ -105,7 +105,7 @@ void check_input_count(protocolIO *io) {
 }
 
 obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 places after radix
- // Newton's Method  
+ // Newton's Method for computing square root
  obliv int prior = SEED * SCALE; // initial seed, see linReg.h to adjust
  obliv int current = 0;
  
@@ -114,7 +114,7 @@ obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 
 
  int i;
  for (i = 0; i < 6; i++) { // 6 found to be threshold for many computations before redundency
-  current = prior - (fixed_div(fixed_mul(prior, prior) - oa, 2*prior));
+  current = prior - (fixed_div(osqr(prior) - oa, 2*prior));
   prior = current;
   //revealOblivInt(&x, current, 0); // REMOVE AFTER TESTING
   //printf("[%d] %lf\n", i, (double) DESCALE(x)); // REMOVE AFTER TESTING
