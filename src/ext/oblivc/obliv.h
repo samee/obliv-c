@@ -30,7 +30,6 @@ bool execNpProtocol_Bcast1(ProtocolDesc* pd, protocol_run start, void* arg);
 
 void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOTs, bool useAltOTExt);
 
-unsigned yaoGateCount(void);
 int tcp2PBytesSent(ProtocolDesc* pd);
 
 #endif // OBLIV_H

@@ -28,7 +28,6 @@ int testPsiMain(int argc,char* argv[])
   setCurrentParty(&pd,argv[2][0]=='1'?1:2);
   execYaoProtocol(&pd,randomPsi,NULL);
   fprintf(stderr,"Total time: %lf s\n",wallClock()-lap);
-  fprintf(stderr,"%u\n",yaoGateCount());
   cleanupProtocol(&pd);
   return 0;
 }

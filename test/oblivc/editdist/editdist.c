@@ -42,7 +42,6 @@ int main(int argc,char *argv[])
   lap = wallClock();
   execYaoProtocol(&pd,editDistance,&io);
   fprintf(stderr,"%s total time: %lf s\n",mySide(),wallClock()-lap);
-  fprintf(stderr,"%u\n",yaoGateCount());
   cleanupProtocol(&pd);
   fprintf(stderr,"Result: %d\n",io.res);
   return 0;

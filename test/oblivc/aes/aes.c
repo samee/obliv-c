@@ -34,7 +34,6 @@ int main(int argc,char* argv[])
   lap = wallClock();
   execYaoProtocol(&pd,goaes,&io);
   fprintf(stderr,"Total time: %lf s\n",wallClock()-lap);
-  fprintf(stderr,"Yao gate count: %u\n",yaoGateCount());
   cleanupProtocol(&pd);
   fprintf(stderr,"Result: ");
   for(i=0;i<16;++i) fprintf(stderr,"%02x",io.testcipher[i]&0xff);
