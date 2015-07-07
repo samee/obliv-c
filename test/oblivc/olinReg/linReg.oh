@@ -1,0 +1,9 @@
+void linear_regression(protocolIO *io, obliv int x[MAXN], obliv int y[MAXN], obliv int om, obliv int ob, obliv int or);
+void check_input_count(protocolIO *io);
+void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN], int party);
+obliv int osqr(obliv int x);
+obliv int dotProd(obliv int a[MAXN], obliv int b[MAXN], int n);
+obliv int sum(obliv int a[MAXN], int n);
+obliv int fixed_mul(obliv int oa, obliv int ob);
+obliv int fixed_div(obliv int oa, obliv int ob);
+obliv int osqrt(obliv int oa);

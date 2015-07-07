@@ -1,0 +1,124 @@
+// Samuel Havron <havron@virginia.edu>
+// https://www.github.com/samuelhavron
+// MIT License
+
+#include <stdio.h>
+#include <obliv.oh>
+#include "linReg.h"
+#include "linReg.oh"
+
+void linReg(void* args) {
+  protocolIO *io = (protocolIO*) args;
+
+  int x[MAXN]; // DATA
+  int y[MAXN];
+  obliv int ox[MAXN];
+  obliv int oy[MAXN];
+
+  obliv int om = 0; // RESULTS
+  obliv int ob = 0;
+  obliv int or = 0;
+  
+  load_data(io, x, y, ocCurrentParty());
+  check_input_count(io);
+  toObliv(io, ox, x, 1);
+  toObliv(io, oy, y, 2);
+  linear_regression(io, ox, oy, om, ob, or);
+}
+
+void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN], int party) {
+ int i, res;
+ // printf("\nParty %d data:\n", party); // REMOVE AFTER TESTING
+ for(i = 0; i < io->n; i++) {
+  oa[i] = feedOblivInt(a[i], party);
+  // revealOblivInt(&res, oa[i], 0); // REMOVE AFTER TESTING	
+  // printf("[%d] %lf\n", i, (double) DESCALE(res)); // REMOVE AFTER TESTING
+ }
+}
+
+void linear_regression(protocolIO *io, obliv int ox[MAXN], obliv int oy[MAXN], obliv int om, obliv int ob, obliv int or) {
+ 
+  int n = io->n;
+  obliv int sumx = sum(ox, n); // sum of x
+  obliv int sumxx = dotProd(ox, ox, n); // sum of each x squared
+  obliv int sumy = sum(oy, n); // sum of y
+  obliv int sumyy = dotProd(oy, oy, n); // sum of each y squared
+  obliv int sumxy = dotProd(ox, oy, n); // sum of each x * y
+  
+  // Compute least-squares best fit straight line
+  om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - osqr(sumx)); // slope
+  ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - osqr(sumx)); // y-intercept
+  or = fixed_div((n*sumxy - fixed_mul(sumx, sumy)), fixed_mul(osqrt((n*sumxx) - osqr(sumx)), osqrt((n*sumyy) - osqr(sumy)))); // correlation coefficient
+
+  revealOblivInt(&io->m, om, 0);
+  revealOblivInt(&io->b, ob, 0);
+  revealOblivInt(&io->r, or, 0);
+}
+
+obliv int osqr(obliv int x) {
+  return fixed_mul(x, x);
+}
+
+obliv int dotProd(obliv int oa[MAXN], obliv int ob[MAXN], int n) {
+  obliv int dotProd = 0;
+  int i;
+  for (i = 0; i < n; i++) {
+    dotProd += fixed_mul(oa[i], ob[i]);
+  }
+  return dotProd;
+}
+
+obliv int sum(obliv int a[MAXN], int n) {
+  obliv int sum = 0;
+  int i;
+  for (i = 0; i < n; i++) {
+    sum += a[i];
+  }
+  return sum;
+}
+
+obliv int fixed_mul(obliv int oa, obliv int ob) { // prevent overflow of scaled values and maintain SCALE factor
+ obliv int res = 0;
+ obliv long long int lloa = (obliv long long int) oa;
+ obliv long long int llob = (obliv long long int) ob;
+ res = DESCALE((lloa*llob));
+ return res;
+}
+
+obliv int fixed_div(obliv int oa, obliv int ob) { // maintain SCALE factor
+ obliv int res = 0;
+ obliv long long int lloa = (obliv long long int) oa;
+ obliv long long int llob = (obliv long long int) ob;
+ res = (lloa*SCALE/llob);
+ return res;
+}
+
+void check_input_count(protocolIO *io) {
+ int nx = ocBroadcastInt(io->n, 1);
+ int ny = ocBroadcastInt(io->n, 2);
+ if (nx != ny) {
+    printf("ERROR: Unequal amount of data points.\n");
+    printf("X data points (party 1): %d\n", nx);
+    printf("Y data points (party 2): %d\n", ny);
+    exit(1);
+  }
+}
+
+obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 places after radix
+ // Newton's Method for computing square root
+ obliv int prior = SEED * SCALE; // initial seed, see linReg.h to adjust
+ obliv int current = 0;
+ 
+ //int x; // REMOVE AFTER TESTING
+ //printf("Square root:\n"); // REMOVE AFTER TESTING
+
+ int i;
+ for (i = 0; i < 6; i++) { // 6 found to be threshold for many computations before redundency
+  current = prior - (fixed_div(osqr(prior) - oa, 2*prior));
+  prior = current;
+  //revealOblivInt(&x, current, 0); // REMOVE AFTER TESTING
+  //printf("[%d] %lf\n", i, (double) DESCALE(x)); // REMOVE AFTER TESTING
+ }
+ 
+ return current;
+}
