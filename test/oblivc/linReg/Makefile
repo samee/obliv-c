@@ -7,4 +7,4 @@ CFLAGS=-O3 -DREMOTE_HOST=$(REMOTE_HOST) -Wall
 	$(CILPATH)/bin/oblivcc $(CFLAGS) -I . $(testName).oc $(testName).c ../common/util.c
 
 clean:
-	rm -f a.out $(testName).oc.cil.i $(testName).oc.i $(testName).oc.cil.c
+	rm -f a.out $(testName).oc.cil.i $(testName).oc.i $(testName).oc.cil.c runtime.dat

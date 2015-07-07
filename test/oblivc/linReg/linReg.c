@@ -32,10 +32,14 @@ int main(int argc, char *argv[]) {
     lap = wallClock();
     execYaoProtocol(&pd, linReg, &io); // start linReg.oc
     cleanupProtocol(&pd);
+    double runtime = wallClock() - lap; // stop clock here 
+    // gates*size = bandwidth
 
-    fprintf(stderr, "%s total time: %lf seconds\n", mySide(), wallClock() - lap);
-    fprintf(stderr, "Yao Gate Count: %u\n\n", yaoGateCount());
-    fprintf(stderr, "Slope   \tm = %15.6e\n", (double) DESCALE(io.m)); // print slope
+    fprintf(stderr, "%s total time: %lf seconds\n", mySide(), runtime);
+    fprintf(stderr, "Yao Gate Count: %u\n", yaoGateCount());
+    write_runtime(io.n, runtime, currentParty, "runtime.dat");
+
+    fprintf(stderr, "\nSlope   \tm = %15.6e\n", (double) DESCALE(io.m)); // print slope
     fprintf(stderr, "y-intercept\tb = %15.6e\n", (double) DESCALE(io.b)); // print y-intercept
     fprintf(stderr, "Correlation\tr = %15.6e\n", (double) DESCALE(io.r)); // print correlation
   } else {
@@ -79,4 +83,16 @@ void load_data(protocolIO *io, int x[MAXN], int y[MAXN], int party) {
 
   printf("Loading %d data points ...\n", io->n);
   fclose(inputFile);
+}
+
+void write_runtime(int n, double time, int party, const char* dest) {
+  FILE *file = fopen(dest, "a");
+  
+  if (file == NULL) {
+    perror(dest);
+    exit(1);
+  }
+
+  fprintf(file, "[party %d] %d points, %lf seconds\n", party, n, time);
+  printf("Write to file %s successful\n", dest);
 }
