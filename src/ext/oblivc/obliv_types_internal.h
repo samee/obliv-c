@@ -19,10 +19,12 @@ typedef struct OblivBit {
       };
       // npSetBitXor, npFlipBit uses assumes the two bools to be aliased
     } yao;
+#ifdef ENABLE_NNOB
 	struct {
 		NnobKey key;
 		NnobShareAndMac shareAndMac;
 	} nnob;
+#endif
   };
 } OblivBit;
 
