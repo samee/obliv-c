@@ -3,6 +3,7 @@
 // MIT License
 
 #include <stdio.h>
+#include <math.h>
 #include "linReg.h"
 #include <obliv.h>
 #include "../common/util.h"
@@ -33,15 +34,16 @@ int main(int argc, char *argv[]) {
     execYaoProtocol(&pd, linReg, &io); // start linReg.oc
     cleanupProtocol(&pd);
     double runtime = wallClock() - lap; // stop clock here 
-    // gates*size = bandwidth
 
     fprintf(stderr, "%s total time: %lf seconds\n", mySide(), runtime);
     fprintf(stderr, "Yao Gate Count: %u\n", yaoGateCount());
     write_runtime(io.n, runtime, currentParty, "runtime.dat");
+    
+    double r = ((double) DESCALE(io.rnum)) / sqrt((double) DESCALE(io.rden)); // does this violate protocol?
 
     fprintf(stderr, "\nSlope   \tm = %15.6e\n", (double) DESCALE(io.m)); // print slope
     fprintf(stderr, "y-intercept\tb = %15.6e\n", (double) DESCALE(io.b)); // print y-intercept
-    fprintf(stderr, "Correlation\tr = %15.6e\n", (double) DESCALE(io.r)); // print correlation
+    fprintf(stderr, "Correlation\tr = %15.6e\n", r); // print correlation
   } else {
     printf("Usage: %s <port> <1|2> <filename>\n", argv[0]);
 
