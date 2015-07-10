@@ -6,28 +6,28 @@ from sys import argv
 import random
 
 try:
-    script, filenameX, filenameY, filenameZ, data_points = argv
+    script, filenameX, filenameY, filenameXY, data_points = argv
 except ValueError:
     print "Usage: python %s <xfile> <yfile> <xycatfile> <number_of_points>" % argv[0]
     quit()
 
 print "Generating %d random data points in %s, %s, and %s" % (
-    int(data_points), filenameX, filenameY, filenameZ)
+    int(data_points), filenameX, filenameY, filenameXY)
 
 fx = open(filenameX, 'w')
 fy = open(filenameY, 'w')
-fz = open(filenameZ, 'w')
+fxy = open(filenameXY, 'w')
 fx.truncate()
 fy.truncate()
-fz.truncate()
+fxy.truncate()
 
 for i in xrange(0, int(data_points)):
     xr = random.uniform(0, 1000)
     yr = random.uniform(0, 1000)
     print>>fx, xr
     print>>fy, yr
-    print>>fz, "%f %f" % (xr, yr)
+    print>>fxy, "%f %f" % (xr, yr)
 
 fx.close()
 fy.close()
-fz.close()
+fxy.close()
