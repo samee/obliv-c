@@ -7,6 +7,11 @@
 // Java-style redundant "say the type twice" practice
 #define CAST(p) ((void*)p)
 
+struct ProtocolDesc* ocCurrentProto(void);
+int ocCurrentParty(void);
+static inline char ocCurrentProtoType()
+  { return *(char*)ocCurrentProto()->extra; }
+
 void gcryDefaultLibInit(void);
 
 // Convenience functions
