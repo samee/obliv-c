@@ -22,8 +22,8 @@ fy.truncate()
 fxy.truncate()
 
 for i in xrange(0, int(data_points)):
-    xr = random.uniform(0, 1000)
-    yr = random.uniform(0, 1000)
+    xr = random.uniform(0, 100)
+    yr = random.uniform(0, 100)
     print>>fx, xr
     print>>fy, yr
     print>>fxy, "%f %f" % (xr, yr)
