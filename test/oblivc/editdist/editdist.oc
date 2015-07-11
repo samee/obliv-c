@@ -58,4 +58,5 @@ void editDistance(void* args)
     dp[i][j] = temp + d;
   }
   revealOblivInt(&io->res,dp[n1][n2],0);
+  fprintf(stderr,"%u\n",yaoGateCount());
 }

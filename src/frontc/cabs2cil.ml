@@ -4068,7 +4068,7 @@ and doExp (asconst: bool)   (* This expression is used as a constant *)
                                                  * finishExp. Simulate what = 
                                                  * AExp None  *)
               with Not_found -> begin
-                ignore (warnOpt "Calling function %s without prototype." n);
+(*                ignore (warnOpt "Calling function %s without prototype." n);
                 let ftype = TFun(intType, None, false, 
                                  [Attr("missingproto",[])]) in
                 (* Add a prototype to the environment *)
@@ -4079,7 +4079,8 @@ and doExp (asconst: bool)   (* This expression is used as a constant *)
                 IH.add noProtoFunctions proto.vid true;
                 (* Add it to the file as well *)
                 cabsPushGlobal (GVarDecl (proto, !currentLoc));
-                (empty, Lval(var proto), ftype)
+                (empty, Lval(var proto), ftype)*)
+                E.s (error "Undefined function")
               end
             end
           | _ -> doExp false f (AExp None) 

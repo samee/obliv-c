@@ -1,3 +1,4 @@
+#ifdef ENABLE_NNOB
 #include<assert.h>
 #include<pthread.h>
 #include<obliv_bits.h>
@@ -1439,3 +1440,4 @@ bool nnobRevealOblivInputs(ProtocolDesc* pd, widest_t* dest,const OblivBit* o,si
 	return true;
 }
 
+#endif

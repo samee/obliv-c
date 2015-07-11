@@ -1,3 +1,4 @@
+#ifdef ENABLE_NNOB
 #ifndef NNOB_H
 #define NNOB_H
 
@@ -130,4 +131,5 @@ void debugPrintHex(const char* a, int len);
 void debugPrintXor(const char* a,const  char* b, int len);
 void debugPrintXorShowParam(const char* a,const  char* b, int len);
 
+#endif
 #endif

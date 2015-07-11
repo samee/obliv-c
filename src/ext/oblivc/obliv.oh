@@ -1,9 +1,6 @@
 #ifndef OBLIV_OH
 #define OBLIV_OH
 
-struct ProtocolDesc* ocCurrentProto(void);
-int ocCurrentParty(void);
-
 // Runtime type info: these functions are no longer used anywhere. Remove?
 // All the protoType fields and DYN_FUN macros will also be unnecessary.
 bool ocInDebugProto(void);
@@ -44,4 +41,6 @@ int ocBroadcastInt(int v,int source);
 short ocBroadcastShort(short v,int source);
 long ocBroadcastLong(long v,int source);
 long long ocBroadcastLLong(long long v,int source);
+
+unsigned yaoGateCount(void);
 #endif

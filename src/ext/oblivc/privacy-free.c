@@ -87,7 +87,7 @@ typedef struct
 
 OC_DYN_EXTRA_FUN(ypdNpProtocolExtra,YaoProtocolDesc,
                  NpProtocolExtra,OC_YPD_TYPE_NP)
-struct ProtocolDesc* ocCurrentProto(void); // copied from obliv.oh
+struct ProtocolDesc* ocCurrentProto(void); // copied from obliv_common.h
 
 void ocNpProtoSetBroadcast1(ProtocolDesc* pd,bool v)
   { ypdNpProtocolExtra(protoYaoProtocolDesc(pd))->broadcast1=v; }

@@ -276,12 +276,24 @@ class typeCheckVisitor = object(self)
 
   method vstmt s = ChangeDoChildrenPost (s, fun s -> match s.skind with
     | If(e,tb,fb,l) -> 
-        if isOblivSimple (typeOf e) then
-          if isOblivBlock tb then s
-          else E.s (E.error 
-            "%s:%i:Cannot use obliv-type expression as a condition" l.file
-            l.line)
-        else s
+        begin
+          let e' = match unrollType (typeOf e) with
+            | TInt(IBool,_) -> e
+            | t ->
+                let boolType = TInt(IBool,[]) in
+                let mybool = if hasOblivAttr(typeAttrs t)
+                      then addOblivType boolType
+                      else boolType
+                in CastE(mybool,e)
+          in
+          let s' = { s with skind = If(e',tb,fb,l) } in
+          if isOblivSimple (typeOf e') then
+            if isOblivBlock tb then s'
+            else E.s (E.error
+              "%s:%i:Cannot use obliv-type expression as a condition" l.file
+              l.line)
+          else s'
+        end
     | _ -> s
   )
 

@@ -243,4 +243,5 @@ void randomPsi(void* arg)
   releaseBCipherRandomGen(gen);
   free(arr);
   free(res);
+  fprintf(stderr,"%u\n",yaoGateCount());
 }

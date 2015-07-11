@@ -926,6 +926,7 @@ void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)
   /*start(arg);*/
 /*}*/
 
+#ifdef ENABLE_NNOB
 void setupNnobProtocol(ProtocolDesc* pd) {
 	NnobProtocolDesc* npd = malloc(sizeof(NnobProtocolDesc));
 	pd->extra=npd;
@@ -1043,6 +1044,7 @@ void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOT
 	fprintf(stderr, "Bucket Size: %d\n", npd->bucketSize);
 	cleanupNnobProtocol(pd);
 }
+#endif // ENABLE_NNOB
 
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
