@@ -2,6 +2,7 @@
 #include<string.h>
 // These are yao-related functions from obliv_bits.c that later became useful 
 // in other files as well
+void yaoKeyNewPair(YaoProtocolDesc* pd,yao_key_t w0,yao_key_t w1);
 static inline void yaoKeyCopy(yao_key_t d, const yao_key_t s) 
   { memcpy(d,s,YAO_KEY_BYTES); }
 static inline void yaoKeyZero(yao_key_t d) { memset(d,0,YAO_KEY_BYTES); }
