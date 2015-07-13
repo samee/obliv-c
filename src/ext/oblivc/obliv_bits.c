@@ -22,7 +22,7 @@
 // Right now, we do not support multiple protocols at the same time
 static __thread ProtocolDesc *currentProto;
 
-inline bool known(const OblivBit* o) { return !o->unknown; }
+static inline bool known(const OblivBit* o) { return !o->unknown; }
 
 // --------------------------- Transports -----------------------------------
 struct stdioTransport

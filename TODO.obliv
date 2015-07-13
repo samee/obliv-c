@@ -2,6 +2,10 @@ Variable length arrays are failing, because alloca() is non-obliv. We should hav
 
 Logical && and || operators.
 
+frozen checks related to pointers don't always work.
+
+void fun(int x, int x); This should be an error.
+
 DOxygen docs
 
 Document calloc, and how sizeof(int)==sizeof(obliv int) is most definitely false.

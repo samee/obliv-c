@@ -22,6 +22,9 @@ typedef struct { OblivBit bits[__bitsize(short)]; } __obliv_c__short;
 typedef struct { OblivBit bits[__bitsize(long)];  } __obliv_c__long;
 typedef struct { OblivBit bits[__bitsize(long long)]; } __obliv_c__lLong;
 
+// Just a cast
+static inline OblivBit* __obliv_c__bits(void* x) { return x; }
+
 #define ocBitSize(type) (sizeof(type)/sizeof(__obliv_c__bool))
 
 static const __obliv_c__bool __obliv_c__trueCond = {{{false,{true}}}};
