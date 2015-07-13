@@ -10,8 +10,7 @@ typedef struct {
   int m; // slope
   int b; // y-intercept
 
-  int rnum; // correlation numerator
-  int rden; // correlation denomenator
+  int rsqr; // correlation numerator
   int r; // correlation
 } protocolIO;
 

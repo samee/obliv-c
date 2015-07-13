@@ -52,8 +52,8 @@ void linear_regression(protocolIO *io, obliv int ox[MAXN], obliv int oy[MAXN], o
 
   obliv int ornum = (n*sumxy - fixed_mul(sumx, sumy));
   obliv int orden = fixed_mul((n*sumxx) - osqr(sumx), (n*sumyy) - osqr(sumy));
-  revealOblivInt(&io->rnum, ornum, 0);
-  revealOblivInt(&io->rden, orden, 0);
+  obliv int orsqr = fixed_div(osqr(ornum), orden); // sqrt(revealed rsqr) = r
+  revealOblivInt(&io->rsqr, orsqr, 0);
   revealOblivInt(&io->m, om, 0);
   revealOblivInt(&io->b, ob, 0);
 

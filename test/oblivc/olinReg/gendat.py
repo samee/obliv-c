@@ -21,9 +21,10 @@ fx.truncate()
 fy.truncate()
 fxy.truncate()
 
+xr = 0.0
 for i in xrange(0, int(data_points)):
-    xr = random.uniform(0, 100)
-    yr = random.uniform(0, 100)
+    xr += round(random.uniform(0, 100), 4)
+    yr = xr + round(random.uniform(0, 5), 2) # create artificial correlation
     print>>fx, xr
     print>>fy, yr
     print>>fxy, "%f %f" % (xr, yr)
