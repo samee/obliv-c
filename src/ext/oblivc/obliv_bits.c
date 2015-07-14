@@ -223,14 +223,18 @@ int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port)
    just before two parties are planning to spawn a new thread each, such that
    the two threads can have an independent channel with the corresponding thread
    on the remote side. Meant to work on TCP sockets only.
+
+   Needs transport object to send the new port number along.
+   Used only with tcp2PSplit, so won't need a party number.
    */
-static int sockSplit(int sock,bool isClient)
+static int sockSplit(int sock,ProtocolTransport* t,bool isClient)
 {
   struct sockaddr_in sa; socklen_t sz=sizeof(sa);
   if(isClient)
   {
     if(getpeername(sock,(struct sockaddr*)&sa,&sz)<0) return -1;
-    int rres=read(sock,&sa.sin_port,sizeof(sa.sin_port));
+    //int rres=read(sock,&sa.sin_port,sizeof(sa.sin_port));
+    int rres = transRecv(t,0,&sa.sin_port,sizeof(sa.sin_port));
     if(rres<0) { fprintf(stderr,"Socket read error\n"); return -1; }
     if(rres<sizeof(sa.sin_port))
       { fprintf(stderr,"BUG: fix with repeated reads\n"); return -1; }
@@ -240,7 +244,9 @@ static int sockSplit(int sock,bool isClient)
   { // any change here should also change PROFILE_NETWORK in tcp2PSplit()
     int listenSock=tcpListenAny("0");
     if(getsockname(listenSock,(struct sockaddr*)&sa,&sz)<0) return -1;
-    if(write(sock,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
+    //if(write(sock,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
+    if(transSend(t,0,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
+    fflush(((tcp2PTransport*)t)->sockStream); 
     int newsock = accept(listenSock,0,0);
     close(listenSock);
     return newsock;
@@ -252,7 +258,7 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
   tcp2PTransport* t = CAST(tsrc);
   fflush(t->sockStream); 
   // I should really rewrite sockSplit to use FILE* sockStream
-  int newsock = sockSplit(t->sock,t->isClient);
+  int newsock = sockSplit(t->sock,tsrc,t->isClient);
   if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
 #ifdef PROFILE_NETWORK
   if(!t->isClient) t->bytes+=sizeof(in_port_t);
