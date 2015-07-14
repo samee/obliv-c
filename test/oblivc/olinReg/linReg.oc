@@ -3,6 +3,7 @@
 // MIT License
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <obliv.oh>
 #include "linReg.h"
 #include "linReg.oh"
@@ -10,10 +11,9 @@
 void linReg(void* args) {
   protocolIO *io = (protocolIO*) args;
 
-  int x[MAXN]; // DATA
-  int y[MAXN];
-  obliv int ox[MAXN];
-  obliv int oy[MAXN];
+  int *x = malloc(sizeof(int));
+  int *y = malloc(sizeof(int));
+  check_mem(x, y, ocCurrentParty());
 
   obliv int om = 0; // RESULTS
   obliv int ob = 0;
@@ -21,12 +21,21 @@ void linReg(void* args) {
   
   load_data(io, x, y, ocCurrentParty());
   check_input_count(io);
+  
+  obliv int *ox = malloc(sizeof(obliv int) * io->n);
+  obliv int *oy = malloc(sizeof(obliv int) * io->n);
+  
   toObliv(io, ox, x, 1);
   toObliv(io, oy, y, 2);
+  
   linear_regression(io, ox, oy, om, ob, or);
+  
+  // 1 and 2 included as params to use for checking in clean()
+  clean(x, ox, 1, ocCurrentParty());
+  clean(y, oy, 2, ocCurrentParty());
 }
 
-void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN], int party) {
+void toObliv(protocolIO *io, obliv int *oa, int *a, int party) {
  int i, res;
  // printf("\nParty %d data:\n", party); // REMOVE AFTER TESTING
  for(i = 0; i < io->n; i++) {
@@ -36,7 +45,7 @@ void toObliv(protocolIO *io, obliv int oa[MAXN], int a[MAXN], int party) {
  }
 }
 
-void linear_regression(protocolIO *io, obliv int ox[MAXN], obliv int oy[MAXN], obliv int om, obliv int ob, obliv int or) {
+void linear_regression(protocolIO *io, obliv int *ox, obliv int *oy, obliv int om, obliv int ob, obliv int or) {
  
   int n = io->n;
   obliv int sumx = sum(ox, n); // sum of x
@@ -64,7 +73,7 @@ obliv int osqr(obliv int x) {
   return fixed_mul(x, x);
 }
 
-obliv int dotProd(obliv int oa[MAXN], obliv int ob[MAXN], int n) {
+obliv int dotProd(obliv int *oa, obliv int *ob, int n) {
   obliv int dotProd = 0;
   int i;
   for (i = 0; i < n; i++) {
@@ -73,7 +82,7 @@ obliv int dotProd(obliv int oa[MAXN], obliv int ob[MAXN], int n) {
   return dotProd;
 }
 
-obliv int sum(obliv int a[MAXN], int n) {
+obliv int sum(obliv int *a, int n) {
   obliv int sum = 0;
   int i;
   for (i = 0; i < n; i++) {
@@ -109,6 +118,7 @@ void check_input_count(protocolIO *io) {
   }
 }
 
+/*
 obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 places after radix
  // Newton's Method for computing square root
  obliv int prior = SEED * SCALE; // initial seed, see linReg.h to adjust
@@ -126,4 +136,14 @@ obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 
  }
  
  return current;
+}
+*/
+
+void clean(int *a, obliv int *oa, int party, int check) {
+  if ((party == 1 && check == 1) || (party == 2 && check == 2)) {
+    if (a != NULL && oa != NULL) { // attempt to prevent double free
+     free(a);
+     free(oa);
+    }
+  }
 }

@@ -3,6 +3,7 @@
 // MIT License
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <math.h>
 #include "linReg.h"
 #include <obliv.h>
@@ -49,7 +50,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void load_data(protocolIO *io, int x[MAXN], int y[MAXN], int party) {
+void load_data(protocolIO *io, int *x, int *y, int party) {
   FILE *inputFile = fopen(io->src, "r");
 
   if (inputFile == NULL) {
@@ -58,27 +59,33 @@ void load_data(protocolIO *io, int x[MAXN], int y[MAXN], int party) {
   }
   
   io->n = 0;
-  int i;
+  
   double a;
-  for (i = 0; i < MAXN; i++) {
+  while (!feof(inputFile)) {
     int dataPoints = fscanf(inputFile, "%lf", &a);
     
     if (dataPoints != 1) {
       if (dataPoints < 0 && feof(inputFile)) {
-      	io->n = i;
 	break;
       } else {
 	fprintf(stderr, "ERROR: Input does not match file format. Check input file.\n");
-	printf("File format exception found at Line %d or Line %d in file.\n", i, i + 1);
+	printf("File format exception found at Line %d or Line %d in file.\n", io->n, io->n + 1);
 	exit(1);
       }
     }
+
+        
+    io->n += 1;
+    x = realloc(x, sizeof(int) * io->n);
+    y = realloc(y, sizeof(int) * io->n);
+    check_mem(x, y, party);
     
     if (party == 1) {
-      x[i] = a * SCALE;  
+      x[io->n - 1] = a * SCALE;  
     } else if (party == 2) {
-      y[i] = a * SCALE;
+      y[io->n - 1] = a * SCALE;
     }
+
   }
 
   printf("Loading %d data points ...\n", io->n);
@@ -95,4 +102,11 @@ void write_runtime(int n, double time, int party, const char* dest) {
 
   fprintf(file, "[party %d] %d points, %lf seconds\n", party, n, time);
   printf("Write to file %s successful\n", dest);
+}
+
+void check_mem(int *x, int *y, int party) {
+  if((party == 1 && x == NULL) || (party == 2 && y == NULL)) {
+    printf("ERROR: Memory allocation failed\n");
+    exit(1);
+  }
 }
