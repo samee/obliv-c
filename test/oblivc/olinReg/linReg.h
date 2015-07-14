@@ -1,8 +1,9 @@
 // Fixed point arithmetic
 #define SCALE (1 << 16) // 2^16
 #define DESCALE(x) x / SCALE // for use in multiplication
-//#define MAXN 5001
-//#define SEED 5 // used for osqrt(), adjust for average values of given dataset
+#define ALLOC 128 // initial malloc amount, doubled when needed in load_data()
+#define APPROX(x, y) fabs(x - y) < EPSILON
+#define EPSILON 2
 
 typedef struct {
   char *src; // filename for data read
@@ -20,6 +21,6 @@ double wallClock();
 const char* mySide();
 
 void linReg(void* args);
-void load_data(protocolIO *io, int *x, int *y, int party);
+void load_data(protocolIO *io, int** x, int** y, int party);
 void write_runtime(int n, double time, int party, const char* dest);
-void check_mem(int *x, int *y, int party);
+void check_mem(int* x, int* y, int party);

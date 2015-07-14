@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <assert.h>
 #include "linReg.h"
 #include <obliv.h>
 #include "../common/util.h"
@@ -50,7 +51,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void load_data(protocolIO *io, int *x, int *y, int party) {
+void load_data(protocolIO *io, int** x, int** y, int party) {
   FILE *inputFile = fopen(io->src, "r");
 
   if (inputFile == NULL) {
@@ -59,6 +60,7 @@ void load_data(protocolIO *io, int *x, int *y, int party) {
   }
   
   io->n = 0;
+  int memsize = ALLOC;
   
   double a;
   while (!feof(inputFile)) {
@@ -73,17 +75,23 @@ void load_data(protocolIO *io, int *x, int *y, int party) {
 	exit(1);
       }
     }
-
         
     io->n += 1;
-    x = realloc(x, sizeof(int) * io->n);
-    y = realloc(y, sizeof(int) * io->n);
-    check_mem(x, y, party);
+    if (io->n > memsize) {
+      printf ("Data is now %d points in size. Changing memsize from %d to ", io->n, memsize);
+      memsize *= 2;
+      printf ("%d\n", memsize);
+      *x = realloc(*x, sizeof(int) * memsize);
+      *y = realloc(*y, sizeof(int) * memsize);
+      check_mem(*x, *y, party);
+    }
     
+    int aint = a * SCALE;
+    assert(APPROX((double) DESCALE(aint), a));
     if (party == 1) {
-      x[io->n - 1] = a * SCALE;  
+      *(*x + io->n - 1) =  aint; // messy, but needed for dereferencing 
     } else if (party == 2) {
-      y[io->n - 1] = a * SCALE;
+      *(*y + io->n - 1) =  aint;
     }
 
   }
@@ -104,7 +112,7 @@ void write_runtime(int n, double time, int party, const char* dest) {
   printf("Write to file %s successful\n", dest);
 }
 
-void check_mem(int *x, int *y, int party) {
+void check_mem(int* x, int* y, int party) {
   if((party == 1 && x == NULL) || (party == 2 && y == NULL)) {
     printf("ERROR: Memory allocation failed\n");
     exit(1);

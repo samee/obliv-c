@@ -11,37 +11,41 @@
 void linReg(void* args) {
   protocolIO *io = (protocolIO*) args;
 
-  int *x = malloc(sizeof(int));
-  int *y = malloc(sizeof(int));
+  int *x = malloc(sizeof(int) * ALLOC);
+  int *y = malloc(sizeof(int) * ALLOC);
   check_mem(x, y, ocCurrentParty());
 
   obliv int om = 0; // RESULTS
   obliv int ob = 0;
   obliv int or = 0;
   
-  load_data(io, x, y, ocCurrentParty());
+  load_data(io, &x, &y, ocCurrentParty());
   check_input_count(io);
+  
+/*  
+int i;
+  for (i = 0; i < io->n; i++) {
+    printf("[%d] %lf %lf \n", i, (double) DESCALE(ocBroadcastInt(x[i], 1)), (double) DESCALE(ocBroadcastInt(y[i], 2)));
+  }
+ */
   
   obliv int *ox = malloc(sizeof(obliv int) * io->n);
   obliv int *oy = malloc(sizeof(obliv int) * io->n);
   
   toObliv(io, ox, x, 1);
   toObliv(io, oy, y, 2);
+  free(x);
+  free(y);
   
   linear_regression(io, ox, oy, om, ob, or);
-  
-  // 1 and 2 included as params to use for checking in clean()
-  clean(x, ox, 1, ocCurrentParty());
-  clean(y, oy, 2, ocCurrentParty());
+  free(ox);
+  free(oy);
 }
 
 void toObliv(protocolIO *io, obliv int *oa, int *a, int party) {
  int i, res;
- // printf("\nParty %d data:\n", party); // REMOVE AFTER TESTING
  for(i = 0; i < io->n; i++) {
   oa[i] = feedOblivInt(a[i], party);
-  // revealOblivInt(&res, oa[i], 0); // REMOVE AFTER TESTING	
-  // printf("[%d] %lf\n", i, (double) DESCALE(res)); // REMOVE AFTER TESTING
  }
 }
 
@@ -62,10 +66,10 @@ void linear_regression(protocolIO *io, obliv int *ox, obliv int *oy, obliv int o
   obliv int ornum = (n*sumxy - fixed_mul(sumx, sumy));
   obliv int orden = fixed_mul((n*sumxx) - osqr(sumx), (n*sumyy) - osqr(sumy));
   obliv int orsqr = fixed_div(osqr(ornum), orden); // sqrt(revealed rsqr) = r
+
   revealOblivInt(&io->rsqr, orsqr, 0);
   revealOblivInt(&io->m, om, 0);
   revealOblivInt(&io->b, ob, 0);
-
   //revealOblivInt(&io->r, or, 0); // no longer used
 }
 
@@ -118,7 +122,7 @@ void check_input_count(protocolIO *io) {
   }
 }
 
-/*
+/* CODE BELOW THIS LINE IS NO LONGER NEEDED, WILL BE REMOVED
 obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 places after radix
  // Newton's Method for computing square root
  obliv int prior = SEED * SCALE; // initial seed, see linReg.h to adjust
@@ -137,8 +141,8 @@ obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 
  
  return current;
 }
-*/
 
+ // NO LONGER NEEDED
 void clean(int *a, obliv int *oa, int party, int check) {
   if ((party == 1 && check == 1) || (party == 2 && check == 2)) {
     if (a != NULL && oa != NULL) { // attempt to prevent double free
@@ -147,3 +151,5 @@ void clean(int *a, obliv int *oa, int party, int check) {
     }
   }
 }
+
+*/

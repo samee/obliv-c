@@ -23,8 +23,11 @@ fxy.truncate()
 
 xr = 0.0
 for i in xrange(0, int(data_points)):
-    xr += round(random.uniform(0, 100), 4)
+    xr += round(random.uniform(0, 1000), 4)
     yr = xr + round(random.uniform(0, 5), 2) # create artificial correlation
+    if (xr >= 32000 or yr >= 32000):
+        xr -= round(random.uniform(1000, 10000), 4)
+        yr -= round(random.uniform(1000, 10000), 4)
     print>>fx, xr
     print>>fy, yr
     print>>fxy, "%f %f" % (xr, yr)
