@@ -1621,6 +1621,15 @@ void feedOblivInputs(OblivInputs* spec, size_t count, int party)
       setupObliv##tname(&spec,&rv,v); \
       feedOblivInputs(&spec,1,party); \
       return rv; \
+    }\
+    void feedObliv##tname##Array(__obliv_c__##ot dest[],const t src[],size_t n,\
+                             int party)\
+    {\
+      int i,p = protoCurrentParty(currentProto);\
+      OblivInputs *specs = malloc(n*sizeof*specs);\
+      for(i=0;i<n;++i) setupObliv##tname(specs+i,dest+i,p==party?src[i]:0);\
+      feedOblivInputs(specs,n,party);\
+      free(specs);\
     }
 
 feedOblivFun(bool,bool,Bool)

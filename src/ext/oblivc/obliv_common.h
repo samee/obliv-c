@@ -9,6 +9,8 @@
 
 struct ProtocolDesc* ocCurrentProto(void);
 int ocCurrentParty(void);
+static inline int protoCurrentParty(ProtocolDesc* pd)
+    { return pd->currentParty(pd); }
 static inline char ocCurrentProtoType()
   { return *(char*)ocCurrentProto()->extra; }
 

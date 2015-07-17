@@ -25,6 +25,20 @@ obliv int feedOblivInt(int v,int party);
 obliv long feedOblivLong(long v,int party);
 obliv long long feedOblivLLong(long long v,int party);
 
+// Feed an entire array. Uses the setup functions above
+void  feedOblivBoolArray(obliv bool  dest[],const bool  src[],size_t n,
+                         int party);
+void  feedOblivCharArray(obliv char  dest[],const char  src[],size_t n,
+                         int party);
+void feedOblivShortArray(obliv short dest[],const short src[],size_t n,
+                         int party);
+void   feedOblivIntArray(obliv int   dest[],const int   src[],size_t n,
+                         int party);
+void  feedOblivLongArray(obliv long  dest[],const long  src[],size_t n,
+                         int party);
+void feedOblivLLongArray(obliv long long dest[],const long long src[],size_t n,
+                         int party);
+
 // Return value true means 'dest' was actually written to.
 //   Write may not occur if I am not the intended party, or this is
 //   a multithreaded protocol where only one thread writes

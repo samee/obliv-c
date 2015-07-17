@@ -118,11 +118,11 @@ let isImplicitCastResult t = hasAttribute "implicitCast" (typeAttrs t)
 let isFrozenQualified t = let a = typeAttrs t in
                           hasAttribute frozen a && not (hasOblivAttr a)
 
-let isFrozenPtr e = match e with
+let isFrozenPtr e = match unrollType e with
 | TPtr(t,_) -> isFrozenQualified t
 | _ -> false
 
-let isNonFrozenPtr e = match e with
+let isNonFrozenPtr e = match unrollType e with
 | TPtr(t,_) -> not (isFrozenQualified t)
 | _ -> false
 

@@ -66,20 +66,6 @@ void cmpswapInt(void* va,void* vb,void* arg)
   obliv if(*a>*b) swapInt(a,b);
 }
 
-void feedOblivBoolArr(obliv bool* dest,size_t n,bool* src,int srcParty)
-{
-  size_t i,p=ocCurrentParty();
-  for(i=0;i<n;++i) dest[i]=feedOblivBool(p==srcParty?src[i]:false,srcParty);
-}
-void feedOblivIntArr(obliv int* dest,size_t n,int* src,int srcParty)
-{
-  size_t i,p=ocCurrentParty();
-  OblivInputs* spec = malloc(sizeof(OblivInputs)*n);
-  for(i=0;i<n;++i) setupOblivInt(spec+i,dest+i,(p==srcParty?src[i]:0));
-  feedOblivInputs(spec,n,srcParty);
-    //dest[i]=feedOblivInt(p==srcParty?src[i]:0,srcParty); FIXME What..?!
-  free(spec);
-}
 void revealOblivIntArr(int* dest,size_t n,obliv int* src,int destParty)
 {
   size_t i,p=ocCurrentParty();
@@ -97,9 +83,9 @@ void randomShuffleControl(obliv bool* doSwap,size_t n,int party)
     waksmanSwitches(perm,n,c);
     free(perm);
     releaseBCipherRandomGen(gen);
-    feedOblivBoolArr(doSwap,sc,c,party);
+    feedOblivBoolArray(doSwap,c,sc,party);
     free(c);
-  }else feedOblivBoolArr(doSwap,sc,NULL,party); // both parties do this
+  }else feedOblivBoolArray(doSwap,NULL,sc,party); // both parties do this
 }
 
 void party1Shuffle(obliv int* arr,size_t n)
@@ -160,8 +146,8 @@ size_t privateSetIntersection(int *output,size_t oN,int *input,size_t iN)
   obliv int *arr=calloc(a+b,sizeof(obliv int));
   obliv int *out=calloc((a+b)/2,sizeof(obliv int));
   fprintf(stderr,"Started extending OT\n");
-  feedOblivIntArr(arr,a,input,1);
-  feedOblivIntArr(arr+a,b,input,2);
+  feedOblivIntArray(arr,input,a,1);
+  feedOblivIntArray(arr+a,input,b,2);
   lap2 = wallClock();
   fprintf(stderr,"starting gates\n");
   batcherMerge(arr,a,b,sizeof(*arr),cmpswapInt,NULL);
