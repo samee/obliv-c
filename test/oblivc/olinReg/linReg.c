@@ -22,17 +22,32 @@ int main(int argc, char *argv[]) {
   printf("Linear Regression\n");
   printf("=================\n\n");
 
-  char* REMOTE_HOST = "localhost";
+ 
 
   // Check args
   if (argc >= 4) {
-    if (argc == 5) {
-      REMOTE_HOST = argv[4];
-    }
+ 
+    const char *remote_host = argv[4];
 
     ProtocolDesc pd;
     protocolIO io;
-    ocTestUtilTcpOrDie(&pd, argv[2][0]=='1', argv[1]);
+    
+
+    if(argv[2][0] == '1') { 
+      if(protocolAcceptTcp2P(&pd,argv[1])!=0) { 
+	fprintf(stderr,"TCP accept failed\n");
+	exit(1);
+      }
+    }
+    else 
+      if(protocolConnectTcp2P(&pd,remote_host,argv[1])!=0) {
+	fprintf(stderr,"TCP connect failed\n");
+	exit(1);
+      }
+
+
+
+    //ocTestUtilTcpOrDie(&pd, argv[2][0]=='1', argv[1]);
     currentParty = (argv[2][0]=='1'?1:2);
     setCurrentParty(&pd, currentParty); // only checks for a '1'
     
