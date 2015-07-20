@@ -22,11 +22,16 @@ int main(int argc, char *argv[]) {
   printf("Linear Regression\n");
   printf("=================\n\n");
 
-  ProtocolDesc pd;
-  protocolIO io;
+  char* REMOTE_HOST = "localhost";
 
   // Check args
-  if (argc == 4) {
+  if (argc >= 4) {
+    if (argc == 5) {
+      REMOTE_HOST = argv[4];
+    }
+
+    ProtocolDesc pd;
+    protocolIO io;
     ocTestUtilTcpOrDie(&pd, argv[2][0]=='1', argv[1]);
     currentParty = (argv[2][0]=='1'?1:2);
     setCurrentParty(&pd, currentParty); // only checks for a '1'
@@ -78,9 +83,9 @@ void load_data(protocolIO *io, int** x, int** y, int party) {
         
     io->n += 1;
     if (io->n > memsize) {
-      printf ("Data is now %d points in size. Changing memsize from %d to ", io->n, memsize);
+      printf ("Data is now %d points in size. Changing memsize from %d bytes to ", io->n, memsize);
       memsize *= 2;
-      printf ("%d\n", memsize);
+      printf ("%d bytes\n", memsize);
       *x = realloc(*x, sizeof(int) * memsize);
       *y = realloc(*y, sizeof(int) * memsize);
       check_mem(*x, *y, party);

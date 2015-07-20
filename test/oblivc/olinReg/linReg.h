@@ -11,7 +11,7 @@ typedef struct {
   int m; // slope
   int b; // y-intercept
 
-  int rsqr; // correlation numerator
+  int rsqr; // correlation numerator, cov^2 / variances
   int r; // correlation
 } protocolIO;
 

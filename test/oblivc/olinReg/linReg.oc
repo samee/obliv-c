@@ -22,12 +22,12 @@ void linReg(void* args) {
   load_data(io, &x, &y, ocCurrentParty());
   check_input_count(io);
   
-/*  
+ /*
 int i;
   for (i = 0; i < io->n; i++) {
-    printf("[%d] %lf %lf \n", i, (double) DESCALE(ocBroadcastInt(x[i], 1)), (double) DESCALE(ocBroadcastInt(y[i], 2)));
+    printf("[%d] %lf %lf \n", i, (double) DESCALE(ocBroadcastInt(x[i], 1)), (double) DESCALE(ocBroadcastInt(y[i], 2))); // 32,000 limit before overflow (2^16)
   }
- */
+*/
   
   obliv int *ox = malloc(sizeof(obliv int) * io->n);
   obliv int *oy = malloc(sizeof(obliv int) * io->n);
@@ -50,27 +50,33 @@ void toObliv(protocolIO *io, obliv int *oa, int *a, int party) {
 }
 
 void linear_regression(protocolIO *io, obliv int *ox, obliv int *oy, obliv int om, obliv int ob, obliv int or) {
- 
+  
+ // printf("Almost done! Ready in 6 ...\n");
   int n = io->n;
   obliv int sumx = sum(ox, n); // sum of x
+ // printf("5 ... \n");
   obliv int sumxx = dotProd(ox, ox, n); // sum of each x squared
+ // printf("4 ...\n");
   obliv int sumy = sum(oy, n); // sum of y
+ // printf("3 ...\n");
   obliv int sumyy = dotProd(oy, oy, n); // sum of each y squared
+ // printf("2 ...\n");
   obliv int sumxy = dotProd(ox, oy, n); // sum of each x * y
-  
+//  printf("1 ...\n");
   // Compute least-squares best fit straight line
   om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - osqr(sumx)); // slope
   ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - osqr(sumx)); // y-intercept
   // or = fixed_div((n*sumxy - fixed_mul(sumx, sumy)), fixed_mul(osqrt((n*sumxx) - osqr(sumx)), osqrt((n*sumyy) - osqr(sumy)))); // correlation coefficient, no longer used
 
-  obliv int ornum = (n*sumxy - fixed_mul(sumx, sumy));
-  obliv int orden = fixed_mul((n*sumxx) - osqr(sumx), (n*sumyy) - osqr(sumy));
-  obliv int orsqr = fixed_div(osqr(ornum), orden); // sqrt(revealed rsqr) = r
+  obliv int ocov = (n*sumxy - fixed_mul(sumx, sumy));
+  obliv int ostddevs = fixed_mul((n*sumxx) - osqr(sumx), (n*sumyy) - osqr(sumy));
+  obliv int orsqr = fixed_div(osqr(ocov), ostddevs); // sqrt(revealed rsqr) = r
 
   revealOblivInt(&io->rsqr, orsqr, 0);
   revealOblivInt(&io->m, om, 0);
   revealOblivInt(&io->b, ob, 0);
   //revealOblivInt(&io->r, or, 0); // no longer used
+ // printf("0 ...\n"); 
 }
 
 obliv int osqr(obliv int x) {
