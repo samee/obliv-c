@@ -27,12 +27,11 @@ int main(int argc, char *argv[]) {
   // Check args
   if (argc >= 4) {
  
-    const char *remote_host = argv[4];
+    const char *remoteHost = argv[4];
 
     ProtocolDesc pd;
     protocolIO io;
     
-
     if(argv[2][0] == '1') { 
       if(protocolAcceptTcp2P(&pd,argv[1])!=0) { 
 	fprintf(stderr,"TCP accept failed\n");
@@ -40,7 +39,7 @@ int main(int argc, char *argv[]) {
       }
     }
     else 
-      if(protocolConnectTcp2P(&pd,remote_host,argv[1])!=0) {
+      if(protocolConnectTcp2P(&pd,remoteHost,argv[1])!=0) {
 	fprintf(stderr,"TCP connect failed\n");
 	exit(1);
       }
