@@ -27,26 +27,31 @@ int main(int argc, char *argv[]) {
   // Check args
   if (argc >= 4) {
  
-    const char *remoteHost = argv[4];
+    const char *remote_host = argv[4];
+    const char *port = argv[1];
 
     ProtocolDesc pd;
     protocolIO io;
     
-    /*if(argv[2][0] == '1') { 
-      if(protocolAcceptTcp2P(&pd,argv[1])!=0) { 
+    printf("Connecting to %s on port %s\n", remote_host, port);
+    if(argv[2][0] == '1') { 
+      printf("Running listener\n");
+      if(protocolAcceptTcp2P(&pd,port)!=0) { 
 	fprintf(stderr,"TCP accept failed\n");
 	exit(1);
       }
     }
     else 
-      if(protocolConnectTcp2P(&pd,remoteHost,argv[1])!=0) {
+      if(protocolConnectTcp2P(&pd,remote_host,port)!=0) {
+	printf("Running connector\n");
 	fprintf(stderr,"TCP connect failed\n");
 	exit(1);
-	} */
+	}
 
+    // REMOTE_HOST = localhost // TAKEN FROM MAKEFILE
+    //-DREMOTE_HOST=$(REMOTE_HOST) // TAKEN FROM MAKEFILE
 
-
-    ocTestUtilTcpOrDie(&pd, argv[2][0]=='1', argv[1]);
+    //ocTestUtilTcpOrDie(&pd, argv[2][0]=='1', argv[1]);
     currentParty = (argv[2][0]=='1'?1:2);
     setCurrentParty(&pd, currentParty); // only checks for a '1'
     
