@@ -7,4 +7,3 @@ obliv int sum(obliv int *a, int n);
 obliv int fixed_mul(obliv int oa, obliv int ob);
 obliv int fixed_div(obliv int oa, obliv int ob);
 //obliv int osqrt(obliv int oa);
-//void clean(int *a, obliv int *oa, int party, int check);

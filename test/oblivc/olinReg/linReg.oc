@@ -7,6 +7,7 @@
 #include <obliv.oh>
 #include "linReg.h"
 #include "linReg.oh"
+#include "dbg.h"
 
 void linReg(void* args) {
   protocolIO *io = (protocolIO*) args;
@@ -51,18 +52,13 @@ void toObliv(protocolIO *io, obliv int *oa, int *a, int party) {
 
 void linear_regression(protocolIO *io, obliv int *ox, obliv int *oy, obliv int om, obliv int ob, obliv int or) {
   
- // printf("Almost done! Ready in 6 ...\n");
   int n = io->n;
   obliv int sumx = sum(ox, n); // sum of x
- // printf("5 ... \n");
   obliv int sumxx = dotProd(ox, ox, n); // sum of each x squared
- // printf("4 ...\n");
   obliv int sumy = sum(oy, n); // sum of y
- // printf("3 ...\n");
   obliv int sumyy = dotProd(oy, oy, n); // sum of each y squared
- // printf("2 ...\n");
   obliv int sumxy = dotProd(ox, oy, n); // sum of each x * y
-//  printf("1 ...\n");
+
   // Compute least-squares best fit straight line
   om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - osqr(sumx)); // slope
   ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - osqr(sumx)); // y-intercept
@@ -76,7 +72,6 @@ void linear_regression(protocolIO *io, obliv int *ox, obliv int *oy, obliv int o
   revealOblivInt(&io->m, om, 0);
   revealOblivInt(&io->b, ob, 0);
   //revealOblivInt(&io->r, or, 0); // no longer used
- // printf("0 ...\n"); 
 }
 
 obliv int osqr(obliv int x) {
@@ -121,9 +116,10 @@ void check_input_count(protocolIO *io) {
  int nx = ocBroadcastInt(io->n, 1);
  int ny = ocBroadcastInt(io->n, 2);
  if (nx != ny) {
-    printf("ERROR: Unequal amount of data points.\n");
-    printf("X data points (party 1): %d\n", nx);
-    printf("Y data points (party 2): %d\n", ny);
+    log_err("Unequal amount of data points.\n\t"
+    "X data points (party 1): %d\n\t"
+    "Y data points (party 2): %d\n", nx, ny);
+    clean_errno();	  
     exit(1);
   }
 }
@@ -146,16 +142,6 @@ obliv int osqrt(obliv int oa) { // rewrite sqrt() for obliv data, accurate to 4 
  }
  
  return current;
-}
-
- // NO LONGER NEEDED
-void clean(int *a, obliv int *oa, int party, int check) {
-  if ((party == 1 && check == 1) || (party == 2 && check == 2)) {
-    if (a != NULL && oa != NULL) { // attempt to prevent double free
-     free(a);
-     free(oa);
-    }
-  }
 }
 
 */
