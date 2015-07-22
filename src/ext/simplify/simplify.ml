@@ -121,7 +121,8 @@ let rec makeThreeAddress
                               * return that temp *)
     (e: exp) : taExp = 
   match e with 
-    SizeOf _ | SizeOfE _ | AlignOf _ |  AlignOfE _ | SizeOfStr _ -> 
+  | SizeOfE _ when isBuiltinVaArgPack e -> e
+  | SizeOf _ | SizeOfE _ | AlignOf _ |  AlignOfE _ | SizeOfStr _ -> 
       constFold true e
   | Const _ -> e
   | AddrOf (Var _, NoOffset) -> e
@@ -167,6 +168,7 @@ and makeBasic (setTemp: taExp -> bExp) (e: exp) : bExp =
   | Lval (Var _, _) -> e'
   | Const _ | AddrOf (Var _, NoOffset) | StartOf (Var _, NoOffset) ->
       if !onlyVariableBasics then setTemp e' else e'
+  | SizeOfE _ when isBuiltinVaArgPack e' -> e'
   | SizeOf _ | SizeOfE _ | AlignOf _ |  AlignOfE _ | SizeOfStr _ -> 
       E.s (bug "Simplify: makeBasic found SizeOf: %a" d_exp e')
 
@@ -186,6 +188,10 @@ and makeBasic (setTemp: taExp -> bExp) (e: exp) : bExp =
     setTemp e' (* Put it into a temporary otherwise *)
   end
 
+and isBuiltinVaArgPack e = match e with
+  | SizeOfE (Lval (Var fv, NoOffset)) when fv.vname = "__builtin_va_arg_pack" ->
+      true
+  | _ -> false
 
 and simplifyLval 
     (setTemp: taExp -> bExp) 

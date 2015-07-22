@@ -172,4 +172,10 @@ void __obliv_c__condAdd(const void* c,void* dest
 
 void __obliv_c__condSub(const void* c,void* dest
                        ,const void* x,size_t size);
+
+// Special bit, that tells the compiler to start inserting memsets
+// This way we don't insert memsets into header files, specially before
+// memset has even been defined. The value of this variable doesn't matter, 
+// only the fact that it's here
+static const int __obliv_c__enable_zero_out = 1;
 #endif // OBLIV_BITS_H

@@ -6,8 +6,14 @@ CCARGS=""
 CILLYARGS=""
 OCSRC=()
 GCRYPT="-lgcrypt"
+if [ "$OBLIVC_BITS" = "no" ]; then
+  OBLIV_BITS=
+else
+  OBLIV_BITS="-include obliv_bits.h"
+fi
 
-$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations  --keepunused --doprocessObliv --markImplicitCasts -include obliv_bits.h -I $OCLIB -L$OCCPATH/_build -lobliv -lgcrypt -pthread $*
+
+$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations  --keepunused --doprocessObliv --markImplicitCasts $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv -lgcrypt -pthread $*
 
 if false; then
 while [ $# -ge 1 ]; do

@@ -708,10 +708,11 @@ let hasOblivBlocks f = begin
   vis#found
 end
 
+let zeroOutEnable = ref false
+
 class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval) 
   : cilVisitor = object(self)
   inherit nopCilVisitor
-
   method vstmt s = 
     let tmpVar ?name t = SimplifyTagged.makeSimplifyTemp ?name curFunc t in
     let isDeepVar v = dt#curDepth() = dt#varDepth v in
@@ -761,13 +762,24 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
         ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b')
   end
   method vfunc = dt#wrapVFunc begin fun f ->
-    (* if isOblivFunc f.svar.vtype || hasOblivBlocks f then begin *)
-      (* This really needs to be done only for obliv types
-       * But I am too lazy to traverse through structs *)
-    let nontemp = List.filter (fun v -> not (isTaggedTemp (var v)))
-                              f.slocals in
-    self#queueInstr (List.map (fun v -> zeroSet v !currentLoc) nontemp);
-    (* end; *)
+    if !zeroOutEnable then begin
+      (* if isOblivFunc f.svar.vtype || hasOblivBlocks f then begin *)
+        (* This really needs to be done only for obliv types
+         * But I am too lazy to traverse through structs *)
+      let nonbasic t = match unrollType t with
+        | TPtr _ -> false
+        | TFloat _ when not (isOblivSimple t) -> false
+        | TFun _ -> false
+        | TInt _ when not (isOblivSimple t) -> false
+        | _ -> true
+      in
+      let nontemp = List.filter (fun v -> 
+              nonbasic v.vtype
+           && not (isTaggedTemp (var v)))
+                                f.slocals in
+      self#queueInstr (List.map (fun v -> zeroSet v !currentLoc) nontemp);
+      (* end; *)
+    end;
     DoChildren
   end
 end
@@ -784,6 +796,10 @@ let genFunc g = match g with
     let c = if isofun then makeFormal f else trueCond in
     let cv = new codegenVisitor f (new depthTracker) c in
     GFun(visitCilFunction cv f,loc)
+| GVar(vi,_,_) ->
+    if vi.vname = "__obliv_c__enable_zero_out" then
+      zeroOutEnable := true; 
+    g
 | _ -> g
 
 (* If this gets too slow, merge it with codegen *)
