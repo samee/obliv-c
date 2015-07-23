@@ -1,7 +1,7 @@
 Obliv-C Compiler (`oblivcc`)
 ============================
 
-Step 1) Installation of dependencies (on Ubuntu systems) `sudo apt-get install ocaml libgcrypt20-dev`. Then, if you don't already have OCaml findlib, follow these extra instructions: [findlib.md](findlib.md).
+Step 1) Installation of dependencies (on Ubuntu systems) `sudo apt-get install ocaml libgcrypt20-dev ocaml-findlib`. 
 
 Step 2) Git-clone this repository, and do a `./configure && make RELEASE=1`. 
 
