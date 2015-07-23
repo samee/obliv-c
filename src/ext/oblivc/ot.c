@@ -732,9 +732,9 @@ senderExtensionBox(SenderExtensionBox* s,char box[],size_t rowBytes)
   char *keymine = malloc(k*rowBytes);
   for(i=0;i<k;++i)
     randomizeBuffer(s->keyblock[i],keymine+i*rowBytes,rowBytes);
+  orecv(s->pd,s->destParty,box,k*rowBytes);
   for(i=0;i<k;++i)
   { char *keybox = box+i*rowBytes;
-    orecv(s->pd,s->destParty,keybox,rowBytes);
     if(s->S[i]) memxor(keybox,keymine+i*rowBytes,rowBytes);
     else        memcpy(keybox,keymine+i*rowBytes,rowBytes);
   }
@@ -756,8 +756,8 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
   { char *key0 = box+i*rowBytes, *key1 = keyxor+i*rowBytes;
     memxor(key1,key0,rowBytes);
     memxor(key1,mask,rowBytes);
-    osend(r->pd,r->srcParty,key1,rowBytes);
   }
+  osend(r->pd,r->srcParty,keyxor,k*rowBytes);
   free(keyxor);
 }
 
