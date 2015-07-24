@@ -729,13 +729,14 @@ senderExtensionBox(SenderExtensionBox* s,char box[],size_t rowBytes)
 {
   const int k = s->keyBytes*8;
   int i;
-  char *keymine = malloc(rowBytes);
+  char *keymine = malloc(k*rowBytes);
   for(i=0;i<k;++i)
-  { randomizeBuffer(s->keyblock[i],keymine,rowBytes);
-    char *keybox = box+i*rowBytes;
-    orecv(s->pd,s->destParty,keybox,rowBytes);
-    if(s->S[i]) memxor(keybox,keymine,rowBytes);
-    else        memcpy(keybox,keymine,rowBytes);
+    randomizeBuffer(s->keyblock[i],keymine+i*rowBytes,rowBytes);
+  orecv(s->pd,s->destParty,box,k*rowBytes);
+  for(i=0;i<k;++i)
+  { char *keybox = box+i*rowBytes;
+    if(s->S[i]) memxor(keybox,keymine+i*rowBytes,rowBytes);
+    else        memcpy(keybox,keymine+i*rowBytes,rowBytes);
   }
   free(keymine);
 }
@@ -745,15 +746,18 @@ recverExtensionBox(RecverExtensionBox* r,char box[],
 {
   const int k = r->keyBytes*8;
   int i;
-  char *keyxor = malloc(rowBytes);
+  char *keyxor = malloc(k*rowBytes);
   for(i=0;i<k;++i)
-  { char *key0 = box+i*rowBytes, *key1 = keyxor;
+  { char *key0 = box+i*rowBytes, *key1 = keyxor+i*rowBytes;
     randomizeBuffer(r->keyblock0[i],key0,rowBytes);
     randomizeBuffer(r->keyblock1[i],key1,rowBytes);
+  }
+  for(i=0;i<k;++i)
+  { char *key0 = box+i*rowBytes, *key1 = keyxor+i*rowBytes;
     memxor(key1,key0,rowBytes);
     memxor(key1,mask,rowBytes);
-	osend(r->pd,r->srcParty,keyxor,rowBytes);
   }
+  osend(r->pd,r->srcParty,keyxor,k*rowBytes);
   free(keyxor);
 }
 
@@ -1296,7 +1300,9 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   const int k = 8*s->box->keyBytes;
   char *box = malloc(k*rowBytes);
   int *all = allRows(k);
+#ifndef PHASE_TIME_UPTO_BASE_OT
   senderExtensionBox(s->box,box,rowBytes);
+#ifndef PHASE_TIME_UPTO_EXTENSION
   SendMsgArgs args = {
     .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
     .k=k, .nonce=s->nonce, .opt0=opt0, .opt1=opt1, .len=len,
@@ -1304,6 +1310,8 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   };
   senderExtensionBoxSendMsgs(&args);
   s->nonce=args.nonce;
+#endif
+#endif
   free(all);
   free(box);
 }
@@ -1315,7 +1323,9 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   char *box = malloc(k*rowBytes);
   int *all = allRows(k);
   char *mask = malloc(rowBytes); packBytes(mask,sel,n);
+#ifndef PHASE_TIME_UPTO_BASE_OT
   recverExtensionBox(r->box,box,mask,rowBytes);
+#ifndef PHASE_TIME_UPTO_EXTENSION
   RecvMsgArgs args = {
     .cipher=r->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
     .k=k, .nonce=r->nonce, .msg=dest, .mask=mask, .len=len,
@@ -1323,6 +1333,8 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   };
   recverExtensionBoxRecvMsgs(&args);
   r->nonce=args.nonce;
+#endif
+#endif
   free(mask);
   free(all);
   free(box);
