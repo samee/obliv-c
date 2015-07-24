@@ -12,8 +12,16 @@ else
   OBLIV_BITS="-include obliv_bits.h"
 fi
 
+while [ $# -ge 1 ]; do
+  if [ "$1" = "-static-gcrypt" ]; then
+    GCRYPT="/usr/lib/x86_64-linux-gnu/libgcrypt.a -lgpg-error"
+  else
+    CCARGS+="$1 "
+  fi
+  shift
+done
 
-$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations  --keepunused --doprocessObliv --markImplicitCasts $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv -lgcrypt -pthread $*
+$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations  --keepunused --doprocessObliv --markImplicitCasts $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv $GCRYPT -pthread $CCARGS 
 
 if false; then
 while [ $# -ge 1 ]; do
