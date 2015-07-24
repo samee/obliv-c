@@ -67,6 +67,7 @@ typedef struct tcp2PTransport
   int sinceFlush;
 #ifdef PROFILE_NETWORK
   size_t bytes;
+  int flushCount;
   struct tcp2PTransport* parent;
 #endif
 } tcp2PTransport;
@@ -74,6 +75,13 @@ typedef struct tcp2PTransport
 size_t tcp2PBytesSent(ProtocolDesc* pd) 
 #ifdef PROFILE_NETWORK
   { return ((tcp2PTransport*)(pd->trans))->bytes; }
+#else
+  { return 0; }
+#endif
+
+int tcp2PFlushCount(ProtocolDesc* pd)
+#ifdef PROFILE_NETWORK
+  { return ((tcp2PTransport*)(pd->trans))->flushCount; }
 #else
   { return 0; }
 #endif
@@ -107,6 +115,9 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 	if(tcpt->needFlush)
 	{
 		fflush(tcpt->sockStream);	
+#ifdef PROFILE_NETWORK
+                tcpt->flushCount++;
+#endif
 		tcpt->needFlush=false;
 	}
   /*while(n>n2)*/
@@ -129,8 +140,15 @@ static void tcp2PCleanup(ProtocolTransport* pt)
 	close(((tcp2PTransport*)pt)->sock);
 #ifdef PROFILE_NETWORK
   tcp2PTransport* t = CAST(pt);
-  if(t->parent==NULL) fprintf(stderr,"Total bytes sent: %zd\n",t->bytes);
-  else t->parent->bytes+=t->bytes;
+  t->flushCount++;
+  if(t->parent==NULL)
+  { fprintf(stderr,"Total bytes sent: %zd\n",t->bytes);
+    fprintf(stderr,"Total flush done: %d\n",t->flushCount);
+  }
+  else
+  { t->parent->bytes+=t->bytes;
+    t->parent->flushCount+=t->flushCount;
+  }
 #endif
   free(pt);
 }
@@ -140,7 +158,8 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
       .cleanup = tcp2PCleanup},
-     .sock=0, .isClient=0, .needFlush=false, .bytes=0, .parent=NULL};
+     .sock=0, .isClient=0, .needFlush=false, .bytes=0, .flushCount=0,
+     .parent=NULL};
 #else
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
@@ -251,6 +270,9 @@ static int sockSplit(int sock,ProtocolTransport* t,bool isClient)
     //if(write(sock,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
     if(transSend(t,0,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
     fflush(((tcp2PTransport*)t)->sockStream); 
+#ifdef PROFILE_NETWORK
+    ((tcp2PTransport*)t)->flushCount++;
+#endif
     int newsock = accept(listenSock,0,0);
     close(listenSock);
     return newsock;
@@ -261,6 +283,9 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
 {
   tcp2PTransport* t = CAST(tsrc);
   fflush(t->sockStream); 
+#ifdef PROFILE_NETWORK
+  ((tcp2PTransport*)t)->flushCount++;
+#endif
   // I should really rewrite sockSplit to use FILE* sockStream
   int newsock = sockSplit(t->sock,tsrc,t->isClient);
   if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
