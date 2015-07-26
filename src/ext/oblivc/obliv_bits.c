@@ -440,6 +440,13 @@ const int yaoFixedKeyAlgo = GCRY_CIPHER_AES128;
 // Finite field doubling: used in fixed key garbling
 void yaoKeyDouble(yao_key_t d)
 {
+#if YAO_KEY_BYTES==10
+  uint64_t tmp = ((uint64_t *)d)[0];
+  ((uint64_t *)d)[0] = (tmp | ((tmp & 0x8080808080808080LL) << 8 )) ^ 0x03;
+
+  uint16_t tmp2 = ((uint16_t *)d)[4];
+  ((uint16_t *)d)[4] = tmp2 | ((tmp2 & 0x8080) << 8 );
+#else
   char carry = 0, next;
   int i;
   for(i=0;i<YAO_KEY_BYTES;++i)
@@ -448,6 +455,7 @@ void yaoKeyDouble(yao_key_t d)
     carry = next;
   }
   d[0] ^= 0x03;
+#endif
 }
 
 // Remove old SHA routines?
@@ -511,11 +519,13 @@ void yaoSetHalfMask2(YaoProtocolDesc* ypd,
     obuf=d1; // eliminate redundant yaoKeyCopy later
   else obuf=alloca(2*blen);
 
-  for(j=0;j<2;++j)
-    for(i=YAO_KEY_BYTES;i<FIXED_KEY_BLOCKLEN;++i) buf[i+j*blen]=0;
+  memset(buf+YAO_KEY_BYTES, 0, FIXED_KEY_BLOCKLEN - YAO_KEY_BYTES);
+  memset(buf+YAO_KEY_BYTES+FIXED_KEY_BLOCKLEN, 0, FIXED_KEY_BLOCKLEN - YAO_KEY_BYTES);
+
   yaoKeyCopy(buf     ,a1); yaoKeyDouble(buf);
   yaoKeyCopy(buf+blen,a2); yaoKeyDouble(buf+blen);
-  for(i=0;i<sizeof(k);++i) for(j=0;j<2;++j) buf[i+j*blen]^=((k>>8*i)&0xff);
+  ((uint64_t *)buf)[0] ^= k;
+  ((uint64_t *)(buf+blen))[0] ^= k;
 
   gcry_cipher_encrypt(ypd->fixedKeyCipher,obuf,2*blen,buf,2*blen);
   if(obuf!=d1) { yaoKeyCopy(d1,obuf); yaoKeyCopy(d2,obuf+blen); }

@@ -8,8 +8,14 @@ static inline void yaoKeyCopy(yao_key_t d, const yao_key_t s)
 static inline void yaoKeyZero(yao_key_t d) { memset(d,0,YAO_KEY_BYTES); }
 static inline bool yaoKeyLsb(const yao_key_t k) { return k[0]&1; }
 static inline void yaoKeyXor(yao_key_t d, const yao_key_t s)
-{ int i;
+{
+#if YAO_KEY_BYTES==10
+  ((int64_t *)d)[0] ^= ((int64_t *)s)[0];
+  ((int16_t *)d)[4] ^= ((int16_t *)s)[4];
+#else
+ int i;
   for(i=0;i<YAO_KEY_BYTES;++i) d[i]^=s[i];
+#endif
 }
 void yaoSetHalfMask(YaoProtocolDesc* ypd,
                     yao_key_t d,const yao_key_t a,uint64_t k);
