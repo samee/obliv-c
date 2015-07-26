@@ -440,22 +440,15 @@ const int yaoFixedKeyAlgo = GCRY_CIPHER_AES128;
 // Finite field doubling: used in fixed key garbling
 void yaoKeyDouble(yao_key_t d)
 {
-#if YAO_KEY_BYTES==10
-  uint64_t tmp = ((uint64_t *)d)[0];
-  ((uint64_t *)d)[0] = (tmp | ((tmp & 0x8080808080808080LL) << 8 )) ^ 0x03;
-
-  uint16_t tmp2 = ((uint16_t *)d)[4];
-  ((uint16_t *)d)[4] = tmp2 | ((tmp2 & 0x8080) << 8 );
-#else
   char carry = 0, next;
   int i;
   for(i=0;i<YAO_KEY_BYTES;++i)
-  { next = (d[i]&0x80);
+  { next = d[i]>>= 7;
     d[i] = ((d[i]<<1)|carry);
     carry = next;
   }
-  d[0] ^= 0x03;
-#endif
+   if(next == 1)
+     d[0] ^= 0x03;
 }
 
 // Remove old SHA routines?
