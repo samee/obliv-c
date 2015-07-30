@@ -4961,6 +4961,7 @@ let makeVarinfo global name ?init typ =
       
 let copyVarinfo (vi: varinfo) (newname: string) : varinfo = 
   let vi' = {vi with vname = newname; vid = newVID () } in
+  Hashtbl.add vidOblivDepth vi'.vid !currentOblivDepth;
   vi'
 
 let makeLocal fdec name typ init = (* a helper function *)
