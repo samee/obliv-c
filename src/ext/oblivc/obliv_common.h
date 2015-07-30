@@ -103,7 +103,16 @@ static inline void memxor (void* dest, const void* src, size_t n)
 { size_t i;
   for(i=0;i+sizeof(uint64_t)<=n;i+=sizeof(uint64_t))
     *((uint64_t*)((char*)dest+i)) ^= *((uint64_t*)((char*)src+i));
-  for(;i<n;++i) ((char*)dest)[i]^=((const char*)src)[i];
+  if(i+sizeof(uint32_t)<=n){
+    *((uint32_t*)((char*)dest+i)) ^= *((uint32_t*)((char*)src+i));
+   i+=sizeof(uint32_t);
+  }
+  if(i+sizeof(uint16_t)<=n)  {
+    *((uint16_t*)((char*)dest+i)) ^= *((uint16_t*)((char*)src+i));
+   i+=sizeof(uint16_t);
+  }
+  if(i < n)
+    *((char*)dest+i) ^= *((char*)src+i);
 }
 
 
