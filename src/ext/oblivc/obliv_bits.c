@@ -440,14 +440,24 @@ const int yaoFixedKeyAlgo = GCRY_CIPHER_AES128;
 // Finite field doubling: used in fixed key garbling
 void yaoKeyDouble(yao_key_t d)
 {
+#if YAO_KEY_BYTES==10
+ uint16_t tmp = (((uint16_t *)d)[3] >> 15) & 1;
+  char tmp2 = (d[9] >> 7) & 1;
+  ((uint64_t *)d)[0]<<=1;
+  ((uint16_t *)d)[4]<<=1;
+  ((uint16_t *)d)[4]|=tmp;
+   d[0] ^= ((tmp2<<1) | tmp2);
+#else
   char carry = 0, next;
   int i;
   for(i=0;i<YAO_KEY_BYTES;++i)
-  { next = (d[i]&0x80);
+  { next = (d[i] >> 7);
     d[i] = ((d[i]<<1)|carry);
     carry = next;
   }
+   if(next == 1)
   d[0] ^= 0x03;
+#endif
 }
 
 // Remove old SHA routines?
@@ -511,8 +521,8 @@ void yaoSetHalfMask2(YaoProtocolDesc* ypd,
     obuf=d1; // eliminate redundant yaoKeyCopy later
   else obuf=alloca(2*blen);
 
-  for(j=0;j<2;++j)
-    for(i=YAO_KEY_BYTES;i<FIXED_KEY_BLOCKLEN;++i) buf[i+j*blen]=0;
+  memset(buf+YAO_KEY_BYTES, 0, FIXED_KEY_BLOCKLEN-YAO_KEY_BYTES);
+  memset(buf+YAO_KEY_BYTES+FIXED_KEY_BLOCKLEN, 0, FIXED_KEY_BLOCKLEN-YAO_KEY_BYTES);
   yaoKeyCopy(buf     ,a1); yaoKeyDouble(buf);
   yaoKeyCopy(buf+blen,a2); yaoKeyDouble(buf+blen);
   for(i=0;i<sizeof(k);++i) for(j=0;j<2;++j) buf[i+j*blen]^=((k>>8*i)&0xff);
@@ -753,10 +763,21 @@ void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
 void yaoKeyCondXor(yao_key_t dest, bool cond,
                    const yao_key_t a, const yao_key_t b)
 {
-  char cmask = (cond?0xff:0);
-  int i;
-  for(i=0;i<YAO_KEY_BYTES;++i)
-    dest[i] = a[i] ^ (cmask & b[i]);
+   yao_key_t tmp;
+   memset(tmp, cond?-1:0, YAO_KEY_BYTES);
+ size_t i;
+  for(i=0;i+sizeof(uint64_t)<=YAO_KEY_BYTES;i+=sizeof(uint64_t))
+    *((uint64_t*)((char*)dest+i)) =  ( *((uint64_t*)((char*)tmp+i)) & *((uint64_t*)((char*)b+i)) ) ^ *((uint64_t*)((char*)a+i));
+  if(i+sizeof(uint32_t)<=YAO_KEY_BYTES){
+    *((uint32_t*)((char*)dest+i)) =  ( *((uint32_t*)((char*)tmp+i)) & *((uint32_t*)((char*)b+i)) ) ^ *((uint32_t*)((char*)a+i));
+   i+=sizeof(uint32_t);
+  }
+  if(i+sizeof(uint16_t)<=YAO_KEY_BYTES)  {
+    *((uint16_t*)((char*)dest+i)) =  ( *((uint16_t*)((char*)tmp+i)) & *((uint16_t*)((char*)b+i)) ) ^ *((uint16_t*)((char*)a+i));
+   i+=sizeof(uint16_t);
+  }
+  if(i < YAO_KEY_BYTES)
+    *(((char*)dest+i)) =  ( *(((char*)tmp+i)) & *(((char*)b+i)) ) ^ *(((char*)a+i));
 }
 
 // Computes r = (a xor ac)(b xor bc) xor rc

@@ -115,5 +115,4 @@ static inline void memxor (void* dest, const void* src, size_t n)
     *((char*)dest+i) ^= *((char*)src+i);
 }
 
-
 #endif
