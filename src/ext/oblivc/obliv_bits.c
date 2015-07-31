@@ -441,7 +441,7 @@ const int yaoFixedKeyAlgo = GCRY_CIPHER_AES128;
 void yaoKeyDouble(yao_key_t d)
 {
 #if YAO_KEY_BYTES==10
- uint16_t tmp = (((uint16_t *)d)[3] >> 15) & 1;
+  char tmp = (d[7] >> 7) & 1;
   char tmp2 = (d[9] >> 7) & 1;
   ((uint64_t *)d)[0]<<=1;
   ((uint16_t *)d)[4]<<=1;
