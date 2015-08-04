@@ -66,7 +66,6 @@ void honestCorrelatedOTExtRecv1Of2(struct HonestOTExtRecver* r,char* dest,
     const bool* sel,int n,int len);
 OTrecver honestOTExtRecverAbstract(struct HonestOTExtRecver* r);
 
-typedef void (*OcOtCorrelator)(char*,const char*,int,void*);
 struct HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty);
 void honestOTExtSenderRelease(struct HonestOTExtSender* sender);
 void honestOTExtSend1Of2(struct HonestOTExtSender* s,

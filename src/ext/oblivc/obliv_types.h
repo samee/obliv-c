@@ -85,6 +85,15 @@ typedef struct {
   void (*release)(void*);
 } OTrecver;
 
+typedef void (*OcOtCorrelator)(char*,const char*,int,void*);
+typedef struct {
+  void* sender;
+  void (*send)(void*,char*,char*,int n,int len,OcOtCorrelator,void*);
+  void (*release)(void*);
+} COTsender;
+
+typedef OTrecver COTrecver; // Strong typedef would have been nice
+
 /* Somehow I have settled on this "allocation-on-initialization"
    convention that I never planned. It simplifies user code a bit
    (i.e. user does not have to upcast every time execProtocol
