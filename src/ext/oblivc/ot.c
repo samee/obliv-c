@@ -14,7 +14,15 @@
 #include<obliv_common.h>
 #include<obliv_types.h>
 #include<commitReveal.h>
+#define HERE printf("%s:%d\n",__FILE__,__LINE__)
 
+inline void printhex(const char* msg,const char* buf,size_t n)
+{
+  int i;
+  printf("%s: ",msg);
+  for(i=0;i<n;++i) printf("%.02x ",buf[i]&0xff);
+  printf("\n");
+}
 // ---------------- Diffie Hellman Random Elt Generator ----------------------
 
 static gcry_mpi_t DHModQ,DHModQMinus3; // minus 3?! This is just paranoia
@@ -1037,9 +1045,12 @@ typedef struct
 { BCipherRandomGen *cipher;
   const char *box;
   int n, rowBytes, *rows, k, nonce, len, destParty, c;
-  const char *opt0, *opt1, *spack;
+  char *opt0, *opt1;
+  const char *spack;
   ProtocolTransport *trans;
   char *buf; int bufused;
+  OcOtCorrelator corrFun; // Callback function
+  void* corrArg;
 } SendMsgArgs;
 
 #define MSGBUFFER_SIZE 10000
@@ -1077,11 +1088,20 @@ senderExtensionBoxSendMsg(SendMsgArgs* a)
       ch = ((ch<<1)|getBit(a->box+a->rows[8*i+j]*a->rowBytes,a->c));
     keyx[i]=ch;
   }
-  bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt0,a->len);
-  sendBufSend(a,ctext);
-  memxor(keyx,a->spack,a->k/8);
-  bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt1,a->len);
-  sendBufSend(a,ctext);
+  if(a->corrFun)                            // If we are doing correlated OTs
+  { memset(ctext,0,a->len);                 // Decrypt zeroes
+    bcipherCryptNoResize(a->cipher,keyx,a->nonce,a->opt0,ctext,a->len);
+    a->corrFun(a->opt1,a->opt0,a->c,a->corrArg); // Get other option
+    memxor(keyx,a->spack,a->k/8);           // Encrypt with new key
+    bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt1,a->len);
+    sendBufSend(a,ctext);
+  }else
+  { bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt0,a->len);
+    sendBufSend(a,ctext);
+    memxor(keyx,a->spack,a->k/8);
+    bcipherCryptNoResize(a->cipher,keyx,a->nonce,ctext,a->opt1,a->len);
+    sendBufSend(a,ctext);
+  }
   a->nonce++;
   free(ctext);
 }
@@ -1096,6 +1116,7 @@ typedef struct
   const char *mask; // Receiver's selections
   ProtocolTransport *trans;
   char *buf; int bufread, payloadLeft;
+  bool isCorr;
 } RecvMsgArgs;
 static void recvBufFill(RecvMsgArgs* a)
 {
@@ -1115,7 +1136,7 @@ static void recvBufInit(RecvMsgArgs* a)
 {
   a->buf=malloc(a->len*MSGBUFFER_SIZE);
   a->bufread=a->len*MSGBUFFER_SIZE;
-  a->payloadLeft=2*a->n;
+  a->payloadLeft=(a->isCorr?a->n:2*a->n);
 }
 static void recvBufRelease(RecvMsgArgs* a) { free(a->buf); }
 
@@ -1135,7 +1156,9 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
       ch = ((ch<<1)|getBit(a->box+a->rows[8*i+j]*a->rowBytes,a->c));
     keyx[i]=ch;
   }
-  recvBufRecv(a,sel?a->msg:ctext);
+  // For correlated OTs, just imagine you are receiving zeroes
+  if(a->isCorr) memset(sel?a->msg:ctext,0,a->len);
+  else recvBufRecv(a,sel?a->msg:ctext);
   recvBufRecv(a,sel?ctext:a->msg);
   bcipherCryptNoResize(a->cipher,keyx,a->nonce++,a->msg,ctext,a->len);
   free(ctext);
@@ -1293,8 +1316,10 @@ honestOTExtRecverRelease(HonestOTExtRecver* r)
   free(r);
 }
 
-void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
-    int n,int len)
+void
+honestOTExtSend1Of2_impl(
+    HonestOTExtSender* s,char* opt0,char* opt1,
+    int n,int len,OcOtCorrelator f,void* corrArg)
 {
   int rowBytes = (n+7)/8;
   const int k = 8*s->box->keyBytes;
@@ -1306,7 +1331,8 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   SendMsgArgs args = {
     .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
     .k=k, .nonce=s->nonce, .opt0=opt0, .opt1=opt1, .len=len,
-    .destParty=s->box->destParty, .spack=s->box->spack, .trans=s->box->pd->trans
+    .destParty=s->box->destParty, .spack=s->box->spack,
+    .trans=s->box->pd->trans, .corrFun=f, .corrArg=corrArg
   };
   senderExtensionBoxSendMsgs(&args);
   s->nonce=args.nonce;
@@ -1315,8 +1341,19 @@ void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
   free(all);
   free(box);
 }
-void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
+void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
     int n,int len)
+{
+  honestOTExtSend1Of2_impl(s,(char*)opt0,(char*)opt1,n,len,NULL,NULL);
+}
+void honestCorrelatedOTExtSend1Of2(HonestOTExtSender* s,char* opt0,char* opt1,
+    int n,int len,OcOtCorrelator f,void* corrArg)
+{
+  honestOTExtSend1Of2_impl(s,(char*)opt0,(char*)opt1,n,len,f,corrArg);
+}
+
+void honestOTExtRecv1Of2_impl(HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len,bool isCorr)
 {
   int rowBytes = (n+7)/8;
   const int k = 8*r->box->keyBytes;
@@ -1329,7 +1366,8 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   RecvMsgArgs args = {
     .cipher=r->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
     .k=k, .nonce=r->nonce, .msg=dest, .mask=mask, .len=len,
-    .srcParty=r->box->srcParty, .trans=r->box->pd->trans
+    .srcParty=r->box->srcParty, .trans=r->box->pd->trans,
+    .isCorr = isCorr
   };
   recverExtensionBoxRecvMsgs(&args);
   r->nonce=args.nonce;
@@ -1338,6 +1376,16 @@ void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
   free(mask);
   free(all);
   free(box);
+}
+void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len)
+{
+  honestOTExtRecv1Of2_impl(r,dest,sel,n,len,false);
+}
+void honestCorrelatedOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,
+    const bool* sel,int n,int len)
+{
+  honestOTExtRecv1Of2_impl(r,dest,sel,n,len,true);
 }
 void honestWrapperSend(void* s,const char* opt0,const char* opt1,
     int n,int len) { honestOTExtSend1Of2(s,opt0,opt1,n,len); }
@@ -1454,9 +1502,9 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
   else
   { SendMsgArgs args = {
       .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=rows,
-      .k=rc, .nonce=s->nonce, .opt0=opt0, .opt1=opt1, .len=len,
+      .k=rc, .nonce=s->nonce, .opt0=(char*)opt0, .opt1=(char*)opt1, .len=len,
       .destParty=s->box->destParty, .spack=s->box->spack,
-      .trans=s->box->pd->trans
+      .trans=s->box->pd->trans, .corrFun=NULL, .corrArg=NULL
     };
     senderExtensionBoxSendMsgs(&args);
     s->nonce=args.nonce;
@@ -1507,7 +1555,7 @@ otExtRecv1Of2(OTExtRecver* rr,char* dest,const bool* sel,
     RecvMsgArgs args = {
       .cipher=r->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=rows,
       .k=rc, .nonce=r->nonce, .msg=dest, .mask=mask, .len=len,
-      .srcParty=r->box->srcParty, .trans=r->box->pd->trans
+      .srcParty=r->box->srcParty, .trans=r->box->pd->trans, .isCorr = false
     };
     recverExtensionBoxRecvMsgs(&args);
     r->nonce=args.nonce;

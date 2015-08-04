@@ -135,11 +135,11 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 
 static void tcp2PCleanup(ProtocolTransport* pt)
 { 
-	fflush(((tcp2PTransport*)pt)->sockStream);
-	fclose(((tcp2PTransport*)pt)->sockStream);
-	close(((tcp2PTransport*)pt)->sock);
-#ifdef PROFILE_NETWORK
   tcp2PTransport* t = CAST(pt);
+  fflush(t->sockStream);
+  fclose(t->sockStream);
+  close(t->sock);
+#ifdef PROFILE_NETWORK
   t->flushCount++;
   if(t->parent==NULL)
   { fprintf(stderr,"Total bytes sent: %zd\n",t->bytes);
@@ -151,6 +151,14 @@ static void tcp2PCleanup(ProtocolTransport* pt)
   }
 #endif
   free(pt);
+}
+
+static inline bool transIsTcp2P(ProtocolTransport* pt)
+  { return pt->cleanup == tcp2PCleanup; }
+FILE* transGetFile(ProtocolTransport* t)
+{
+  if(transIsTcp2P(t)) return ((tcp2PTransport*)t)->sockStream;
+  else return NULL;
 }
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 
