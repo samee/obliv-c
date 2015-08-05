@@ -15,6 +15,9 @@ void yaoSetHashMask(YaoProtocolDesc* ypd,
                     yao_key_t d,const yao_key_t a,const yao_key_t b,
                     uint64_t k,int i);
 
+// Assumes b is unknown
+const char* yaoKeyOfBit(const OblivBit* b);
+
 extern void setupYaoProtocol(ProtocolDesc* pd,bool halfgates);
 extern void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
                             protocol_run start, void* arg);
