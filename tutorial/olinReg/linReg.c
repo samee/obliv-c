@@ -66,8 +66,9 @@ int main(int argc, char *argv[]) {
     /* If repo is synced with base fork (with new CIL version), 
     note that yaoGateCount() is defined in <obliv.oh> 
     and must be implemented in linReg.oc and not here */
-    log_info("Yao Gate Count: %u\n", yaoGateCount());
-    write_runtime(io.n, runtime, currentParty, "runtime.dat");
+    int gates = yaoGateCount();
+    log_info("Yao Gate Count: %u\n", gates);
+    write_runtime(io.n, runtime, currentParty, gates, "runtime.dat");
 
     printf("\n");
     log_info("Slope   \tm = %15.6e\n", (double) DESCALE(io.m)); // print slope
@@ -131,7 +132,7 @@ void load_data(protocolIO *io, int** x, int** y, int party) {
   fclose(inputFile);
 }
 
-void write_runtime(int n, double time, int party, const char* dest) {
+void write_runtime(int n, double time, int party, int gates, const char* dest) {
   FILE *file = fopen(dest, "a");
   
   if (file == NULL) {
@@ -140,7 +141,7 @@ void write_runtime(int n, double time, int party, const char* dest) {
     exit(1);
   }
 
-  fprintf(file, "[party %d] %d points, %lf seconds\n", party, n, time);
+  fprintf(file, "[party %d] %d points, %lf seconds, %d gates\n", party, n, time, gates);
   log_info("Runtime data stored in file '%s'\n", dest);
 }
 

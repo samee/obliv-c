@@ -22,5 +22,5 @@ const char* mySide();
 
 void linReg(void* args);
 void load_data(protocolIO *io, int** x, int** y, int party);
-void write_runtime(int n, double time, int party, const char* dest);
+void write_runtime(int n, double time, int party, int gates, const char* dest);
 void check_mem(int* x, int* y, int party);
