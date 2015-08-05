@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
     protocolIO io;
     
     // Make connection between two shells
-    // Modified ocTestUtilTcpOrDie() function from ~/obliv-c/test/oblivc/common/util.c
+    // Modified ocTestUtilTcpOrDie() function from obliv-c/test/oblivc/common/util.c
     log_info("Connecting to %s on port %s ...\n", remote_host, port);
     if(argv[2][0] == '1') { 
       if(protocolAcceptTcp2P(&pd,port)!=0) { 
@@ -62,6 +62,10 @@ int main(int argc, char *argv[]) {
 
     // Print results and store runtime data
     log_info("%s total time: %lf seconds\n", mySide(), runtime);
+
+    /* If repo is synced with base fork (with new CIL version), 
+    note that yaoGateCount() is defined in <obliv.oh> 
+    and must be implemented in linReg.oc and not here */
     log_info("Yao Gate Count: %u\n", yaoGateCount());
     write_runtime(io.n, runtime, currentParty, "runtime.dat");
 

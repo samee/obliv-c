@@ -1,7 +1,7 @@
 // Fixed point arithmetic
 #define SCALE (1 << 16) // 2^16
 #define DESCALE(x) x / SCALE // for use in multiplication
-#define ALLOC 128 // initial malloc amount, doubled when needed in load_data()
+#define ALLOC 128 // initial amount for input data, doubled when needed in load_data()
 #define APPROX(x, y) fabs(x - y) < EPSILON
 #define EPSILON 2
 

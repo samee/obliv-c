@@ -23,6 +23,3 @@ t1:
 t2:
 	$(./a.out) 
 	./a.out $(CONNECTION) 2 $(TY)
-
-# REMOTE_HOST = localhost 
-# -DREMOTE_HOST=$(#REMOTE_HOST)
