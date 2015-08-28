@@ -10,6 +10,7 @@
 #include <stdio.h>      // for protoUseStdio()
 #include <string.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <netdb.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -138,7 +139,6 @@ static void tcp2PCleanup(ProtocolTransport* pt)
   tcp2PTransport* t = CAST(pt);
   fflush(t->sockStream);
   fclose(t->sockStream);
-  close(t->sock);
 #ifdef PROFILE_NETWORK
   t->flushCount++;
   if(t->parent==NULL)
@@ -186,6 +186,8 @@ static tcp2PTransport* tcp2PNew(int sock,bool isClient)
   trans->isClient=isClient;
   trans->sockStream=fdopen(sock, "rb+");
   trans->sinceFlush = 0;
+  const int one=1;
+  setsockopt(sock,IPPROTO_TCP,TCP_NODELAY,&one,sizeof(one));
   /*setvbuf(trans->sockStream, trans->buffer, _IOFBF, BUFFER_SIZE);*/
   return trans;
 }
