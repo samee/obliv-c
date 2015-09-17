@@ -510,7 +510,6 @@ void yaoSetHalfMask2128(YaoProtocolDesc* ypd,
    __m128i buf[2];
    __m128i obuf[2];
   const int blen = FIXED_KEY_BLOCKLEN;
-  assert(YAO_KEY_BYTES==FIXED_KEY_BLOCKLEN);
 
    buf[0] = double_block(a1);
    buf[1] = double_block(a2);
@@ -529,15 +528,16 @@ void yaoGenerateHalfGatePair128(ProtocolDesc* pd, OblivBit* r,
   if(a->yao.inverted) ac=!ac;
   if(b->yao.inverted) bc=!bc;
 
-  bool pa = yaoKeyLsb(a->yao.w), pb = yaoKeyLsb(b->yao.w);
+//  bool pa = yaoKeyLsb(a->yao.w), pb = yaoKeyLsb(b->yao.w);
 
 
   __m128i row,t,wg,we,wa1,wb1, wa0, wb0;
   wa0 = *(__m128i*) &(a->yao.w[0]);
   wb0 = *(__m128i*) &(b->yao.w[0]);
-
   wa1 = _mm_xor_si128(wa0, R_128);
   wb1 = _mm_xor_si128(wb0, R_128);
+   bool pa = (*((unsigned short *)&wa0)&1);
+   bool pb = (*((unsigned short *)&wb0)&1);
 
   yaoSetHalfMask2128(ypd,&row,wa0,&t,wa1,ypd->gcount);
   wg = pa ? t : row;
@@ -564,15 +564,11 @@ void yaoGenerateHalfGatePair128(ProtocolDesc* pd, OblivBit* r,
 void yaoSetHalfMask128(YaoProtocolDesc* ypd,
                     __m128i * d,const __m128i a,uint64_t k)
 {
-   __m128i buf;
+   __m128i buf = double_block(a);
    __m128i obuf;
-  assert(YAO_KEY_BYTES==FIXED_KEY_BLOCKLEN);
-   buf = double_block(a);
    __m128i k_128 = _mm_loadl_epi64( (__m128i const *) (&k));
    buf = _mm_xor_si128(buf, k_128);
-
   gcry_cipher_encrypt(ypd->fixedKeyCipher,&obuf,sizeof(obuf),&buf,sizeof(buf));
-
    *d = _mm_xor_si128(obuf, buf);
 }
 
