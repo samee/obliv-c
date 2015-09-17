@@ -530,14 +530,13 @@ void yaoGenerateHalfGatePair128(ProtocolDesc* pd, OblivBit* r,
 
 //  bool pa = yaoKeyLsb(a->yao.w), pb = yaoKeyLsb(b->yao.w);
 
+  bool pa = yaoKeyLsb(a->yao.w), pb = yaoKeyLsb(b->yao.w);
 
   __m128i row,t,wg,we,wa1,wb1, wa0, wb0;
   wa0 = *(__m128i*) &(a->yao.w[0]);
   wb0 = *(__m128i*) &(b->yao.w[0]);
   wa1 = _mm_xor_si128(wa0, R_128);
   wb1 = _mm_xor_si128(wb0, R_128);
-   bool pa = (*((unsigned short *)&wa0)&1);
-   bool pb = (*((unsigned short *)&wb0)&1);
 
   yaoSetHalfMask2128(ypd,&row,wa0,&t,wa1,ypd->gcount);
   wg = pa ? t : row;
