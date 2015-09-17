@@ -25,13 +25,17 @@ typedef struct OblivBit OblivBit;
 //   Add a new entry in OblivBit union
 //   Assign proper hooks to these callbacks in ProtocolDesc
 
-#define YAO_KEY_BITS 80
+#define YAO_KEY_BITS 128
 #define YAO_KEY_BYTES ((YAO_KEY_BITS+7)/8)
 #if YAO_KEY_BITS!=(YAO_KEY_BYTES*8)
 #error "Yao key size needs to be a multiple of 8 bits"
 #endif
 
+#if YAO_KEY_BITS == 128
+typedef char yao_key_t[YAO_KEY_BYTES] __attribute__((aligned(16)));
+#else
 typedef char yao_key_t[YAO_KEY_BYTES];
+#endif
 
 #define NNOB_KEY_BYTES 10 
 typedef char nnob_key_t[NNOB_KEY_BYTES];
@@ -68,7 +72,7 @@ struct ProtocolDesc {
 
 #define OC_DYN_EXTRA_FUN(fname,Type1,Type2,type2Id)    \
   Type2* fname(Type1* s1)                              \
-  { if(*(char*)s1->extra==(type2Id)) return s1->extra; \
+  { if(*(char*)s1->extra==(type2Id)) return (Type2 *)s1->extra; \
     else return NULL;                                  \
   }
 

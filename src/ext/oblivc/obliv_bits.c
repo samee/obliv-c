@@ -15,7 +15,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <gcrypt.h>
-
+#include <emmintrin.h>
 // Q: What's with all these casts to and from void* ?
 // A: Code generation becomes easier without the need for extraneous casts.
 //      Might fix it some day. But user code never sees these anyway.
@@ -447,6 +447,156 @@ const char yaoFixedKey[] = "\x61\x7e\x8d\xa2\xa0\x51\x1e\x96"
 const int yaoFixedKeyAlgo = GCRY_CIPHER_AES128;
 #define FIXED_KEY_BLOCKLEN 16
 
+//------------- Optimization -------
+
+/*------------------------------------------------------------------------
+/ OCB Version 3 Reference Code (Optimized C)     Last modified 08-SEP-2012
+/-------------------------------------------------------------------------
+/ Copyright (c) 2012 Ted Krovetz.
+/
+/ Permission to use, copy, modify, and/or distribute this software for any
+/ purpose with or without fee is hereby granted, provided that the above
+/ copyright notice and this permission notice appear in all copies.
+/
+/ THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+/ WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+/ MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+/ ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+/ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+/ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+/ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+/
+/ Phillip Rogaway holds patents relevant to OCB. See the following for
+/ his patent grant: http://www.cs.ucdavis.edu/~rogaway/ocb/grant.htm
+/
+/ Special thanks to Keegan McAllister for suggesting several good improvements
+/
+/ Comments are welcome: Ted Krovetz <ted@krovetz.net> - Dedicated to Laurel K
+/------------------------------------------------------------------------- */
+static inline __m128i double_block(__m128i bl) {
+      const __m128i mask = _mm_set_epi32(135,1,1,1);
+      __m128i tmp = _mm_srai_epi32(bl, 31);
+      tmp = _mm_and_si128(tmp, mask);
+      tmp = _mm_shuffle_epi32(tmp, _MM_SHUFFLE(2,1,0,3));
+      bl = _mm_slli_epi32(bl, 1);
+      return _mm_xor_si128(bl,tmp);
+}
+//End Copyright scope...
+void yaoSetBitXor128(ProtocolDesc* pd,OblivBit* r,
+                 const OblivBit* a,const OblivBit* b)
+{
+  OblivBit t;
+   _mm_store_si128((__m128i *)&(t.yao.w[0]), 
+   _mm_xor_si128( (*(__m128i*) &(a->yao.w[0])), (*(__m128i*) &(b->yao.w[0]))));
+
+  t.yao.inverted = (a->yao.inverted!=b->yao.inverted); // no-op for evaluator
+  t.unknown = true;
+  *r = t;
+}
+
+
+static __m128i R_128;
+void yaoKeyCondXor128(__m128i* dest, bool cond,
+                   __m128i a, __m128i b)
+{
+   __m128i res = _mm_setzero_si128();
+   *dest = _mm_xor_si128(a, cond ? b : res);
+}
+
+void yaoSetHalfMask2128(YaoProtocolDesc* ypd,
+                     __m128i* d1, __m128i a1,
+                     __m128i* d2, __m128i a2, uint64_t k)
+{
+   __m128i buf[2];
+   __m128i obuf[2];
+  const int blen = FIXED_KEY_BLOCKLEN;
+  assert(YAO_KEY_BYTES==FIXED_KEY_BLOCKLEN);
+
+   buf[0] = double_block(a1);
+   buf[1] = double_block(a2);
+   __m128i k_128 = _mm_loadl_epi64( (__m128i const *) (&k));
+   buf[0] = _mm_xor_si128(buf[0], k_128);
+   buf[1] = _mm_xor_si128(buf[1], k_128);
+
+   gcry_cipher_encrypt(ypd->fixedKeyCipher,obuf,2*blen, buf,2*blen);
+   *d1 = _mm_xor_si128(obuf[0], buf[0]);
+   *d2 = _mm_xor_si128(obuf[1], buf[1]);
+}
+
+void yaoGenerateHalfGatePair128(ProtocolDesc* pd, OblivBit* r,
+    bool ac, bool bc, bool rc, const OblivBit* a, const OblivBit* b) {
+  YaoProtocolDesc* ypd = pd->extra;
+  if(a->yao.inverted) ac=!ac;
+  if(b->yao.inverted) bc=!bc;
+
+  bool pa = yaoKeyLsb(a->yao.w), pb = yaoKeyLsb(b->yao.w);
+
+
+  __m128i row,t,wg,we,wa1,wb1, wa0, wb0;
+  wa0 = *(__m128i*) &(a->yao.w[0]);
+  wb0 = *(__m128i*) &(b->yao.w[0]);
+
+  wa1 = _mm_xor_si128(wa0, R_128);
+  wb1 = _mm_xor_si128(wb0, R_128);
+
+  yaoSetHalfMask2128(ypd,&row,wa0,&t,wa1,ypd->gcount);
+  wg = pa ? t : row;
+  row = _mm_xor_si128(row, t);
+  yaoKeyCondXor128(&row,(pb!=bc),row, R_128);
+  osend(pd,2,&row,YAO_KEY_BYTES);
+  yaoKeyCondXor128(&wg,((pa!=ac)&&(pb!=bc))!=rc,wg,R_128);
+  ypd->gcount++;
+
+  yaoSetHalfMask2128(ypd,&row,wb0,&t,wb1,ypd->gcount);
+  we = pb ? t : row;
+  row = _mm_xor_si128(row, t);
+  row = _mm_xor_si128(row, (ac?wa1:wa0));
+
+  osend(pd,2, &row,YAO_KEY_BYTES);
+  ypd->gcount++;
+
+  // r may alias a and b, so modify at the end
+   _mm_store_si128((__m128i *)&(r->yao.w[0]), _mm_xor_si128(wg, we) );
+
+  r->yao.inverted = false; r->unknown = true;
+}
+
+void yaoSetHalfMask128(YaoProtocolDesc* ypd,
+                    __m128i * d,const __m128i a,uint64_t k)
+{
+   __m128i buf;
+   __m128i obuf;
+  assert(YAO_KEY_BYTES==FIXED_KEY_BLOCKLEN);
+   buf = double_block(a);
+   __m128i k_128 = _mm_loadl_epi64( (__m128i const *) (&k));
+   buf = _mm_xor_si128(buf, k_128);
+
+  gcry_cipher_encrypt(ypd->fixedKeyCipher,&obuf,sizeof(obuf),&buf,sizeof(buf));
+
+   *d = _mm_xor_si128(obuf, buf);
+}
+
+void yaoEvaluateHalfGatePair128(ProtocolDesc* pd, OblivBit* r,
+    const OblivBit* a, const OblivBit* b) {
+  YaoProtocolDesc* ypd = pd->extra;
+  __m128i row,t,wg,we;
+   __m128i a_key = *(__m128i*) &(a->yao.w[0]);
+   __m128i b_key = *(__m128i*) &(b->yao.w[0]);
+
+  yaoSetHalfMask128(ypd,&t,a_key, ypd->gcount++);
+  orecv(pd,1,&row,YAO_KEY_BYTES);
+  yaoKeyCondXor128(&wg,yaoKeyLsb(a->yao.w),t,row);
+
+  yaoSetHalfMask128(ypd,&t,b_key,ypd->gcount++);
+  orecv(pd,1,&row,YAO_KEY_BYTES);
+   row = _mm_xor_si128(row, a_key);
+  yaoKeyCondXor128(&we,yaoKeyLsb(b->yao.w),t,row);
+
+  // r may alias a and b, so modify at the end
+  _mm_store_si128((__m128i *)&(r->yao.w[0]), _mm_xor_si128(wg, we) );
+  r->unknown = true;
+}
+
 // Finite field doubling: used in fixed key garbling
 void yaoKeyDouble(yao_key_t d)
 {
@@ -833,11 +983,23 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
 
 void yaoGenerateAndPair(ProtocolDesc* pd, OblivBit* r, 
                         const OblivBit* a, const OblivBit* b)
-  { yaoGenerateHalfGatePair(pd,r,0,0,0,a,b); }
+  {
+#if YAO_KEY_BITS == 128 
+ yaoGenerateHalfGatePair128(pd,r,0,0,0,a,b); 
+#else
+ yaoGenerateHalfGatePair(pd,r,0,0,0,a,b); 
+#endif
+}
 
 void yaoGenerateOrPair(ProtocolDesc* pd, OblivBit* r,
                        const OblivBit* a, const OblivBit* b)
-  { yaoGenerateHalfGatePair(pd,r,1,1,1,a,b); }
+  {
+#if YAO_KEY_BITS == 128 
+ yaoGenerateHalfGatePair128(pd,r,1,1,1,a,b); 
+#else
+ yaoGenerateHalfGatePair(pd,r,1,1,1,a,b); 
+#endif
+}
 
 // TODO merge these too? Maybe I paired the wrong way
 void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
@@ -865,7 +1027,8 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
 unsigned yaoGateCount()
 { int rv = ((YaoProtocolDesc*)currentProto->extra)->gcount;
   if(currentProto->setBitAnd==yaoGenerateAndPair
-      || currentProto->setBitAnd==yaoEvaluateHalfGatePair) // halfgate
+      || currentProto->setBitAnd==yaoEvaluateHalfGatePair
+      || currentProto->setBitAnd==yaoEvaluateHalfGatePair128) // halfgate
     return rv/2;
   else return rv;
 }
@@ -900,14 +1063,24 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   pd->feedOblivInputs = (me==1?yaoGenrFeedOblivInputs:yaoEvalFeedOblivInputs);
   pd->revealOblivBits = (me==1?yaoGenrRevealOblivBits:yaoEvalRevealOblivBits);
   if(halfgates)
-  { pd->setBitAnd = (me==1?yaoGenerateAndPair:yaoEvaluateHalfGatePair);
+  {
+#if YAO_KEY_BITS == 128
+    pd->setBitAnd = (me==1?yaoGenerateAndPair:yaoEvaluateHalfGatePair128);
+    pd->setBitOr  = (me==1?yaoGenerateOrPair :yaoEvaluateHalfGatePair128);
+#else 
+    pd->setBitAnd = (me==1?yaoGenerateAndPair:yaoEvaluateHalfGatePair);
     pd->setBitOr  = (me==1?yaoGenerateOrPair :yaoEvaluateHalfGatePair);
+#endif
   }else
   { ypd->nonFreeGate = (me==1?yaoGenerateGate:yaoEvaluateGate);
     pd->setBitAnd = yaoSetBitAnd;
     pd->setBitOr  = yaoSetBitOr;
   }
+#if YAO_KEY_BITS == 128
+  pd->setBitXor = yaoSetBitXor128;
+#else
   pd->setBitXor = yaoSetBitXor;
+#endif
   pd->setBitNot = yaoSetBitNot;
   pd->flipBit   = yaoFlipBit;
 
@@ -933,6 +1106,7 @@ void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
     gcry_randomize(ypd->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
     gcry_randomize(ypd->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
     if(point_and_permute) ypd->R[0] |= 1;   // flipper bit
+   R_128 = *(__m128i*) &(ypd->R[0]);
 
     if(ypd->sender.sender==NULL)
     { ownOT=true;
