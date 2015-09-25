@@ -2689,7 +2689,10 @@ and constFoldBinOp (machdep: bool) bop e1 e2 tres =
         | TEnum (ei, _) -> ei.ekind
         | _ -> E.s (bug "constFoldBinOp")
       in
-      let collapse0 () = kinteger tk 0 in
+      let collapse0 () = if isOblivSimple tres then
+                           CastE(tres,(kinteger tk 0))
+                         else kinteger tk 0
+      in
       let collapse e = e (*mkCast e tres*) in
       let shiftInBounds i2 =
          (* We only try to fold shifts if the second arg is positive and
