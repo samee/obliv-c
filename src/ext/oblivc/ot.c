@@ -1118,6 +1118,7 @@ typedef struct
   ProtocolTransport *trans;
   char *buf; int bufread, payloadLeft;
   bool isCorr;
+  void* recver;
 } RecvMsgArgs;
 static void recvBufFill(RecvMsgArgs* a)
 {
@@ -1383,32 +1384,56 @@ void honestCorrelatedOTExtSend1Of2(HonestOTExtSender* s,char* opt0,char* opt1,
   honestOTExtSend1Of2_impl(s,(char*)opt0,(char*)opt1,n,len,f,corrArg);
 }
 
-void honestOTExtRecv1Of2_impl(HonestOTExtRecver* r,char* dest,const bool* sel,
-    int n,int len,bool isCorr)
+void* honestOTExtRecv1Of2Start(HonestOTExtRecver* r,const bool* sel,int n)
 {
+  RecvMsgArgs* args = malloc(sizeof(RecvMsgArgs));
   int rowBytes = (n+7)/8;
   const int k = 8*r->box->keyBytes;
   const int blen = r->padder->blen;
   char *box = malloc(k*rowBytes);
   int *all = allRows(k);
   char *mask = malloc(rowBytes); packBytes(mask,sel,n);
-#ifndef PHASE_TIME_UPTO_BASE_OT
   recverExtensionBox(r->box,box,mask,rowBytes);
-#ifndef PHASE_TIME_UPTO_EXTENSION
-  RecvMsgArgs args = {
+  *args = (RecvMsgArgs) {
     .cipher=r->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
-    .k=k, .nonce=r->nonce, .nonceDelta=(len+blen-1)/blen,
-    .msg=dest, .mask=mask, .len=len,
-    .srcParty=r->box->srcParty, .trans=r->box->pd->trans,
-    .isCorr = isCorr
+    .k=k, .nonce=r->nonce, .nonceDelta = 0, .c=0,
+    .msg=NULL, .mask=mask, .len=0,
+    .srcParty=r->box->srcParty,
+    .trans=r->box->pd->trans, .isCorr = false,
+    .recver=r
   };
-  recverExtensionBoxRecvMsgs(&args);
-  r->nonce=args.nonce;
-#endif
-#endif
-  free(mask);
-  free(all);
-  free(box);
+  return args;
+}
+void honestOTExtRecv1Of2Chunk(void* vargs,char* dest,int nchunk,
+    int len,bool isCorr)
+{ RecvMsgArgs* args = vargs;
+  RecvMsgArgs suba = *args;
+  suba.n=nchunk;
+  suba.msg=dest;
+  suba.len=len;
+  suba.nonce=((HonestOTExtRecver*)args->recver)->nonce;
+  suba.nonceDelta = (len+suba.cipher->blen-1)/suba.cipher->blen;
+  suba.isCorr=isCorr;
+  recverExtensionBoxRecvMsgs(&suba);
+  ((HonestOTExtRecver*)args->recver)->nonce=suba.nonce;
+  args->c+=nchunk;
+}
+void honestOTExtRecv1Of2End(void* vargs)
+{
+  RecvMsgArgs* args=vargs;
+  free((void*)args->mask);
+  free(args->rows);
+  free((void*)args->box);
+  free(args);
+}
+
+
+void honestOTExtRecv1Of2_impl(HonestOTExtRecver* r,char* dest,const bool* sel,
+    int n,int len,bool isCorr)
+{
+  void* args = honestOTExtRecv1Of2Start(r,sel,n);
+  honestOTExtRecv1Of2Chunk(args,dest,n,len,isCorr);
+  honestOTExtRecv1Of2End(args);
 }
 void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len)
