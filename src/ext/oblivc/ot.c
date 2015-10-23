@@ -1051,6 +1051,7 @@ typedef struct
   char *buf; int bufused;
   OcOtCorrelator corrFun; // Callback function
   void* corrArg;
+  void* sender;
 } SendMsgArgs;
 
 #define MSGBUFFER_SIZE 10000
@@ -1317,32 +1318,59 @@ honestOTExtRecverRelease(HonestOTExtRecver* r)
   free(r);
 }
 
-void
-honestOTExtSend1Of2_impl(
-    HonestOTExtSender* s,char* opt0,char* opt1,
-    int n,int len,OcOtCorrelator f,void* corrArg)
+void* honestOTExtSend1Of2Start(HonestOTExtSender* s,int n)
 {
+  SendMsgArgs* args = malloc(sizeof(SendMsgArgs));
   int rowBytes = (n+7)/8;
   const int k = 8*s->box->keyBytes;
   const int blen = s->padder->blen;
   char *box = malloc(k*rowBytes);
   int *all = allRows(k);
-#ifndef PHASE_TIME_UPTO_BASE_OT
   senderExtensionBox(s->box,box,rowBytes);
-#ifndef PHASE_TIME_UPTO_EXTENSION
-  SendMsgArgs args = {
+  *args = (SendMsgArgs) {
     .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
-    .k=k, .nonce=s->nonce, .nonceDelta = (len+blen-1)/blen,
-    .opt0=opt0, .opt1=opt1, .len=len,
+    .k=k, .nonce=s->nonce, .nonceDelta = 0, .c=0,
+    .opt0=NULL, .opt1=NULL, .len=0,
     .destParty=s->box->destParty, .spack=s->box->spack,
-    .trans=s->box->pd->trans, .corrFun=f, .corrArg=corrArg
+    .trans=s->box->pd->trans, .corrFun=NULL, .corrArg=NULL,
+    .sender=s
   };
-  senderExtensionBoxSendMsgs(&args);
-  s->nonce=args.nonce;
-#endif
-#endif
-  free(all);
-  free(box);
+  return args;
+}
+
+void honestOTExtSend1Of2Chunk(void* vargs,char* opt0,char* opt1,int nchunk,
+    int len,OcOtCorrelator f,void* corrArg)
+{ SendMsgArgs* args = vargs;
+  SendMsgArgs suba = *args;
+  suba.n=nchunk;
+  suba.opt0=opt0;
+  suba.opt1=opt1;
+  suba.len=len;
+  suba.nonce=((HonestOTExtSender*)args->sender)->nonce;
+  suba.nonceDelta = (len+suba.cipher->blen-1)/suba.cipher->blen;
+  suba.corrFun=f;
+  suba.corrArg=corrArg;
+  senderExtensionBoxSendMsgs(&suba);
+  ((HonestOTExtSender*)args->sender)->nonce=suba.nonce;
+  args->c+=nchunk;
+}
+
+void honestOTExtSend1Of2End(void* vargs)
+{
+  SendMsgArgs* args=vargs;
+  free(args->rows);
+  free((void*)args->box);
+  free(args);
+}
+
+void
+honestOTExtSend1Of2_impl(
+    HonestOTExtSender* s,char* opt0,char* opt1,
+    int n,int len,OcOtCorrelator f,void* corrArg)
+{
+  void* args = honestOTExtSend1Of2Start(s,n);
+  honestOTExtSend1Of2Chunk(args,opt0,opt1,n,len,f,corrArg);
+  honestOTExtSend1Of2End(args);
 }
 void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
     int n,int len)
