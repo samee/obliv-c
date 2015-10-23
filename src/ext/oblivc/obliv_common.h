@@ -65,6 +65,10 @@ void honestOTExtRecv1Of2(struct HonestOTExtRecver* r,char* dest,const bool* sel,
 void honestCorrelatedOTExtRecv1Of2(struct HonestOTExtRecver* r,char* dest,
     const bool* sel,int n,int len);
 OTrecver honestOTExtRecverAbstract(struct HonestOTExtRecver* r);
+void* honestOTExtRecv1Of2Start(struct HonestOTExtRecver* r,const bool* sel,
+    int n);
+void honestOTExtRecv1Of2Chunk(void* vargs,char* dest,int nchunk,
+    int len,bool isCorr);
 
 struct HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty);
 void honestOTExtSenderRelease(struct HonestOTExtSender* sender);
@@ -73,6 +77,11 @@ void honestOTExtSend1Of2(struct HonestOTExtSender* s,
 void honestCorrelatedOTExtSend1Of2(struct HonestOTExtSender* s,
     char* opt0,char* opt1,int n,int len,OcOtCorrelator f,void* corrArg);
 OTsender honestOTExtSenderAbstract(struct HonestOTExtSender* s);
+void* honestOTExtSend1Of2Start(struct HonestOTExtSender* s,int n);
+void honestOTExtSend1Of2Chunk(void* vargs,char* opt0,char* opt1,int nchunk,
+    int len,OcOtCorrelator f,void* corrArg);
+void honestOTExtSend1Of2Skip(void* vargs);
+void honestOTExtSend1Of2Skip(void* vargs);
 
 struct OTExtSender;
 struct OTExtRecver;

@@ -1010,11 +1010,43 @@ void yaoEvaluateGenHalf(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
   yaoKeyCondXor(r->yao.w,yaoKeyLsb(a->yao.w),t,row);
   r->unknown = true;
 }
-// b is ignored if I am not party 'party'
+typedef struct
+{ yao_key_t w,*R;
+  bool flip;
+} YaoSendEHalfAndAux;
+
+void yaoSendEHalfAnd_aux(char* opt1,const char* opt0,int c,void* vargs)
+{
+  YaoSendEHalfAndAux* args = vargs;
+  yao_key_t neg;
+  yaoKeyCopy(opt1,opt0);
+  yaoKeyXor(opt1,args->w);
+  yaoKeyCondXor(opt1,args->flip,opt1,*args->R);
+}
+void yaoSendEHalfAnd(ProtocolDesc* pd,YaoEHalfSwapper* sw,
+    OblivBit* r,const OblivBit* a)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  YaoSendEHalfAndAux args = { .w={}, .R=&ypd->R, .flip=a->yao.inverted };
+  yaoKeyCopy(args.w,a->yao.w);
+  yao_key_t dummy;
+  honestOTExtSend1Of2Chunk(sw,r->yao.w,dummy,1,YAO_KEY_BYTES,
+      yaoSendEHalfAnd_aux,&args);
+  r->yao.inverted=false; r->unknown=false;
+}
+void yaoRecvEHalfAnd(ProtocolDesc* pd,YaoEHalfSwapper* sw,
+    OblivBit* r,const OblivBit* a)
+{
+  YaoProtocolDesc *ypd = pd->extra;
+  honestOTExtRecv1Of2Chunk(sw,r->yao.w,1,YAO_KEY_BYTES,true);
+  r->unknown=false;
+}
+// b is ignored if I am not generator
 void yaoGHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b)
 {
+  __obliv_c__bool feedOblivBool(bool b,int party);
   if(known(a)) 
-  { if(a->knownValue)  __obliv_c__copyBit(r,a);
+  { if(a->knownValue) *r=feedOblivBool(b,1).bits[0];
     else __obliv_c__assignBitKnown(r,false);
   }
   else if(protoCurrentParty(pd)==1) yaoGenerateGenHalf(pd,r,0,0,0,a,b);
@@ -1030,6 +1062,26 @@ void yaoGHalfSwapGate(ProtocolDesc* pd,
     __obliv_c__setBitXor(a+n,a+n,&r);
     __obliv_c__setBitXor(b+n,b+n,&r);
   }
+}
+// b ignored if I am generator
+YaoEHalfSwapper yaoEHalfSwapStart(ProtocolDesc* pd,const bool* b,size_t n)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  void* rv;
+  if(protoCurrentParty(pd)==1)
+    rv=honestOTExtSend1Of2Start(ypd->sender.sender,n);
+  else rv=honestOTExtRecv1Of2Start(ypd->recver.recver,b,n);
+  return (YaoEHalfSwapper){.args=rv};
+}
+void yaoEHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,
+    YaoEHalfSwapper sw)
+{
+  if(known(a))
+  { if(a->knownValue) __obliv_c__copyBit(r,a);
+    else __obliv_c__assignBitKnown(r,false);
+  }
+  else if(protoCurrentParty(pd)==1) yaoSendEHalfAnd(pd,&sw,r,a);
+  else yaoRecvEHalfAnd(pd,&sw,r,a);
 }
 /*void nnobAndGatesCount(ProtocolDesc* pd, protocol_run start, void* arg)*/
 /*{*/

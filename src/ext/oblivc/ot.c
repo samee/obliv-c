@@ -1362,6 +1362,8 @@ void honestOTExtSend1Of2Chunk(void* vargs,char* opt0,char* opt1,int nchunk,
   args->c+=nchunk;
   if(args->c>=args->n) honestOTExtSend1Of2End(args);
 }
+void honestOTExtSend1Of2Skip(void* vargs)
+  { ((SendMsgArgs*)vargs)->c++; }
 
 void
 honestOTExtSend1Of2_impl(
@@ -1424,7 +1426,8 @@ void honestOTExtRecv1Of2Chunk(void* vargs,char* dest,int nchunk,
   args->c+=nchunk;
   if(args->c>=args->n) honestOTExtRecv1Of2End(args);
 }
-
+void honestOTExtRecv1Of2Skip(void* vargs)
+  { ((RecvMsgArgs*)vargs)->c--; }
 
 void honestOTExtRecv1Of2_impl(HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len,bool isCorr)
