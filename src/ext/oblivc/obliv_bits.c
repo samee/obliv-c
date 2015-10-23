@@ -10,6 +10,7 @@
 #include <stdio.h>      // for protoUseStdio()
 #include <string.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <netdb.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -138,7 +139,6 @@ static void tcp2PCleanup(ProtocolTransport* pt)
   tcp2PTransport* t = CAST(pt);
   fflush(t->sockStream);
   fclose(t->sockStream);
-  close(t->sock);
 #ifdef PROFILE_NETWORK
   t->flushCount++;
   if(t->parent==NULL)
@@ -186,6 +186,8 @@ static tcp2PTransport* tcp2PNew(int sock,bool isClient)
   trans->isClient=isClient;
   trans->sockStream=fdopen(sock, "rb+");
   trans->sinceFlush = 0;
+  const int one=1;
+  setsockopt(sock,IPPROTO_TCP,TCP_NODELAY,&one,sizeof(one));
   /*setvbuf(trans->sockStream, trans->buffer, _IOFBF, BUFFER_SIZE);*/
   return trans;
 }
@@ -970,6 +972,69 @@ void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)
   setupYaoProtocol(pd,false);
   mainYaoProtocol(pd,true,start,arg);
   free(pd->extra);
+}
+
+// Special purpose gates, meant to be used if you like doing low-level
+// optimizations. Note: this one assumes constant propagation has already
+// been done, and 'a' is private to the generator.
+// TODO I should really find a better way to factor this out with 
+// YaoGenerateHalfGatePair
+void yaoGenerateGenHalf(ProtocolDesc* pd,OblivBit* r,
+    bool ac, bool bc, bool rc, const OblivBit* a, bool b)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  if(a->yao.inverted) ac=!ac;
+
+  bool pa = yaoKeyLsb(a->yao.w);
+  yao_key_t row,t,wg,wa1;
+  const char *wa0 = a->yao.w;
+
+  yaoKeyCopy(wa1,wa0); yaoKeyXor(wa1,ypd->R);
+  yaoSetHalfMask2(ypd,row,wa0,t,wa1,ypd->gcount);
+  yaoKeyCopy(wg,(pa?t:row));
+  yaoKeyXor (row,t);
+  yaoKeyCondXor(row,(b!=bc),row,ypd->R);
+  osend(pd,2,row,YAO_KEY_BYTES);
+  yaoKeyCondXor(wg,((pa!=ac)&&(b!=bc))!=rc,wg,ypd->R);
+  yaoKeyCopy(r->yao.w,wg);
+  r->yao.inverted = false; r->unknown = true;
+  ypd->gcount++;
+}
+void yaoEvaluateGenHalf(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  yao_key_t row,t;
+
+  yaoSetHalfMask(ypd,t,a->yao.w,ypd->gcount++);
+  orecv(pd,1,row,YAO_KEY_BYTES);
+  yaoKeyCondXor(r->yao.w,yaoKeyLsb(a->yao.w),t,row);
+  r->unknown = true;
+}
+// b is ignored if I am not party 'party'
+void yaoHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b,
+    int party)
+{
+  if(known(a)) 
+  { if(a->knownValue)  __obliv_c__copyBit(r,a);
+    else __obliv_c__assignBitKnown(r,false);
+  }
+  else if(party==1)
+  { if(protoCurrentParty(pd)==1) yaoGenerateGenHalf(pd,r,0,0,0,a,b);
+    else yaoEvaluateGenHalf(pd,r,a);
+  }else
+  {
+    exit(-1); // unimplemented
+  }
+}
+void yaoHalfCondCopyGate(ProtocolDesc* pd,
+    OblivBit a[],const OblivBit b[],int n,bool c,int party)
+{
+  OblivBit x,r;
+  while(n-->0)
+  { __obliv_c__setBitXor(&x,a+n,b+n);
+    yaoHalfAnd(pd,&r,&x,c,party);
+    __obliv_c__setBitXor(a+n,a+n,&r);
+  }
 }
 
 /*void nnobAndGatesCount(ProtocolDesc* pd, protocol_run start, void* arg)*/

@@ -1,4 +1,5 @@
 #pragma once
+#include<obliv_types_internal.h>
 #include<string.h>
 // These are yao-related functions from obliv_bits.c that later became useful 
 // in other files as well
@@ -30,4 +31,15 @@ extern void yaoGenrFeedOblivInputs(ProtocolDesc* pd
                ,OblivInputs* oi,size_t n,int src);
 extern void yaoEvalFeedOblivInputs(ProtocolDesc* pd
                ,OblivInputs* oi,size_t n,int src);
+
+extern void yaoHalfCondCopyGate(ProtocolDesc* pd,
+    OblivBit a[],const OblivBit b[],int n,bool c,int party);
+
+// Uses private value from party 'party's x to initialize
+// a special "fatBit" OblivBit object. These can only be used by
+// __obliv_c__fatDecode() later. Useful with yaoHalfSwapGate.
+static inline OblivBit __obliv_c__fatBit(bool x)
+  { return (OblivBit){.unknown=false,{.knownValue=x}}; }
+static inline bool __obliv_c__fatDecode(const OblivBit* b) 
+  { return b->knownValue; }
 
