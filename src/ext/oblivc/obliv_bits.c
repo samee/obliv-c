@@ -1011,7 +1011,7 @@ void yaoEvaluateGenHalf(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
   r->unknown = true;
 }
 // b is ignored if I am not party 'party'
-void yaoHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b)
+void yaoGHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b)
 {
   if(known(a)) 
   { if(a->knownValue)  __obliv_c__copyBit(r,a);
@@ -1020,18 +1020,17 @@ void yaoHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b)
   else if(protoCurrentParty(pd)==1) yaoGenerateGenHalf(pd,r,0,0,0,a,b);
   else yaoEvaluateGenHalf(pd,r,a);
 }
-void yaoHalfSwapGate(ProtocolDesc* pd,
+void yaoGHalfSwapGate(ProtocolDesc* pd,
     OblivBit a[],OblivBit b[],int n,bool c)
 {
   OblivBit x,r;
   while(n-->0)
   { __obliv_c__setBitXor(&x,a+n,b+n);
-    yaoHalfAnd(pd,&r,&x,c);
+    yaoGHalfAnd(pd,&r,&x,c);
     __obliv_c__setBitXor(a+n,a+n,&r);
     __obliv_c__setBitXor(b+n,b+n,&r);
   }
 }
-
 /*void nnobAndGatesCount(ProtocolDesc* pd, protocol_run start, void* arg)*/
 /*{*/
   /*pd->currentParty = ocCurrentPartyDefault;*/

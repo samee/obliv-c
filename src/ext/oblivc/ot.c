@@ -1339,6 +1339,12 @@ void* honestOTExtSend1Of2Start(HonestOTExtSender* s,int n)
   return args;
 }
 
+void honestOTExtSend1Of2End(SendMsgArgs* args)
+{
+  free(args->rows);
+  free((void*)args->box);
+  free(args);
+}
 void honestOTExtSend1Of2Chunk(void* vargs,char* opt0,char* opt1,int nchunk,
     int len,OcOtCorrelator f,void* corrArg)
 { SendMsgArgs* args = vargs;
@@ -1354,14 +1360,7 @@ void honestOTExtSend1Of2Chunk(void* vargs,char* opt0,char* opt1,int nchunk,
   senderExtensionBoxSendMsgs(&suba);
   ((HonestOTExtSender*)args->sender)->nonce=suba.nonce;
   args->c+=nchunk;
-}
-
-void honestOTExtSend1Of2End(void* vargs)
-{
-  SendMsgArgs* args=vargs;
-  free(args->rows);
-  free((void*)args->box);
-  free(args);
+  if(args->c>=args->n) honestOTExtSend1Of2End(args);
 }
 
 void
@@ -1371,7 +1370,6 @@ honestOTExtSend1Of2_impl(
 {
   void* args = honestOTExtSend1Of2Start(s,n);
   honestOTExtSend1Of2Chunk(args,opt0,opt1,n,len,f,corrArg);
-  honestOTExtSend1Of2End(args);
 }
 void honestOTExtSend1Of2(HonestOTExtSender* s,const char* opt0,const char* opt1,
     int n,int len)
@@ -1404,6 +1402,13 @@ void* honestOTExtRecv1Of2Start(HonestOTExtRecver* r,const bool* sel,int n)
   };
   return args;
 }
+void honestOTExtRecv1Of2End(RecvMsgArgs* args)
+{
+  free((void*)args->mask);
+  free(args->rows);
+  free((void*)args->box);
+  free(args);
+}
 void honestOTExtRecv1Of2Chunk(void* vargs,char* dest,int nchunk,
     int len,bool isCorr)
 { RecvMsgArgs* args = vargs;
@@ -1417,14 +1422,7 @@ void honestOTExtRecv1Of2Chunk(void* vargs,char* dest,int nchunk,
   recverExtensionBoxRecvMsgs(&suba);
   ((HonestOTExtRecver*)args->recver)->nonce=suba.nonce;
   args->c+=nchunk;
-}
-void honestOTExtRecv1Of2End(void* vargs)
-{
-  RecvMsgArgs* args=vargs;
-  free((void*)args->mask);
-  free(args->rows);
-  free((void*)args->box);
-  free(args);
+  if(args->c>=args->n) honestOTExtRecv1Of2End(args);
 }
 
 
@@ -1433,7 +1431,6 @@ void honestOTExtRecv1Of2_impl(HonestOTExtRecver* r,char* dest,const bool* sel,
 {
   void* args = honestOTExtRecv1Of2Start(r,sel,n);
   honestOTExtRecv1Of2Chunk(args,dest,n,len,isCorr);
-  honestOTExtRecv1Of2End(args);
 }
 void honestOTExtRecv1Of2(HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len)

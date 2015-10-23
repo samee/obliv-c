@@ -32,7 +32,7 @@ extern void yaoGenrFeedOblivInputs(ProtocolDesc* pd
 extern void yaoEvalFeedOblivInputs(ProtocolDesc* pd
                ,OblivInputs* oi,size_t n,int src);
 
-extern void yaoHalfSwapGate(ProtocolDesc* pd,
+extern void yaoGHalfSwapGate(ProtocolDesc* pd,
     OblivBit a[],OblivBit b[],int n,bool c);
 
 // Uses private value from party 'party's x to initialize
@@ -42,4 +42,4 @@ static inline OblivBit __obliv_c__fatBit(bool x)
   { return (OblivBit){.unknown=false,{.knownValue=x}}; }
 static inline bool __obliv_c__fatDecode(const OblivBit* b) 
   { return b->knownValue; }
-
+typedef struct { void* args; } YaoEHalfSwapper;
