@@ -32,8 +32,8 @@ extern void yaoGenrFeedOblivInputs(ProtocolDesc* pd
 extern void yaoEvalFeedOblivInputs(ProtocolDesc* pd
                ,OblivInputs* oi,size_t n,int src);
 
-extern void yaoHalfCondCopyGate(ProtocolDesc* pd,
-    OblivBit a[],const OblivBit b[],int n,bool c,int party);
+extern void yaoHalfSwapGate(ProtocolDesc* pd,
+    OblivBit a[],OblivBit b[],int n,bool c);
 
 // Uses private value from party 'party's x to initialize
 // a special "fatBit" OblivBit object. These can only be used by
