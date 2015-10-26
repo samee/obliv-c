@@ -1011,35 +1011,79 @@ void yaoEvaluateGenHalf(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
   r->unknown = true;
 }
 typedef struct
-{ yao_key_t w,*R;
-  bool flip;
+{ yao_key_t *w,*R;
+  bool *flip;
+  int n;
 } YaoSendEHalfAndAux;
 
-void yaoSendEHalfAnd_aux(char* opt1,const char* opt0,int c,void* vargs)
+void yaoGenerateEvalHalf_aux(char* opt1,const char* opt0,int c,void* vargs)
 {
   YaoSendEHalfAndAux* args = vargs;
-  yao_key_t neg;
-  yaoKeyCopy(opt1,opt0);
-  yaoKeyXor(opt1,args->w);
-  yaoKeyCondXor(opt1,args->flip,opt1,*args->R);
+  int i;
+  for(i=0;i<args->n;++i)
+  { yaoKeyCopy(opt1,opt0);
+    yaoKeyXor(opt1,args->w[i]);
+    yaoKeyCondXor(opt1,args->flip[i],opt1,*args->R);
+  }
 }
-void yaoSendEHalfAnd(ProtocolDesc* pd,YaoEHalfSwapper* sw,
-    OblivBit* r,const OblivBit* a)
+void yaoGenerateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper sw,
+    OblivBit r[],const OblivBit a[],int n)
 {
   YaoProtocolDesc* ypd = pd->extra;
-  YaoSendEHalfAndAux args = { .w={}, .R=&ypd->R, .flip=a->yao.inverted };
-  yaoKeyCopy(args.w,a->yao.w);
-  yao_key_t dummy;
-  honestOTExtSend1Of2Chunk(sw,r->yao.w,dummy,1,YAO_KEY_BYTES,
-      yaoSendEHalfAnd_aux,&args);
-  r->yao.inverted=false; r->unknown=false;
+  YaoSendEHalfAndAux args;
+  // This seems like too many mallocs. Should profile/preallocate this
+  // Or split up OT "chunks" into multiple pieces for a piece. TODO
+  // Simplifies this code to make it look more like GenHalf
+  yao_key_t *dummy = malloc(n*sizeof(yao_key_t));
+  yao_key_t *results = malloc(n*sizeof(yao_key_t));
+  args.w = malloc(n*sizeof(yao_key_t));
+  args.flip = malloc(n*sizeof(bool));
+  int i,j=0;
+  for(i=0;i<n;++i) 
+    if(a[i].unknown)
+    { yaoKeyCopy(args.w[j],a[i].yao.w);
+      args.flip[j]=a[i].yao.inverted;
+      j++;
+    }else if(known(a+i) && a[i].knownValue==true)
+    { yaoKeyZero(args.w[j]);
+      args.flip[j]=true; // Negation of zero, if receiver picked 1
+      j++;
+    }
+  args.R=&ypd->R;
+  args.n=j;
+  honestOTExtSend1Of2Chunk(sw.args,(char*)results,(char*)dummy,1,
+      j*YAO_KEY_BYTES,
+      yaoGenerateEvalHalf_aux,&args);
+  j=0;
+  for(i=0;i<n;++i)
+    if(a[i].unknown||a[i].knownValue==true)
+    { yaoKeyCopy(r[i].yao.w,results[j]);
+      r[i].yao.inverted=false;
+      r[i].unknown=false;
+      j++;
+    }else __obliv_c__assignBitKnown(r+i,false);
+  free(args.w);
+  free(args.flip);
+  free(results);
+  free(dummy);
 }
-void yaoRecvEHalfAnd(ProtocolDesc* pd,YaoEHalfSwapper* sw,
-    OblivBit* r,const OblivBit* a)
+void yaoEvaluateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper sw,
+    OblivBit r[],const OblivBit a[],int n)
 {
   YaoProtocolDesc *ypd = pd->extra;
-  honestOTExtRecv1Of2Chunk(sw,r->yao.w,1,YAO_KEY_BYTES,true);
-  r->unknown=false;
+  yao_key_t *results = malloc(n*sizeof(yao_key_t));
+  int i,j=0;
+  for(i=0;i<n;++i) if(a[i].unknown||a[i].knownValue==true) j++;
+  honestOTExtRecv1Of2Chunk(sw.args,(char*)results,1,j*YAO_KEY_BYTES,true);
+  j=0;
+  for(i=0;i<n;++i)
+    if(a[i].unknown||a[i].knownValue==true)
+    { yaoKeyCopy(r[i].yao.w,results[j]);
+      r[i].yao.inverted=false;
+      r[i].unknown=false;
+      j++;
+    }else __obliv_c__assignBitKnown(r+i,false);
+  free(results);
 }
 // b is ignored if I am not generator
 void yaoGHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b)
@@ -1073,15 +1117,20 @@ YaoEHalfSwapper yaoEHalfSwapStart(ProtocolDesc* pd,const bool* b,size_t n)
   else rv=honestOTExtRecv1Of2Start(ypd->recver.recver,b,n);
   return (YaoEHalfSwapper){.args=rv};
 }
-void yaoEHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,
-    YaoEHalfSwapper sw)
+void yaoEHalfSwapGate(ProtocolDesc* pd,
+   OblivBit a[], OblivBit b[],int n,YaoEHalfSwapper sw)
 {
-  if(known(a))
-  { if(a->knownValue) __obliv_c__copyBit(r,a);
-    else __obliv_c__assignBitKnown(r,false);
+  // Again, too many mallocs
+  OblivBit *x = calloc(n,sizeof(OblivBit));
+  int i;
+  for(i=0;i<n;++i) __obliv_c__setBitXor(x+i,a+i,b+i);
+  if(protoCurrentParty(pd)==1) yaoGenerateEvalHalf(pd,sw,x,x,n);
+  else yaoEvaluateEvalHalf(pd,sw,x,x,n);
+  for(i=0;i<n;++i)
+  { __obliv_c__setBitXor(a+i,a+i,x+i);
+    __obliv_c__setBitXor(b+i,b+i,x+i);
   }
-  else if(protoCurrentParty(pd)==1) yaoSendEHalfAnd(pd,&sw,r,a);
-  else yaoRecvEHalfAnd(pd,&sw,r,a);
+  free(x);
 }
 /*void nnobAndGatesCount(ProtocolDesc* pd, protocol_run start, void* arg)*/
 /*{*/
