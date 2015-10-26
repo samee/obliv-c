@@ -32,13 +32,14 @@ extern void yaoGenrFeedOblivInputs(ProtocolDesc* pd
 extern void yaoEvalFeedOblivInputs(ProtocolDesc* pd
                ,OblivInputs* oi,size_t n,int src);
 
-typedef struct { void* args; } YaoEHalfSwapper;
+typedef struct { void* args; const bool* sel; int ind; } YaoEHalfSwapper;
 extern void yaoGHalfSwapGate(ProtocolDesc* pd,
     OblivBit a[],OblivBit b[],int n,bool c);
-extern YaoEHalfSwapper yaoEHalfSwapStart(ProtocolDesc* pd,
-    const bool* b,size_t n);
+// Do not modify b[] until SwapGates are all done
+extern YaoEHalfSwapper yaoEHalfSwapSetup(ProtocolDesc* pd,
+    const bool b[],size_t n);
 extern void yaoEHalfSwapGate(ProtocolDesc* pd,
-    OblivBit a[],OblivBit b[],int n,YaoEHalfSwapper sw);
+    OblivBit a[],OblivBit b[],int n,YaoEHalfSwapper* sw);
 
 // Uses private value from party 'party's x to initialize
 // a special "fatBit" OblivBit object. These can only be used by

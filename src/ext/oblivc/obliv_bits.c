@@ -1021,12 +1021,14 @@ void yaoGenerateEvalHalf_aux(char* opt1,const char* opt0,int c,void* vargs)
   YaoSendEHalfAndAux* args = vargs;
   int i;
   for(i=0;i<args->n;++i)
-  { yaoKeyCopy(opt1,opt0);
-    yaoKeyXor(opt1,args->w[i]);
-    yaoKeyCondXor(opt1,args->flip[i],opt1,*args->R);
+  { char *dest=opt1+i*YAO_KEY_BYTES;
+    const char *src=opt0+i*YAO_KEY_BYTES;
+    yaoKeyCopy(dest,src);
+    yaoKeyXor (dest,args->w[i]);
+    yaoKeyCondXor(dest,args->flip[i],dest,*args->R);
   }
 }
-void yaoGenerateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper sw,
+void yaoGenerateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper* sw,
     OblivBit r[],const OblivBit a[],int n)
 {
   YaoProtocolDesc* ypd = pd->extra;
@@ -1051,7 +1053,7 @@ void yaoGenerateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper sw,
     }
   args.R=&ypd->R;
   args.n=j;
-  honestOTExtSend1Of2Chunk(sw.args,(char*)results,(char*)dummy,1,
+  honestOTExtSend1Of2Chunk(sw->args,(char*)results,(char*)dummy,1,
       j*YAO_KEY_BYTES,
       yaoGenerateEvalHalf_aux,&args);
   j=0;
@@ -1059,7 +1061,7 @@ void yaoGenerateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper sw,
     if(a[i].unknown||a[i].knownValue==true)
     { yaoKeyCopy(r[i].yao.w,results[j]);
       r[i].yao.inverted=false;
-      r[i].unknown=false;
+      r[i].unknown=true;
       j++;
     }else __obliv_c__assignBitKnown(r+i,false);
   free(args.w);
@@ -1067,23 +1069,25 @@ void yaoGenerateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper sw,
   free(results);
   free(dummy);
 }
-void yaoEvaluateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper sw,
+void yaoEvaluateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper* sw,
     OblivBit r[],const OblivBit a[],int n)
 {
   YaoProtocolDesc *ypd = pd->extra;
   yao_key_t *results = malloc(n*sizeof(yao_key_t));
   int i,j=0;
+  bool s = sw->sel[sw->ind];
   for(i=0;i<n;++i) if(a[i].unknown||a[i].knownValue==true) j++;
-  honestOTExtRecv1Of2Chunk(sw.args,(char*)results,1,j*YAO_KEY_BYTES,true);
+  honestOTExtRecv1Of2Chunk(sw->args,(char*)results,1,j*YAO_KEY_BYTES,true);
   j=0;
   for(i=0;i<n;++i)
     if(a[i].unknown||a[i].knownValue==true)
-    { yaoKeyCopy(r[i].yao.w,results[j]);
+    { yaoKeyCondXor(r[i].yao.w,s,results[j],a[i].yao.w);
       r[i].yao.inverted=false;
-      r[i].unknown=false;
+      r[i].unknown=true;
       j++;
     }else __obliv_c__assignBitKnown(r+i,false);
   free(results);
+  sw->ind++;
 }
 // b is ignored if I am not generator
 void yaoGHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b)
@@ -1108,17 +1112,18 @@ void yaoGHalfSwapGate(ProtocolDesc* pd,
   }
 }
 // b ignored if I am generator
-YaoEHalfSwapper yaoEHalfSwapStart(ProtocolDesc* pd,const bool* b,size_t n)
+YaoEHalfSwapper yaoEHalfSwapSetup(ProtocolDesc* pd,const bool b[],size_t n)
 {
   YaoProtocolDesc* ypd = pd->extra;
   void* rv;
   if(protoCurrentParty(pd)==1)
     rv=honestOTExtSend1Of2Start(ypd->sender.sender,n);
   else rv=honestOTExtRecv1Of2Start(ypd->recver.recver,b,n);
-  return (YaoEHalfSwapper){.args=rv};
+  int i;
+  return (YaoEHalfSwapper){.args=rv,.sel=b,.ind=0};
 }
 void yaoEHalfSwapGate(ProtocolDesc* pd,
-   OblivBit a[], OblivBit b[],int n,YaoEHalfSwapper sw)
+   OblivBit a[], OblivBit b[],int n,YaoEHalfSwapper* sw)
 {
   // Again, too many mallocs
   OblivBit *x = calloc(n,sizeof(OblivBit));
