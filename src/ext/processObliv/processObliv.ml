@@ -755,8 +755,9 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
     | NotRipObliv -> DoChildren
     | RipOblivWithVar vi ->
         let asg = mkStmt (Instr [Set (var vi,Lval curCond,!currentLoc)]) in
-        let b' = dropRipOblivAttr { b with bstmts = asg :: b.bstmts } in
-        ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b')
+        let b' = dropRipOblivAttr b in
+        let b'' = {b' with bstmts = asg :: b'.bstmts} in
+        ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b'')
     | RipOblivNoVar ->
         let b' = dropRipOblivAttr b in
         ChangeTo (visitCilBlock (new codegenVisitor curFunc dt trueCond) b')
