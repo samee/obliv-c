@@ -5,7 +5,14 @@
 \begin{document}
 \maketitle
 \section{Introduction}
-A \emph{Secure multi-party computation} (MPC) is a protocol which allows for two or more parties to compute a function on sensitive input data provided by each party, without revealing anything about the inputs. At an abstract level, many current implementations of MPC work by executing instructions \emph{data-oblivious} manner, where the control flow of the program is independent of the inputs provided by each party. MPCs have practical uses for many organizations that have sensitive data sets which they cannot share, but could otherwise learn a lot by computing statistical functions on their joint data. With a computer program that implements MPC, parties can safely share their sensitive data in such a manner that only the output of the program is revealed to them, with all sensitive input and intermediary data being hidden. For instance, two competitor companies may want to compute statistical functions on joint sales data and publish the results for internal company research and marketing, without allowing either competitor to uncover sensitive sales data about the other. In such situations it is important that neither company know the sales data inputs of their competitor, as they may learn secrets or be able to manipulate the data in their favor.
+A \emph{Secure multi-party computation} (MPC) is a protocol which allows for two or more parties to compute a function on sensitive input data provided by each party, without revealing anything about the inputs (other than what can be inferred from the revealed output result). 
+
+Most current implementations of MPC work by executing instructions in a \emph{data-oblivious} manner, where the control flow of the program is independent of the inputs provided by each party and the program executes without any knowledge of the cleartext data it is operating on.  % may want some more details and cites here, explaining general-purpose MPC able to compute any function
+
+MPCs have practical uses for many organizations that have sensitive data sets which they cannot share, but could otherwise learn a lot by computing statistical functions on their joint data.  For instance, two competitor companies may want to compute statistical functions on joint sales data and publish the results for internal company research and marketing, without allowing either competitor to uncover sensitive sales data about the other. In such situations it is important that neither company know the sales data inputs of their competitor, as they may learn secrets or be able to manipulate the data in their favor. By using an MPC protocol, the organizations can jointly compute functions of their combined sensitive data in such a manner that only the output of the program is revealed to them, with all sensitive input and intermediate results hidden. 
+
+% replace the companies example with one more appropriate for social scientists
+
 \\
 \begin{description}
 \item[$\bullet$] Capabilities of MPC (including overview of previous work, Samee's implementation, efficiency/speed comparison with non-secure MPC programs) 
@@ -25,6 +32,13 @@ A \emph{Secure multi-party computation} (MPC) is a protocol which allows for two
 \end{description}
 
 The scalability and speed of OblivC as a tool for implementing MPC programs was tested using \emph{Elastic Compute Cloud} (EC2) nodes of varying tiers from \emph{Amazon Web Services} (AWS) of Amazon.com\textregistered. Data for computation was mined from New York public health data (include link), as well as synthetic data points generated through a Python program (footnote for file location) for performance results.
+
+% Does your implementation use multiple threads?  The main difference between the EC2 nodes is the number of cores you are getting (as well as memory size), but if the implementation is only using 1 core, this won't make a difference.
+
+% what does "input size" mean here?  is it the number of data points?  how big is each data point?
+
+% time is clock time to complete protocol execution between two EC2 nodes?
+
 \begin{table}[htb]
 \caption{Performance of MPC linear regression analysis}
 \centering
