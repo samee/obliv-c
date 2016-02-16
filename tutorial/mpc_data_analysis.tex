@@ -1,0 +1,54 @@
+\documentclass{article}
+\usepackage{hyperref, textcomp}
+\author{Samuel Havron \textlangle{}\href{mailto:havron@virginia.edu}{havron@virginia.edu}\textrangle{}}
+\title{\textbf{Secure MPC as a Tool for Sensitive Data Analysis}}
+\begin{document}
+\maketitle
+\section{Introduction}
+A \emph{Secure multi-party computation} (MPC) is a protocol which allows for two or more parties to perform a function (typically a mathematical computation) on sensitive input data provided by each party, without revealing anything about the inputs. At an abstract level, many current implementations of MPC work by executing instructions \emph{data-oblivious} manner, where the control flow of the program is independent of the inputs provided by each party. MPCs have practical uses for many organizations that have sensitive data sets which they cannot share, but could otherwise learn a lot by computing statistical functions on their joint data. With a computer program that implements MPC, parties can safely share their sensitive data in such a manner that only the output of the program is revealed to them, with all sensitive input and intermediary data being hidden. For instance, two competitor companies may want to compute statistical functions on joint sales data and publish the results for internal company research and marketing, without allowing either competitor to uncover sensitive sales data about the other. In such situations it is important that neither company know the sales data inputs of their competitor, as they may learn secrets or be able to manipulate the data in their favor.
+\\
+\begin{description}
+\item[$\bullet$] Capabilities of MPC (including overview of previous work, Samee's implementation, efficiency/speed comparison with non-secure MPC programs) 
+\item[$\bullet$] Value of MPC to social scientists, researchers (with motivating example(s)) as a tool for sensitive data analysis
+\end{description}
+
+\section{Methods}
+\begin{description}
+\item[$\bullet$] Description of OblivC’s efficiency/speed in comparison to other existing MPC implementations
+\item[$\bullet$] Overview of OblivC as a language, relationship to C (appeal to researchers with some C/basic programming experience) 
+\item[$\bullet$] Introduce implementation of linear regression analysis program, use code snippets and reference repo/site tutorial
+\end{description}
+\section{Results}
+\begin{description}
+\item[$\bullet$] Discuss efficiency/speed/scalability of aforementioned linear regression analysis program, provide EC2 testing data (collect more formally prior to including in final paper)
+\item[$\bullet$] Discuss results of other motivating OblivC programs, compare to alternative MPC results
+\end{description}
+
+The scalability and speed of OblivC as a tool for implementing MPC programs was tested using \emph{Elastic Compute Cloud} (EC2) nodes of varying tiers from \emph{Amazon Web Services} (AWS) of Amazon.com\textregistered. Data for computation was mined from New York public health data (include link), as well as synthetic data points generated through a Python program (footnote for file location) for performance results.
+\begin{table}[htb]
+\caption{Performance of MPC linear regression analysis}
+\centering
+
+\begin{tabular}{| c | c | c |}
+\hline Input Size & EC2 Node Tier & Time to Compute\\
+\hline 1,000 & GP:t2.micro & 11.755s\\
+\hline 5,000 & GP:t2.micro & 57.997s\\
+\hline 10,000 & GP:t2.micro & 115.089s\\ 
+\hline 1,000 & GP:m4.large & 11.262s\\ 
+\hline 5,000 & GP:m4.large & 55.233s\\ 
+\hline 10,000 & GP:m4.large & 110.049s\\
+\hline 1,000 & CO:c4.xlarge & 5.783s\\
+\hline 5,000 & CO:c4.xlarge & 27.928s\\
+\hline 10,000 & CO:c4.xlarge & 57.433s\\
+\hline
+\end{tabular}
+\end{table}
+\\Data collected represents average compute time \emph{(5 iterations per test)}. 
+\begin{description}
+\item[$\bullet$] Include table with times from non secure MPC computation for comparison.
+\end{description}
+\section{Conclusion}
+\begin{description}
+\item[$\bullet$] Overview of secure MPC, utility/extensibility of OblivC programming, real-world usage for scientists/researchers
+\end{description}
+\end{document}
