@@ -1,5 +1,6 @@
 \documentclass{article}
-\usepackage{hyperref, textcomp}
+\usepackage{hyperref, textcomp, pgfplots}
+\pgfplotsset{width=7cm,compat=1.9}
 \author{Samuel Havron \textlangle{}\href{mailto:havron@virginia.edu}{havron@virginia.edu}\textrangle{}}
 \title{\textbf{Secure MPC as a Tool for Sensitive Data Analysis}}
 \begin{document}
@@ -13,7 +14,6 @@ MPCs have practical uses for many organizations that have sensitive data sets wh
 
 % replace the companies example with one more appropriate for social scientists
 
-\\
 \begin{description}
 \item[$\bullet$] Capabilities of MPC (including overview of previous work, Samee's implementation, efficiency/speed comparison with non-secure MPC programs) 
 \item[$\bullet$] Value of MPC to social scientists, researchers (with motivating example(s)) as a tool for sensitive data analysis
@@ -27,11 +27,39 @@ MPCs have practical uses for many organizations that have sensitive data sets wh
 \end{description}
 \section{Results}
 \begin{description}
-\item[$\bullet$] Discuss efficiency/speed/scalability of aforementioned linear regression analysis program, provide EC2 testing data (collect more formally prior to including in final paper)
+\item[$\bullet$] Discuss efficiency/speed/scalability of aforementioned linear regression analysis program, provide EC2 testing data (collect more formally prior to including in final paper). Mention single-threaded implementation and limits on performance results.
 \item[$\bullet$] Discuss results of other motivating OblivC programs, compare to alternative MPC results
 \end{description}
 
-The scalability and speed of OblivC as a tool for implementing MPC programs was tested using \emph{Elastic Compute Cloud} (EC2) nodes of varying tiers from \emph{Amazon Web Services} (AWS) of Amazon.com\textregistered. Data for computation was mined from New York public health data (include link), as well as synthetic data points generated through a Python program (footnote for file location) for performance results.
+The scalability and speed of OblivC as a tool for implementing MPC programs was tested using c4.large \emph{Elastic Compute Cloud} (EC2) nodes from \emph{Amazon Web Services} (AWS) of Amazon.com\textregistered. Two c4.large instances were launched and connected through OblivC's API for TCP/IP connections. One node instance provided independent ($x$) data points, while the other provided dependent ($y$) data points. Data points used were 32-bit integers. Data for computation was mined from New York public health data (include link), as well as synthetic data points generated through a Python program (footnote for file location) for performance results.
+
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+    title={Performance of MPC linear regresssion analysis},
+    xlabel={Number of Data Points},
+    ylabel={MPC Execution Time (minutes)},
+    xmin=0, xmax=1100000,
+    ymin=0, ymax=150,
+    xtick={0,100000,500000,1000000},
+    ytick={0,20,40,60,80,100,120,140},
+    legend pos=north west,
+    ymajorgrids=true,
+    grid style=dashed,
+]
+ 
+\addplot[
+    color=blue,
+    mark=square,
+    ]
+    coordinates {
+    (1000,0.1088522)(100000,12.74658383)(500000,63.765116616)(1000000,127.42427975)
+    };
+    \legend{\emph{EC2 c4.large}}
+ 
+\end{axis}
+\end{tikzpicture}
+\end{center}
 
 % Does your implementation use multiple threads?  The main difference between the EC2 nodes is the number of cores you are getting (as well as memory size), but if the implementation is only using 1 core, this won't make a difference.
 
@@ -39,26 +67,10 @@ The scalability and speed of OblivC as a tool for implementing MPC programs was 
 
 % time is clock time to complete protocol execution between two EC2 nodes?
 
-\begin{table}[htb]
-\caption{Performance of MPC linear regression analysis}
-\centering
 
-\begin{tabular}{| c | c | c |}
-\hline Input Size & EC2 Node Tier & Time to Compute\\
-\hline 1,000 & GP:t2.micro & 11.755s\\
-\hline 5,000 & GP:t2.micro & 57.997s\\
-\hline 10,000 & GP:t2.micro & 115.089s\\ 
-\hline 1,000 & GP:m4.large & 11.262s\\ 
-\hline 5,000 & GP:m4.large & 55.233s\\ 
-\hline 10,000 & GP:m4.large & 110.049s\\
-\hline 1,000 & CO:c4.xlarge & 5.783s\\
-\hline 5,000 & CO:c4.xlarge & 27.928s\\
-\hline 10,000 & CO:c4.xlarge & 57.433s\\
-\hline
-\end{tabular}
-\end{table}
-\\Data collected represents average compute time \emph{(5 iterations per test)}. 
+
 \begin{description}
+\item[$\bullet$] Include table with times from NY public health dataset computation.
 \item[$\bullet$] Include table with times from non secure MPC computation for comparison.
 \end{description}
 \section{Conclusion}
