@@ -206,10 +206,9 @@ void randomPsi(void* arg)
 {
   // randomly select 69 random numbers from range [1..100]
   // On average, intersection of two such sets should be of about size 25
-  const int maxval=100000;
+  const int maxval=100;
   extern double lap;
-  // const int n=69;
-  const int n=1024;
+  const int n=69;
   int on;
   int *arr=malloc(sizeof(int)*n), *res=malloc(sizeof(int)*n);
   fprintf(stderr,"Base OT time: %lf s\n",wallClock()-lap);

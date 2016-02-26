@@ -1,4 +1,5 @@
 CILPATH=../../../
+CFLAGS=-DREMOTE_HOST=$(REMOTE_HOST) -O3
 a.out: psi.oc psi.c waksman.c waksman.h ../common/util.c $(CILPATH)/_build/libobliv.a
 	$(CILPATH)/bin/oblivcc $(CFLAGS) -I . psi.oc psi.c waksman.c ../common/util.c
 
