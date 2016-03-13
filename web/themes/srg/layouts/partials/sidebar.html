@@ -1,0 +1,31 @@
+<div class="sidebar pure-u-1 pure-u-md-1-4">
+  <div class="header">
+    {{ partial "sidebarheader.html" . }}
+
+    {{ if .Site.Params.sidebartitle }}<a href="{{ .Site.BaseURL}}"><h1 class="brand-title">{{ .Site.Params.sidebartitle }}</h1></a>{{ end }}
+    {{ if .Site.Params.sidebartagline }}<h2 class="brand-tagline">{{ .Site.Params.sidebartagline }}</h2>{{ end }}
+
+<!--
+    <nav class="nav">
+      <ul class="nav-list">
+        <li class="nav-item"><span class="nav-item-separator">//</span><a href="{{ .Site.BaseURL }}">Home</a></li>
+        {{ range .Site.Menus.main }}
+          <li class="nav-item"><span class="nav-item-separator">//</span><a href="{{ .URL }}">{{ .Name }}</a></li>
+        {{ end }}
+      </ul>
+    </nav>
+-->
+
+    {{ if .Site.Menus.social }}
+    <div class="social-buttons">
+      {{ range .Site.Menus.social }}
+        {{ if .URL }}
+        <a href="{{ .URL }}" target="_blank">{{ .Pre }}</a>
+        {{ end }}
+      {{ end }}
+      
+    </div>
+    {{ end }}
+
+  </div>
+</div>

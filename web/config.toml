@@ -1,0 +1,15 @@
+baseurl = "http://oblivc.org"
+languageCode = "en-us"
+title = "Obliv-C"
+subtitle = "A Language for Extensible Data-Oblivious Computation"
+
+[params]
+    sidebartitle = "Obliv-C"
+    sidebartagline = "A Language for Extensible Data-Oblivious Computation"
+    nodate = true
+    noauthor = true
+    noread = true
+    nopaging=true
+    notoc=true
+
+[[menu.footer]]

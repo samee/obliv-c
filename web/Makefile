@@ -12,6 +12,7 @@ develop:
 	hugo server --theme=$(THEME) --watch
 
 github: html
+	cp CNAME public/CNAME
 	git add -A
 	git commit -m "Rebuilt site"
 	git push origin master

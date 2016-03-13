@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en-us">
+<head>
+  <title>
+    Obliv-C: A Language for Extensible Data-Oblivious Computation // Obliv-C
+  </title>
+
+  <link href="http://gmpg.org/xfn/11" rel="profile">
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+
+<meta name="description" content="">
+<meta name="keywords" content="">
+<meta name="author" content="">
+<meta name="generator" content="Hugo 0.15-DEV" />
+
+  <meta property="og:title" content="Obliv-C: A Language for Extensible Data-Oblivious Computation" />
+<meta property="og:description" content="" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="en_US" />
+<meta property="og:url" content="http://oblivc.org/main/" />
+
+
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pure/0.5.0/base-min.css">
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pure/0.5.0/pure-min.css">
+  
+  
+    <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/pure/0.5.0/grids-responsive-min.css">
+  
+  
+
+  <link rel="stylesheet" href="http://oblivc.org/css/srg.css">
+  <link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" rel="stylesheet">
+  <link href='//fonts.googleapis.com/css?family=Open+Sans:400,400italic,200,100,700,300,500,600,800' rel='stylesheet' type='text/css'>
+  <link href='//fonts.googleapis.com/css?family=Libre+Baskerville:400,700,400italic' rel='stylesheet' type='text/css'>
+
+  
+  <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/rotunda.png">
+  <link rel="shortcut icon" href="/rotunda.png">
+
+  
+  <link href="" rel="alternate" type="application/rss+xml" title="Obliv-C" />
+
+    
+  
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/styles/tomorrow-night-bright.min.css">
+  
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+
+
+  
+
+  
+
+  
+</head>
+
+<body>
+	
+
+	<div id="layout" class="pure-g">
+    <div class="sidebar pure-u-1 pure-u-md-1-4">
+  <div class="header">
+    <h2 class="brand-group">
+
+<a href="https://www.cs.virginia.edu/yanjun/gQdata.htm">Maching Learning Group</a><br>
+and <a href="http://www.jeffersonswheel.org">Security Research Group</a><br>
+<a href="http://www.cs.virginia.edu">University of Virginia</a>
+</h2>
+
+
+
+    <a href="http://oblivc.org"><h1 class="brand-title">Obliv-C</h1></a>
+    <h2 class="brand-tagline">A Language for Extensible Data-Oblivious Computation</h2>
+
+
+
+    
+
+  </div>
+</div>
+
+	
+	
+
+    <div class="content pure-u-1 pure-u-md-3-4">
+		<a name="top"></a>
+		
+
+		
+			
+		    <div id="toc" class="pure-u-1 pure-u-md-1-4">
+				<small class="toc-label">Contents</small>
+		   	 	<nav id="TableOfContents">
+<ul>
+<li>
+<ul>
+<li>
+<ul>
+<li><a href="#obliv-c-a-language-for-extensible-data-oblivious-computation:379caad01b6ea305187be199bcac1370">Obliv-C: A Language for Extensible Data-Oblivious Computation</a></li>
+<li><a href="#paper:379caad01b6ea305187be199bcac1370">Paper</a></li>
+<li><a href="#tutorial:379caad01b6ea305187be199bcac1370">Tutorial</a></li>
+<li><a href="#projects-using-obliv-c:379caad01b6ea305187be199bcac1370">Projects Using Obliv-C</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</nav>
+		    </div>
+		    
+	    
+  		<section class="post">
+            <h1 class="post-title">
+              <a href="/main/">Obliv-C: A Language for Extensible Data-Oblivious Computation</a>
+            </h1>
+            <h3 class="post-subtitle">
+            	
+            </h3>
+            
+            	<span class="post-date">
+                	<span class="post-date-day"><sup>1</sup></span><span class="post-date-separator">/</span><span class="post-date-month">Jan</span> <span class="post-date-year">0001</span>
+            	</span>
+            	
+            
+            	
+            
+
+			
+			
+
+			
+
+			
+
+            
+
+<h3 id="obliv-c-a-language-for-extensible-data-oblivious-computation:379caad01b6ea305187be199bcac1370">Obliv-C: A Language for Extensible Data-Oblivious Computation</h3>
+
+<p>Obliv-C is a simple GCC wrapper that makes it easy to embed secure
+computation protocols inside regular C programs. The idea is simple: if
+you are performing a multi-party distributed computation with sensitive
+data, just write it in our Obliv-C langauge and compile/link it with
+your project. The result will be a secure multi-party cryptographic
+protocol that performs this operation without revealing any of the
+inputs or intermediate values of the computation to any of the
+parties. Only the outputs are finally shared.</p>
+
+<h3 id="paper:379caad01b6ea305187be199bcac1370">Paper</h3>
+
+<h3 id="tutorial:379caad01b6ea305187be199bcac1370">Tutorial</h3>
+
+<h3 id="projects-using-obliv-c:379caad01b6ea305187be199bcac1370">Projects Using Obliv-C</h3>
+
+	
+			
+
+			
+
+			
+				<div class="paging">
+					<span class="paging-label">More Reading</span>
+					
+
+					
+	            </div>
+            
+          </section>
+          
+          	
+          
+        
+      <div class="footer">
+	<hr class="thin" />
+
+
+	<p></p>
+</div>
+
+    </div>
+  </div>
+	
+
+	
+
+  
+</body>
+</html>
