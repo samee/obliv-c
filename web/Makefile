@@ -16,6 +16,6 @@ github: html
 	git add -A 
 	git commit -m "Rebuilt site" 
 	git push origin master 
-	cd ..; git subtree push --prefix=web/public https://github.com/samee/obliv-c.git gh-pages
+	cd ..; git subtree push --prefix=web/public https://evansuva@github.com/samee/obliv-c.git gh-pages
 
 .PHONY: html clean develop
