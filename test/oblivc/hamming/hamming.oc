@@ -1,0 +1,33 @@
+#include<stdio.h>
+#include<obliv.oh>
+
+#include"hamming.h"
+
+//Refactor: put this somewhere useful
+void readString(obliv char* dest, int n, const char* src,int party)
+{
+  OblivInputs specs[MAXN];
+  int i;
+  for(i=0;i<n;++i) setupOblivChar(specs+i,dest+i,src[i]);
+  feedOblivInputs(specs,n,party);
+}
+
+void hammingDistance(void* args)
+{
+  protocolIO *io = args;
+  int n1,n2,n;
+  int i,j;
+  obliv char s1[MAXN], s2[MAXN];
+  obliv int res=0;
+
+  n1 = ocBroadcastInt(io->n,1);
+  n2 = ocBroadcastInt(io->n,2);
+
+  readString(s1,n1,io->s,1);
+  readString(s2,n2,io->s,2);
+
+  n = (n1<n2?n1:n2);
+  for(i=0;i<n;++i) res+=(s1[i]!=s2[i]);
+  revealOblivInt(&io->res,res,0);
+  io->res+=(n1+n2-n*2);
+}

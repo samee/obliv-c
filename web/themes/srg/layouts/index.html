@@ -1,0 +1,59 @@
+{{ partial "header.html" . }}
+<body>
+    <div id="layout" class="pure-g">
+        {{ partial "sidebar.html" . }}
+
+        <div class="content pure-u-1 pure-u-md-3-4">
+            <a name="top"></a>
+            {{ partial "listtop.html" . }}
+
+          <div class="posts">
+            {{ $Site := .Site }}
+            {{ range .Site.Pages }}
+            <section  class="post">
+                <header class="post-header">
+                    {{ if .Params.thumbnail }}
+                    <div class="post-avatar-wrapper">
+                        <img class="post-avatar" alt="" src="{{ .Params.thumbnail }}">
+                    </div>
+                    {{ end }}
+                    <h1 class="post-title">
+                      <a href="{{ .RelPermalink }}">{{ .Title }}</a>
+                  </h1>
+              </header>
+              <p class="post-meta">
+                  {{ if not .Params.nodate }}
+                  <span class="post-date">
+                    <span class="post-date-day"><sup>{{ .Date.Format "2" }}</sup></span><span class="post-date-separator">/</span><span class="post-date-month">{{ .Date.Format "Jan" }}</span> <span class="post-date-year">{{ .Date.Format "2006" }}</span>
+                </span>
+                {{ end }}
+                {{ if not .Params.noauthor }}
+                    {{ if .Params.author }}By <a class="post-author" {{ if .Params.authorlink }}href="{{ .Params.authorlink }}"{{ end }}>{{ .Params.author }}</a>{{ end }}
+                {{ end }}
+                {{ if not .Params.noread }}
+                    <span class="post-reading-time"><i class="fa fa-clock-o"></i> <em>{{.ReadingTime}} min. read</em></span>
+                {{ end }}
+                {{ if .Params.categories }}
+                <div class="post-categories">
+                    {{ range .Params.categories }}
+                    <a class="post-category post-category-{{ . | urlize }}" href="{{ $Site.BaseURL }}/categories/{{ . | urlize }}">{{ . }}</a>
+                    {{ end }}
+                </div>
+                {{ end }}
+            </p>
+            <article class="post-summary">
+                  {{ .Summary }}
+              </article>
+              <div class="read-more-link">
+                  <a href="{{ .RelPermalink }}"><span class="read-more-slashes">//</span>Read More...</a>
+              </div>
+          </section>
+          {{ end }}
+        </div>
+
+        {{ partial "footer.html" . }}
+        </div>
+    </div>
+    {{ partial "bodyend.html" . }}
+</body>
+</html>

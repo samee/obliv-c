@@ -1,11 +1,39 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title></title>
-    <link>/</link>
-    <description>Recent content on </description>
+    <title>Obliv-C</title>
+    <link>http://oblivc.org/</link>
+    <description>Recent content on Obliv-C</description>
     <generator>Hugo -- gohugo.io</generator>
-    <atom:link href="/index.xml" rel="self" type="application/rss+xml" />
+    <language>en-us</language>
+    <atom:link href="http://oblivc.org/index.xml" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Obliv-C: A Language for Extensible Data-Oblivious Computation</title>
+      <link>http://oblivc.org/main/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://oblivc.org/main/</guid>
+      <description>
+
+&lt;h3 id=&#34;obliv-c-a-language-for-extensible-data-oblivious-computation:379caad01b6ea305187be199bcac1370&#34;&gt;Obliv-C: A Language for Extensible Data-Oblivious Computation&lt;/h3&gt;
+
+&lt;p&gt;Obliv-C is a simple GCC wrapper that makes it easy to embed secure
+computation protocols inside regular C programs. The idea is simple: if
+you are performing a multi-party distributed computation with sensitive
+data, just write it in our Obliv-C langauge and compile/link it with
+your project. The result will be a secure multi-party cryptographic
+protocol that performs this operation without revealing any of the
+inputs or intermediate values of the computation to any of the
+parties. Only the outputs are finally shared.&lt;/p&gt;
+
+&lt;h3 id=&#34;paper:379caad01b6ea305187be199bcac1370&#34;&gt;Paper&lt;/h3&gt;
+
+&lt;h3 id=&#34;tutorial:379caad01b6ea305187be199bcac1370&#34;&gt;Tutorial&lt;/h3&gt;
+
+&lt;h3 id=&#34;projects-using-obliv-c:379caad01b6ea305187be199bcac1370&#34;&gt;Projects Using Obliv-C&lt;/h3&gt;
+</description>
+    </item>
     
   </channel>
 </rss>

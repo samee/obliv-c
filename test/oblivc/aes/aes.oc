@@ -1,0 +1,286 @@
+#include<obliv.oh>
+#include<stdio.h>
+#include"../common/util.h"
+#include"aes.h"
+
+extern double lap;
+
+typedef unsigned char byte;
+typedef obliv unsigned char obyte;
+//typedef obliv byte obyte; FIXME
+
+char hex(byte x) { return x<=9?x+'0':x-10+'A'; }
+byte fromhex(char x) 
+{ if('0'<=x&&x<='9') return x-'0';
+  else if('A'<=x&&x<='F') return x-'A'+10;
+  else return x-'a'+10;
+}
+// hexIO
+void eprintBytes(obyte* data,unsigned len)
+{ int i,j,p = ocCurrentParty();
+  for(i=0;i<len;i+=16)
+  { for(j=0;j<16 && i+j<len;++j)
+    { byte ch;
+      revealOblivChar(&ch,data[i+j],1);
+      if(ocCurrentParty()==1) fprintf(stderr,"%2x ",ch);
+    }
+    if(ocCurrentParty()==1) fprintf(stderr,"\n");
+  }
+}
+void readHexBytes(obyte* dest, unsigned destlen, const char* src, 
+                  unsigned srclen)
+{
+  byte ch;
+  int id,is,delta;
+  for(id=is=0;id<destlen && is<srclen;++id)
+  { sscanf(src+is,"%2x%n",&ch,&delta);
+    is+=delta;
+    dest[id]=ch;
+  }
+}
+
+obyte addrj(obyte a,obyte b) { return a^b; }
+obyte mulrj(obyte a,obyte b)
+{
+  obyte p=0,a2;
+  for(int i=0;i<8;++i)
+  { obliv if((b&(1<<i))!=0) p^=a; // FIXME int conditions don't work
+    obliv int res;
+    a2=(a<<1);
+    obliv if((a&(1<<7))!=0) a2^=0x1b; // TODO bit-level identities should have made this free
+    a=a2;
+  }
+  return p;
+}
+obyte exprj(obyte a,int pow)
+  { return pow!=0?mulrj(exprj(mulrj(a,a),pow/2),(pow%2?a:1)):1; }
+obyte invrj(obyte a) { return exprj(a,254); }
+
+typedef struct { obyte state[16];} AesState;
+obyte* mat(AesState* s,int i,int j) { return s->state+i+j*4; }
+
+void aesShiftRows(AesState* s)
+{ int i,j;
+  for(i=1;i<4;++i)
+  { obyte t[4];
+    for(j=0;j<4;++j) t[j]=*mat(s,i,j);
+    for(j=0;j<4;++j) *mat(s,i,j)=t[(i+j)%4];
+  }
+}
+void aesMixCols(AesState* s)
+{ AesState res;
+  int i,j,k;
+  const byte mixer[4]={2,3,1,1};
+  for(i=0;i<4;++i) res.state[i]=0;
+  for(i=0;i<4;++i) for(j=0;j<4;++j) for(k=0;k<4;++k)
+    *mat(&res,j,i) ^= mulrj(*mat(s,k,i),mixer[(k+4-j)%4]);
+  *s=res;
+}
+obyte rotl(obyte x) { return (x<<1)^(x>>7); }
+obyte aesSbox(obyte x)
+{ obyte s=0;
+  x=invrj(x);
+  for(int i=0;i<5;++i) { s^=x; x=rotl(x); }
+  return s^0x63;
+}
+void aesSubBytes(AesState* s)
+  { for(int i=0;i<16;++i) s->state[i]=aesSbox(s->state[i]); }
+obliv unsigned aesKeyCore(obliv unsigned x,int iter)
+{ obliv int rv=0;
+  x=((x<<24)^(x>>8));
+  for(int i=3;i>=0;--i) rv=(rv<<8)^aesSbox((x>>i*8)&0xff);
+  return rv^exprj(2,iter-1);
+}
+obliv unsigned packBytes(const obyte* buf)
+  { return buf[0]^(buf[1]<<8)^(buf[2]<<16)^(buf[3]<<24); }
+void unpackBytes(obyte* buf,obliv unsigned r)
+{ buf[0] = (r&0xff);
+  buf[1] = ((r>> 8)&0xff);
+  buf[2] = ((r>>16)&0xff);
+  buf[3] = ((r>>24)&0xff);
+}
+// Input is in first 16 bytes of buf. Output expands it to 176 bytes
+void aesKeyExpand(obyte* buf)
+{ int i=1,j,k,n=16;
+  for(j=16;j<176;++i,j+=16)
+  { unpackBytes(buf+j, aesKeyCore(packBytes(buf+j-4),i) ^ packBytes(buf+j-n));
+    for(k=4;k<16;++k) buf[j+k] = buf[j+k-4]^buf[j+k-n];
+  }
+}
+void aes128Cipher(obyte* block,const obyte* key)
+{ obyte buf[176];
+  int i,r;
+  AesState s;
+  for(i=0;i<16;++i) s.state[i]=block[i];
+  for(i=0;i<16;++i) buf[i]=key[i];
+  aesKeyExpand(buf);
+  fprintf(stderr,"Time at key expansion: %lf s\n",wallClock()-lap);
+  for(i=0;i<16;++i) s.state[i]^=buf[i];
+  for(r=1;r<=10;++r)
+  { aesSubBytes(&s);
+    aesShiftRows(&s);
+    if(r<10) aesMixCols(&s);
+    for(i=0;i<16;++i) s.state[i]^=buf[i+r*16];
+  }
+  for(i=0;i<16;++i) block[i]=s.state[i];
+}
+
+void inverseTest()
+{
+  byte res;
+  for(int i=1;i<256;++i)
+  { if(revealOblivChar(&res,mulrj(invrj(i),i),1) && res!=1)
+      fprintf(stderr,"Problems with inv(%d), res=%d\n",i,res);
+  }
+}
+
+void testMixCols()
+{
+  byte a[][4]={{0xdb,0x13,0x53,0x45},{0xf2,0x0a,0x22,0x5c}};
+  byte b[][4]={{0x8e,0x4d,0xa1,0xbc},{0x9f,0xdc,0x58,0x9d}};
+  int i,j;
+  bool err;
+  AesState s;
+  for(i=0;i<2;++i)
+  { for(j=0;j<4;++j) *mat(&s,j,0)=a[i][j];
+    aesMixCols(&s);
+    for(j=0;j<4;++j) if(revealOblivBool(&err,*mat(&s,j,0)!=b[i][j],0) && err) 
+      break;
+    if(j<4)
+    { fprintf(stderr,"Mixed cols failed\n");
+      for(j=0;j<4;++j) fprintf(stderr,"%2x",a[i][j]); fprintf(stderr," -> ");
+      for(j=0;j<4;++j) 
+      { byte x;
+        revealOblivBool(&x,*mat(&s,j,0),0);
+        fprintf(stderr,"%2x",x); fprintf(stderr,"\n");
+      }
+    }
+  }
+}
+
+void testShiftRows()
+{ const byte result[]={0,5,10,15, 4,9,14,3, 8,13,2,7, 12,1,6,11};
+  AesState s;
+  bool err;
+  for(int i=0;i<16;++i) s.state[i]=i;
+  aesShiftRows(&s);
+  for(int i=0;i<16;++i)
+  { revealOblivBool(&err,s.state[i]!=result[i],0);
+    if(err) break;
+  }
+  if(err) 
+  { fprintf(stderr,"shiftRows problem\n");
+    byte x[16];
+    for(int i=0;i<16;++i) revealOblivChar(&x[i],s.state[i],0);
+    for(int i=0;i<16;++i) fprintf(stderr,"%2x ",x[i]);
+    fprintf(stderr,"\n");
+  }
+}
+bool hexread(byte* dest,unsigned dn,const char* src,unsigned sn)
+{
+  int i,j,del;
+  char t;
+  for(i=j=0;i<dn&&j<sn;++i)
+  { sscanf(src+j,"%2hhx%n",dest+i,&del);
+    j+=del;
+  }
+  return true;
+  //return sscanf(src+j,"%c",&t)!=1; // EOF test
+}
+bool hexreado(obyte* dest,unsigned dn,const char* src,unsigned sn)
+{
+  byte* buf = malloc(dn*sizeof(obyte));
+  bool rv=hexread(buf,dn,src,sn);
+  for(int i=0;i<dn;++i) dest[i]=buf[i];
+  free(buf);
+  return rv;
+}
+bool cmpHexObyte(const char* a,unsigned na,const obyte* b,unsigned nb)
+{
+  int i,j,del;
+  byte ae,be;
+  for(i=j=0;i<nb&&j<na;++i)
+  { sscanf(a+j,"%2hhx%n",&ae,&del);
+    j+=del;
+    revealOblivChar(&be,b[i],0);
+    if(ae!=be) return false;
+  }
+  return true;
+}
+void testKeyExpansion()
+{
+  const char keyhex[]="6920e299a5202a6d656e636869746f2a";
+  const char reshex[]=  "69 20 E2 99 A5 20 2A 6D 65 6E 63 68 69 74 6F 2A "
+                        "FA 88 07 60 5F A8 2D 0D 3A C6 4E 65 53 B2 21 4F "
+                        "CF 75 83 8D 90 DD AE 80 AA 1B E0 E5 F9 A9 C1 AA "
+                        "18 0D 2F 14 88 D0 81 94 22 CB 61 71 DB 62 A0 DB "
+                        "BA ED 96 AD 32 3D 17 39 10 F6 76 48 CB 94 D6 93 "
+                        "88 1B 4A B2 BA 26 5D 8B AA D0 2B C3 61 44 FD 50 "
+                        "B3 4F 19 5D 09 69 44 D6 A3 B9 6F 15 C2 FD 92 45 "
+                        "A7 00 77 78 AE 69 33 AE 0D D0 5C BB CF 2D CE FE "
+                        "FF 8B CC F2 51 E2 FF 5C 5C 32 A3 E7 93 1F 6D 19 "
+                        "24 B7 18 2E 75 55 E7 72 29 67 44 95 BA 78 29 8C "
+                        "AE 12 7C DA DB 47 9B A8 F2 20 DF 3D 48 58 F6 B1";
+  obyte buff[176];
+  byte bt;
+  for(int i=0;i<16;++i) 
+  { sscanf(keyhex+i*2,"%2x",&bt);
+    buff[i]=bt;
+  }
+  aesKeyExpand(buff);
+  if(!cmpHexObyte(reshex,sizeof(reshex),buff,176))
+  { fprintf(stderr,"Problems with key expansion\n");
+//    showObyteString(buff,176); TODO
+  }
+}
+
+void aestest(void* args)
+{
+  char keyhex[]="6920e2";
+  obyte key[3];
+  readHexBytes(key,sizeof(key)/sizeof(key[0]),keyhex,sizeof(keyhex));
+  eprintBytes(key,sizeof(key)/sizeof(key[0]));
+  inverseTest();
+  testMixCols();
+  testShiftRows();
+  testKeyExpansion();
+
+  // Actual test
+  const char keyhex[]="2b7e151628aed2a6abf7158809cf4f3c";
+  const char plainhex[]="6bc1bee22e409f96e93d7e117393172a";
+  const char cipherhex[]="3ad77bb40d7a3660a89ecaf32466ef97";
+  obyte key[16],block[16];
+  int i;
+  hexreado(key,16,keyhex,sizeof(keyhex));
+  hexreado(block,16,plainhex,sizeof(plainhex));
+  aes128Cipher(block,key);
+  if(!cmpHexObyte(cipherhex,sizeof(cipherhex),block,16))
+    fprintf(stderr,"Didn't manage AES\n");
+}
+
+#define MAXN 100
+void readString(obliv char* dest, int n, const char* src,int party)
+{
+  OblivInputs specs[MAXN];
+  int i;
+  for(i=0;i<n;++i) setupOblivChar(specs+i,dest+i,src[i]);
+  feedOblivInputs(specs,n,party);
+}
+
+void goaes(void* vargs)
+{
+  protocolIO *args=vargs;
+  obyte key[16],block[16];
+  char buf[16];
+
+  if(ocCurrentParty()==1) hexread(buf,16,args->testkey,32);
+  readString(key,16,buf,1);
+  if(ocCurrentParty()==2) hexread(buf,16,args->testplain,32);
+  readString(block,16,buf,2);
+  fprintf(stderr,"OT time: %lf s\n",wallClock()-lap);
+
+  aes128Cipher(block,key);
+  for(int i=0;i<16;++i) revealOblivChar(args->testcipher+i,block[i],0);
+  fprintf(stderr,"Yao gate count: %u\n",yaoGateCount());
+}
+

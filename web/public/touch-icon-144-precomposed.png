@@ -1,0 +1,9 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>301 Moved Permanently</title>
+</head><body>
+<h1>Moved Permanently</h1>
+<p>The document has moved <a href="http://www.cs.virginia.edu/~evans/dm-logo.png">here</a>.</p>
+<hr>
+<address>Apache/2.2.0 (Unix) DAV/2 mod_ssl/2.2.0 OpenSSL/0.9.7i mod_pubcookie/3.3.3 mod_wsgi/2.6 Python/2.5 PHP/5.3.28 Server at <a href="mailto:webteam@cs.virginia.edu">www.cs.virginia.edu</a> Port 80</address>
+</body></html>

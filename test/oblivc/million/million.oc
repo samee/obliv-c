@@ -1,0 +1,17 @@
+#include<obliv.oh>
+#include"million.h"
+
+void millionaire(void* args)
+{
+  protocolIO *io=args;
+  obliv int v1,v2;
+  bool eq,lt;
+  
+  v1 = feedOblivInt(io->mywealth,1);
+  v2 = feedOblivInt(io->mywealth,2);
+  revealOblivBool(&eq,v1==v2,0);
+  revealOblivBool(&lt,v1<v2,0);
+  io->cmp = (!eq?lt?-1:1:0);
+}
+
+

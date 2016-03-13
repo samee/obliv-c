@@ -1,0 +1,17 @@
+#include<stdio.h>
+#include<obliv.oh>
+#include"../common/util.h"
+#include <assert.h>
+void test(void* args)
+{
+   obliv int a = feedOblivInt(0, 1);
+   obliv int b = feedOblivInt(1, 2);
+   double t1 = wallClock();
+   for(int i = 0; i < 1000*1000; ++i)
+      a = a + b;
+   double t2 = wallClock()-t1;
+   int res;revealOblivInt(&res, a, 0);
+   assert(res == 1000*1000);
+   assert(yaoGateCount() == 31*1000*1000);
+   printf("%f\n", 31*1000*1000/t2);
+}

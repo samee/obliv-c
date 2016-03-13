@@ -1,0 +1,37 @@
+Variable length arrays are failing, because alloca() is non-obliv. We should have a way to re-declare existing functions as obliv, so compiler can shut up.
+
+Logical && and || operators.
+
+frozen checks related to pointers don't always work.
+
+void fun(int x, int x); This should be an error.
+
+DOxygen docs
+
+Document calloc, and how sizeof(int)==sizeof(obliv int) is most definitely false.
+
+Integrate test suite into make test, make it all a separate target that builds only binary.
+
+CIL can't handle variable x in: void* calloc(); int (*arr)[x] = calloc(..); 
+GCC handles it gracefully. Fix this upstream. Google for "cil variable length array" to get some interesting results.
+
+Cast to obliv on return needs to go through known() functions
+
+Make sure you can't have obliv pointers
+
+Not sure what the parser currently does in the following line, but I need the 'obliv' applied to the int, and not the whole array.
+  obliv int x[5];
+Also check this on typedefs
+
+Right now CIL turns both to const: extern const int x; int x = 5; Should be 
+illegal. Need to hack CIL attribute parsing for this. Same problem with obliv
+instead of const.
+
+floating point and enum types
+check obliv array length (variable) in decl
+special case: disallow/warn obliv variables in printf
+warn if 'obliv if' has non-obliv condition
+
+Optimization: factoring out muxes for simple if-else assignments
+
+Multiplication/Division/mod
