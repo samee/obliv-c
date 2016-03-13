@@ -13,10 +13,9 @@ develop:
 
 github: html
 	cp CNAME public/CNAME
-	cd .. ;
-	git add -A ;
-	git commit -m "Rebuilt site" ;
-	git push origin master ;
-	git subtree push --prefix=web/public https://github.com/samee/obliv-c.git gh-pages
+	git add -A 
+	git commit -m "Rebuilt site" 
+	git push origin master 
+	cd ..; git subtree push --prefix=web/public https://github.com/samee/obliv-c.git gh-pages
 
 .PHONY: html clean develop
