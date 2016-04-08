@@ -143,7 +143,12 @@ matched properly and each data value is a comparable number.
 All numbers are averages over 5 executions between c4.large instances. The datasets used in Preliminary Results assume that data is matched, sorted, and 
 comprises of comparable values. Using private set intersection to assist matching 
 data with a unique identifier and automatically filtering out incompatible 
-data points is considered for future work.
+data points is considered for future work. The proposed health dataset is
+publicly available and in a single database. A more realistic situation would be 
+for the independent and dependent data points to be each residing in separate 
+datasets, owned by different organizations, and being tied to legal restrictions 
+for sharing the data.
+
 
 \section{Related Work}
 A similar approach in taking distinct federal datasets and comparing them is seen in
@@ -167,7 +172,7 @@ across several databases\cite{secretsharing}.
 \section{Conclusion}
 Using MPCs for scientific analysis of large datasets is promising for social scientists
 and researchers whom would otherwise need to reveal some of one party's input to another
-party in order to analyze their data. 
+party in order to analyze their data or be unable to perform analysis due to legal restrictions and ownership issues. 
 The Obliv-C language is particularly well-suited for implementing such scalable, 
 sensitive data analysis between two or more parties, and shows the practicality of 
 using secure MPCs for processing large datasets.
