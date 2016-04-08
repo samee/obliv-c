@@ -22,65 +22,69 @@
 %If accepted, at least one author must be registered and a final version of the poster abstract submitted by Friday, May 13, 2016.
 
 \begin{abstract}
-A \emph{Secure multi-party computation} (MPC) protocol allows two or more parties to compute a function on sensitive input data provided by each party, without revealing anything about the inputs (other than what can be inferred from the revealed output result). 
-We are exploring opportunities for using MPC to enable scientific research 
-that would not otherwise be possible. Social scientists often work with private
-datasets that cannot be shared due to legal restrictions and ownership
-issues, but many interesting studies could be enabled if MPC allows
-joint data analyses on private data analysis. We are developing tools
-and libraries that enable joint scientific data analyses with private
-data, and report on preliminary results using MPC in this context.
+
+A \emph{Secure multi-party computation} (MPC) protocol allows two or
+more parties to compute a function on sensitive input data provided by
+both parties, without revealing anything about the inputs (other than
+what can be inferred from the revealed output result).  Social
+scientists often work with private datasets that cannot be shared due to
+legal restrictions and ownership issues, but many interesting studies
+could be enabled if MPC allows joint data analyses on private data
+analysis. We are exploring opportunities for using MPC to enable
+scientific research that would not otherwise be possible.  We have
+developed tools and libraries that enable joint scientific data analyses
+with private data, and report on preliminary results using MPC to enable
+linear regression analyses over private data.
 
 \end{abstract}
 
 \section{Introduction}
-Many social scientists and researchers need to perform statistical analyses across 
-large, distinct datasets for their work, but they are often met with difficulties in
-obtaining sensitive data and computing results in a safe manner.
-For instance, an education researcher may be interested in using statistical methods 
-to analyze the relationship between a student's family income and the student's 
-Grade Point Average for a particular school system or collection of school systems. 
-Obtaining such sensitive data is often difficult to do without trusting 
-one or more parties with some of the private input data, as well as considering
-ownership and legal restrictions on having clear access to private data.
-Secure multi-party computation (MPC) is a protocol which can be used as a tool 
-for carrying out large-scale scientific data analysis in these situations without
-compromising the privacy of any party's data.
 
-Most current implementations of MPC work by executing instructions in a \emph{data-oblivious} manner, where the control flow of the program is independent of the 
-inputs provided by each party and the program executes without any 
-knowledge of the cleartext data it is operating on.
-This effectively creates a black box, such that semi-honest adversaries 
-cannot gain addition insight about the source data, receiving only the computated results.
-Several different approaches to MPCs exist, with tradeoffs in security, speed, and
-involvement of each party. The most common are based on secret sharing, homomorphic
-encryption, and garbled boolean circuit construction. 
-Secret sharing, which scatters private inputs onto multiple different 
-servers and uses a distributed computing protocol to safely reach a result, 
-assumes a majority of the servers do not collude with each other. 
-The homomorphic encryption model generally executes computations over
-encrypted data and relies on a trusted third party to reveal the final decrypted result,
-without revealing any intermediary results. The garbled circuit approach allows for
-a final result to be obtained without revealing any other data about any party involved.
-Many researchers and social scientists require MPCs in order to analyze datasets that are 
-both large and sensitive, and they often need to rely on using an underlying 
-secure computation software framework to execute such protocols.
-The Approach section discusses the utility of the Obliv-C language, which is based on 
-the garbled circuit evaluation MPC.
+Many social scientists and researchers need to perform statistical
+analyses across large, independently-owned datasets for their work, but
+they are often met with difficulties in obtaining sensitive data and
+computing results in a safe manner.  For instance, an education
+researcher may be interested in using statistical methods to analyze the
+relationship between family income and grade point average for a
+particular school system or collection of school systems.  Obtaining
+such sensitive data is often difficult to do without trusting one or
+more parties with some of the private input data, as well as considering
+ownership and legal restrictions on having clear access to private data.
+One government agency has information about incomes, but cannot share it
+without violating regulations (and compromising privacy); a local school
+district has information about students' grades, but cannot correlate
+that with their family incomes.  Secure multi-party computation (MPC) is
+a protocol which can be used as a tool for carrying out large-scale
+scientific data analysis in these situations without compromising the
+privacy of any party's data, or risking it being exposed.
 
 \section{Approach}
-Obliv-C is a programming language which allows an application developer to
-quickly implement scalable, secure MPC protocols, using the language’s 
-API or writing specific functionality by extending the language's existing library as
-well as experimenting with the implementation of library 
-protocols\cite{cryptoeprint:2015:1153}. The language is compiled and built 
-on top of the standard C language, allowing for developers to 
-integrate C tools and libraries with Obliv-C seamlessly.
-Obliv-C implements secure MPC through optimizations of Yao's garbled circuit protocol 
-for use with semi-honest adversaries. Using this language to write applications 
-that can analyze large, privacy-preserving datasets 
-results of building one such application for linear regression analysis 
-are shown in Preliminary Results.
+
+Several approaches to MPC have been developed, including
+application-specific custom protocols and generic, universal techniques
+that can be used to compute any function privately.  We use universal
+techniques since it is important that new functions can be developed
+quickly and without needing new security proofs, and we anticipate
+needing to incorporate auditing and other functionality into the MPC.
+The most common universal MPC techniques are based on secret sharing,
+homomorphic encryption, and garbled boolean circuits using Yao's
+protocol.  We use garbled circuits, which are generally the most
+scalable and high performance MPC approach currently known.
+
+Obliv-C (\url{http://oblivc.org}) is a programming language which allows
+an application developer to quickly implement scalable, secure MPC
+protocols, using the language’s API or writing specific functionality by
+extending the language's existing library as well as experimenting with
+the implementation of library
+protocols\cite{cryptoeprint:2015:1153}. The language is compiled and
+built on top of the standard C language, allowing for developers to
+integrate C tools and libraries with Obliv-C seamlessly.  Obliv-C
+provides an implementation of Yao's garbled circuit protocol for use
+with semi-honest adversaries, although it can also be used to implement
+other protocols. Using this language to write applications that can
+analyze large, privacy-preserving datasets results of building one such
+application for linear regression analysis are shown in Preliminary
+Results.
 
 The goal of using Obliv-C as a framework for secure computation is to demonstrate 
 its performance capabilities and ease of use to developers whom have little 
