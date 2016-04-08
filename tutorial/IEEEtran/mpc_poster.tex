@@ -105,81 +105,100 @@ which is accessible to specified parties ("0" means all parties in this
 context).
 
 \section{Preliminary Results}
-\subsection{Scalability}
-A linear regression data analysis program was developed to test the scalability 
-and speed of Obliv-C as a tool for implementing MPC programs. 
-Testing was done using c4.large \emph{Elastic Compute Cloud} (EC2) nodes from \emph{Amazon Web Services} (AWS)\cite{aws:ec2}, which feature 
-high frequency Intel Xeon E5-2666 v3 (Haswell) processors optimized specifically for EC2,
-two vCPUs, and 3.75 GiB of DRAM.
-Two c4.large instances were launched and connected through 
-Obliv-C's API for TCP/IP connections via Oblivious Transfer protocol. The instances 
-were both located in the same cloud cluster in Oregon; exploring network latency 
-impositions with secure MPCs is also an area of interest.
 
-One node instance provided independent ($x$) data points, while the other provided 
-dependent ($y$) data points; data points used were 32-bit integers, using fixed-point 
-mathematics to convert raw data values into scaled integers, as 
-Obliv-C does not currently support floating point numbers.
-The time needed to execute the MPC between instances appears to scale linearly 
-with the size of the data input; 100K data points finished execution in 12.7 minutes 
-on average, 500K completed in 63.7 minutes, and 1 million data points finished execution 
-in just over 127 minutes on average. Given the relative cost of using a c4.large instance
-(as of writing, \$0.105 per hour), executing this program over larger inputs, such as
-10 million data points, will only incur about \$4.45 between two instances in the 
-estimated runtime of 21 hours.
+In our experiments so far, we have implemented a linear regression
+application as an MPC where data is split between two parties.  One node
+instance provided independent ($x$) data points, while the other
+provided dependent ($y$) data points; data points used were 32-bit
+integers, using fixed-point mathematics to convert raw data values into
+scaled integers, as Obliv-C does not currently support floating point
+numbers.  The output of the computation is the coefficients that result
+from the linear regression, which are publicly revealed to both parties.
 
-Artificial data was generated for testing the scalability of input size, and
-considerations to automated data match-ups between two separate datasets were not
-implemented; the artifical data was presumed to already be matched and sorted properly.
-To provide a clear example of the utility of Obliv-C for analyzing sensitive datasets, 
-additional data for computation was obtained from the public New York State Department 
-of Health dataset of Hospital Inpatient Discharges from 2011\cite{healthdata:ny}. 
-Comparisons between fields such as "Length of Days stayed" and "Total Costs" 
-over approximately 2.6 million data points are currently being tested.
-This dataset is particularly amenable to analysis, as all data is already 
-matched properly and each data value is a comparable number.
+Testing was done using c4.large \emph{Elastic Compute Cloud} (EC2) nodes
+from \emph{Amazon Web Services} (AWS)\cite{aws:ec2}, which provide
+high-frequency Intel Xeon E5-2666 v3 (Haswell) processors optimized
+specifically for EC2, two vCPUs, and 3.75 GiB of DRAM.  Two c4.large
+instances were launched and connected through Obliv-C's API for TCP/IP
+connections. The instances were both located in the same datacenter in
+Oregon, with approximately 1 Gbps measured bandwidth between the
+nodes. 
 
-\subsection{Discussion}
-All numbers are averages over 5 executions between c4.large instances. The datasets used in Preliminary Results assume that data is matched, sorted, and 
-comprises of comparable values. Using private set intersection to assist matching 
-data with a unique identifier and automatically filtering out incompatible 
-data points is considered for future work. The proposed health dataset is
-publicly available and in a single database. A more realistic situation would be 
-for the independent and dependent data points to be each residing in separate 
-datasets, owned by different organizations, and being tied to legal restrictions 
-for sharing the data.
+The time needed to execute the MPC between instances appears to scale
+linearly with the size of the data input; 100K data points finished
+execution in 12.7 minutes on average, 500K completed in 63.7 minutes,
+and 1 million data points finished execution in just over 127 minutes on
+average. Given the relative cost of using a c4.large instance (as of
+writing, \$0.105 per hour), executing this program over larger inputs,
+such as 10 million data points, will only incur about \$4.45 between two
+instances in the estimated runtime of 21 hours.  (All numbers are
+averages over 5 executions between c4.large instances.)
 
+Artificial data was generated for testing the scalability of input size,
+and considerations to automated data match-ups between two separate
+datasets were not implemented; the artifical data was presumed to
+already be matched and sorted properly.  To provide a clear example of
+the utility of Obliv-C for analyzing sensitive datasets, additional data
+for computation was obtained from the public New York State Department
+of Health dataset of Hospital Inpatient Discharges from
+2011~\cite{healthdata:ny}.  This dataset is publicly available and in a
+single database, but provides a reasonable model of data that is
+sensitive and would be kept privately in different subsets kept by
+different organizations.
+
+% Can't tell what you are saying here - do you have results for this or not?
+%Comparisons between fields such as "Length of Days stayed" and "Total
+%Costs" over approximately 2.6 million data points are currently being
+%tested.  This dataset is particularly amenable to analysis, as all data
+%is already matched properly and each data value is a comparable number.
+
+The datasets used in our preliminary experiments assume that data is
+matched, sorted, and comprises of comparable values. In a realistic
+scenario, it is more likely that the two parties have data for different
+individuals, and first need to match up the corresponding records.  This
+can be done using private set intersection, which has been efficiently
+implemented as an MPC~\cite{yan2012}.
 
 \section{Related Work}
-A similar approach in taking distinct federal datasets and comparing them is seen in
-Dan Bogdanov \emph{et al.}, where correlations between working hours and failure to
-graduate on time in Estonia was investigated, matching over 10 million 
-tax records and 500K education records\cite{cryptoeprint:2015:1159}.
-This analysis utilized the researchers' own framework for secure
-computation, \emph{ShareMind}, a database and analytics system which 
-almost exclusively uses three-parties to carry out computations, and uses arithmetic
-manipulations to implement secure MPC, rather than boolean circuit evaluation\cite{sharemind}.
 
-Another privacy-preserving approach to analyzing millions of records uses a
-combination of homomorphic encryption (for linear computations) and Yao circuits 
-(for non-linear computations) in order to compute ridge regression\cite{ridgeregression}.
-This approach is designed for many users to send data to a central server called the 
-\emph{Evaluator}, in contrast to the primarily two-party model presented in the Obliv-C
-language. Yet another approach used for secure multiple linear regression 
-relies on protocols based on homomorphic secret sharing, and data which is partitioned 
+A similar approach in taking distinct federal datasets and comparing
+them was done by Bogdanov et al., where correlations between working
+hours and failure to graduate on time in Estonia was investigated,
+matching over 10 million tax records and 500K education
+records\cite{cryptoeprint:2015:1159}.  This analysis utilized the
+researchers' own framework for secure computation, \emph{ShareMind}, a
+database and analytics system which uses three somewhat-trusted parties
+to carry out computations, and uses arithmetic manipulations to
+implement secure MPC, rather than boolean circuit
+evaluation\cite{sharemind}.  The model where sensitive data is split
+between three parties that are trusted to not collude or disrupt the
+protocol enables many efficiencies not possible in standard MPC, but
+requires three parties in which both participants have a high degree of
+trust.
+
+Another privacy-preserving approach to analyzing millions of records
+uses a combination of homomorphic encryption (for linear computations)
+and Yao circuits (for non-linear computations) in order to compute ridge
+regression~\cite{ridgeregression}.  This approach is designed for many
+users to send data to a central server that performs the bulk of the
+computation, in contrast to the two-party model used in MPC. Yet another
+approach used for secure multiple linear regression relies on protocols
+based on homomorphic secret sharing, and data which is partitioned
 across several databases\cite{secretsharing}.
  
 \section{Conclusion}
-Using MPCs for scientific analysis of large datasets is promising for social scientists
-and researchers whom would otherwise need to reveal some of one party's input to another
-party in order to analyze their data or be unable to perform analysis due to legal restrictions and ownership issues. 
-The Obliv-C language is particularly well-suited for implementing such scalable, 
-sensitive data analysis between two or more parties, and shows the practicality of 
-using secure MPCs for processing large datasets.
-Future work invites a closer examination of automatic data-matching between
-separate datasets with private set intersection, improving fixed-point integer 
-conversion for decimal data values used in computation, and other privacy-preserving
-applications.
+
+Using MPCs for scientific analysis of large datasets is promising for
+social scientists and researchers whom would otherwise need to reveal
+some of one party's input to another party in order to analyze their
+data or be unable to perform analysis due to legal restrictions and
+ownership issues.  We hope progress in MPC implementation will enable
+new kinds of scientific data analysis, and envision tools that will make
+these techniques accessible to social scientists.  Future work invites a
+closer examination of automatic data-matching between separate datasets
+with private set intersection, improving fixed-point integer conversion
+for decimal data values used in computation, and other
+privacy-preserving applications.
 
 \begin{thebibliography}{1}
 
