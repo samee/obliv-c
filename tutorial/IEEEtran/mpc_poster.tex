@@ -75,40 +75,34 @@ Obliv-C (\url{http://oblivc.org}) is a programming language which allows
 an application developer to quickly implement scalable, secure MPC
 protocols, using the language’s API or writing specific functionality by
 extending the language's existing library as well as experimenting with
-the implementation of library
-protocols\cite{cryptoeprint:2015:1153}. The language is compiled and
-built on top of the standard C language, allowing for developers to
-integrate C tools and libraries with Obliv-C seamlessly.  Obliv-C
-provides an implementation of Yao's garbled circuit protocol for use
-with semi-honest adversaries, although it can also be used to implement
-other protocols. Using this language to write applications that can
-analyze large, privacy-preserving datasets results of building one such
-application for linear regression analysis are shown in Preliminary
-Results.
+the implementation of library protocols\cite{cryptoeprint:2015:1153}.
+Obliv-C provides an implementation of Yao's garbled circuit protocol for
+use with semi-honest adversaries, although it can also be used to
+implement other protocols.  The language is compiled and built on top of
+the standard C language, allowing for developers to integrate C tools
+and libraries with Obliv-C seamlessly.  This is important for our goals,
+since we want the programming required to build an MPC protocol to be as
+little as possible, while allowing programmers to integrate existing
+tools and libraries.
 
-The goal of using Obliv-C as a framework for secure computation is to demonstrate 
-its performance capabilities and ease of use to developers whom have little 
-knowledge of cryptography or circuit structures, but would greatly benefit from 
-using secure MPCs to carry out privacy-preserving dataset analysis (perhaps for
-social science research). An example of Obliv-C code which calculates and 
-reveals the correlation coefficient of a linear regression are seen in Figure~\ref{fig1}.
-\begin{figure}[!b]
-\centering
+An excerpt of Obliv-C code which calculates and reveals the correlation
+coefficient of a linear regression is below:
+
 \begin{verbatim}
-obliv int orsqr = getOblivRSquared();
-revealOblivInt(&io -> rsqr,orsqr,0);
+   obliv int orsqr = getOblivRSquared();
+   revealOblivInt(&io -> rsqr,orsqr,0);
 \end{verbatim}
-\caption{Code snippet showing \emph{obliv} qualifier and reveal API. Revealing an integer
-stores the result into a struct which is accessible to specified parties ("0" means
-all parties in this context).}
-\label{fig1}
-\end{figure}
-The \emph{obliv} qualifier built into Obliv-C's type system ensures the variable used
-is encrypted with the garbled circuit scheme\cite{cryptoeprint:2015:1153}; in this
-case, the variable is the correlation coefficient of linear regression analysis,
-obtained through some function call to a method within the MPC protocol. The result
-is revealed to specified parties through the API \emph{RevealOblivInt()}, which
-works by decrypting the \emph{obliv} value into a normal C struct.
+\noindent
+The \tt{obliv} qualifier built into Obliv-C's type system ensures the
+variable used is encrypted with the garbled circuit
+scheme\cite{cryptoeprint:2015:1153}. In this case, the variable is the
+correlation coefficient of linear regression analysis, obtained through
+some function call to a method within the MPC protocol. The result is
+revealed to specified parties through the API \tt{revealOblivInt()},
+which works by cooperatively decrypting the encrypted value into a
+normal C struct.  Revealing an integer stores the result into a struct
+which is accessible to specified parties ("0" means all parties in this
+context).
 
 \section{Preliminary Results}
 \subsection{Scalability}
