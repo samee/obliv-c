@@ -10,9 +10,9 @@
 \author{\IEEEauthorblockN{Samuel Havron
 \IEEEauthorblockA{
 \emph{University of Virginia}\\
-\href{mailto:havron@virginia.edu}{havron@virginia.edu}\\
+\href{mailto:havron@virginia.edu}{havron@virginia.edu}\\}
 }
-}
+
 }
 \maketitle
 
@@ -23,15 +23,14 @@
 
 \begin{abstract}
 A \emph{Secure multi-party computation} (MPC) protocol allows two or more parties to compute a function on sensitive input data provided by each party, without revealing anything about the inputs (other than what can be inferred from the revealed output result). 
-The use of MPCs as a tool for large-scale scientific data analysis can give many
-researchers and social scientists the ability to work with private datasets and conduct
-studies that would otherwise be difficult to do securely without revealing some
-input data to one or more parties of the computation.
-Using the Obliv-C language, researchers can develop their own application-specific
-MPCs and quickly deploy them for use in privacy-preserving data analysis.
-A demonstration of the scalability and performance of Obliv-C for scientific data analysis
-and a discussion of related work highlights the utility of the language for 
-researchers who have little to no experience in cryptographic protocols. 
+We are exploring opportunities for using MPC to enable scientific research 
+that would not otherwise be possible. Social scientists often work with private
+datasets that cannot be shared due to legal restrictions and ownership
+issues, but many interesting studies could be enabled if MPC allows
+joint data analyses on private data analysis. We are developing tools
+and libraries that enable joint scientific data analyses with private
+data, and report on preliminary results using MPC in this context.
+
 \end{abstract}
 
 \section{Introduction}
@@ -42,9 +41,11 @@ For instance, an education researcher may be interested in using statistical met
 to analyze the relationship between a student's family income and the student's 
 Grade Point Average for a particular school system or collection of school systems. 
 Obtaining such sensitive data is often difficult to do without trusting 
-one or more parties with some of the private input data.
+one or more parties with some of the private input data, as well as considering
+ownership and legal restrictions on having clear access to private data.
 Secure multi-party computation (MPC) is a protocol which can be used as a tool 
-for carrying out large-scale scientific data analysis.
+for carrying out large-scale scientific data analysis in these situations without
+compromising the privacy of any party's data.
 
 Most current implementations of MPC work by executing instructions in a \emph{data-oblivious} manner, where the control flow of the program is independent of the 
 inputs provided by each party and the program executes without any 
@@ -53,10 +54,11 @@ This effectively creates a black box, such that semi-honest adversaries
 cannot gain addition insight about the source data, receiving only the computated results.
 Several different approaches to MPCs exist, with tradeoffs in security, speed, and
 involvement of each party. The most common are based on secret sharing, homomorphic
-encryption, and garbled boolean circuit construction. Secret sharing, which
-scatters private inputs onto multiple different servers and uses a distributed computing
-protocol to safely reach a result, assumes a majority of the servers do not collude
-with each other. The homomorphic encryption model generally executes computations over
+encryption, and garbled boolean circuit construction. 
+Secret sharing, which scatters private inputs onto multiple different 
+servers and uses a distributed computing protocol to safely reach a result, 
+assumes a majority of the servers do not collude with each other. 
+The homomorphic encryption model generally executes computations over
 encrypted data and relies on a trusted third party to reveal the final decrypted result,
 without revealing any intermediary results. The garbled circuit approach allows for
 a final result to be obtained without revealing any other data about any party involved.
@@ -67,7 +69,6 @@ The Approach section discusses the utility of the Obliv-C language, which is bas
 the garbled circuit evaluation MPC.
 
 \section{Approach}
-
 Obliv-C is a programming language which allows an application developer to
 quickly implement scalable, secure MPC protocols, using the language’s 
 API or writing specific functionality by extending the language's existing library as
@@ -86,19 +87,24 @@ its performance capabilities and ease of use to developers whom have little
 knowledge of cryptography or circuit structures, but would greatly benefit from 
 using secure MPCs to carry out privacy-preserving dataset analysis (perhaps for
 social science research). An example of Obliv-C code which calculates and 
-reveals results of a linear regression are seen in Figure 1.
-\begin{figure}[!t]
+reveals the correlation coefficient of a linear regression are seen in Figure~\ref{fig1}.
+\begin{figure}[!b]
 \centering
 \begin{verbatim}
-obliv int orsqr = f_div(osqr(ocv),ostdvs);
+obliv int orsqr = getOblivRSquared();
 revealOblivInt(&io -> rsqr,orsqr,0);
-revealOblivInt(&io -> m,om,0);
-revealOblivInt(&io -> b,ob,0);
 \end{verbatim}
 \caption{Code snippet showing \emph{obliv} qualifier and reveal API. Revealing an integer
-stores the result into a struct which is accessible to specified parties.}
-\label{snippet}
+stores the result into a struct which is accessible to specified parties ("0" means
+all parties in this context).}
+\label{fig1}
 \end{figure}
+The \emph{obliv} qualifier built into Obliv-C's type system ensures the variable used
+is encrypted with the garbled circuit scheme\cite{cryptoeprint:2015:1153}; in this
+case, the variable is the correlation coefficient of linear regression analysis,
+obtained through some function call to a method within the MPC protocol. The result
+is revealed to specified parties through the API \emph{RevealOblivInt()}, which
+works by decrypting the \emph{obliv} value into a normal C struct.
 
 \section{Preliminary Results}
 \subsection{Scalability}
@@ -172,7 +178,6 @@ separate datasets with private set intersection, improving fixed-point integer
 conversion for decimal data values used in computation, and other privacy-preserving
 applications.
 
-% references section
 \begin{thebibliography}{1}
 
 \bibitem{aws:ec2}
