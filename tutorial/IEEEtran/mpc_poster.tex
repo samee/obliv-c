@@ -73,7 +73,7 @@ scalable and high performance MPC approach currently known.
 
 Obliv-C (\url{http://oblivc.org}) is a programming language which allows
 an application developer to quickly implement scalable, secure MPC
-protocols, using the language’s API or writing specific functionality by
+protocols, using the language's API or writing specific functionality by
 extending the language's existing library as well as experimenting with
 the implementation of library protocols\cite{cryptoeprint:2015:1153}.
 Obliv-C provides an implementation of Yao's garbled circuit protocol for
@@ -85,8 +85,9 @@ since we want the programming required to build an MPC protocol to be as
 little as possible, while allowing programmers to integrate existing
 tools and libraries.
 
-An excerpt of Obliv-C code which calculates and reveals the correlation
-coefficient of a linear regression is below:
+An excerpt of Obliv-C code below demonstrates input, basic expression evaluation, 
+and revealing the encrypted correlation
+coefficient of a linear regression:
 \begin{verbatim}
   //converting int to obliv qualified int
   obliv int x = feedOblivInt(plainIntX);
@@ -106,7 +107,7 @@ integers through the {\tt feedOblivInt()} API, which synchronously executes
 by both parties. Expressions that use both {\tt obliv} data and 
 non-{\tt obliv} data results in an {\tt obliv} value.
 Other typing rules and control flow handling can be found in
-the language’s repository (\url{https://github.com/samee/obliv-c}).
+the language's repository (\url{https://github.com/samee/obliv-c}).
 Following the last two lines of this example, the variable is the
 correlation coefficient of linear regression analysis, obtained through
 some function call to a method within the MPC protocol. The result is
@@ -153,11 +154,13 @@ already be matched and sorted properly.  To provide a clear example of
 the utility of Obliv-C for analyzing sensitive datasets, additional data
 for computation was obtained from the public New York State Department
 of Health dataset of Hospital Inpatient Discharges from
-2011~\cite{healthdata:ny}.  This dataset is publicly available and in a
+2011~\cite{healthdata:ny} and is currently being tested. 
+This dataset is publicly available and in a
 single database, but provides a reasonable model of data that is
 sensitive and would be kept privately in different subsets kept by
 different organizations.
 
+% fixed -- left as "currently being tested"
 % Can't tell what you are saying here - do you have results for this or not?
 %Comparisons between fields such as "Length of Days stayed" and "Total
 %Costs" over approximately 2.6 million data points are currently being
