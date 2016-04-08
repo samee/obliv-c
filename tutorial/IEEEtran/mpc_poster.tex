@@ -87,21 +87,33 @@ tools and libraries.
 
 An excerpt of Obliv-C code which calculates and reveals the correlation
 coefficient of a linear regression is below:
-
 \begin{verbatim}
-   obliv int orsqr = getOblivRSquared();
-   revealOblivInt(&io -> rsqr,orsqr,0);
+  //converting int to obliv qualified int
+  obliv int x = feedOblivInt(plainIntX);
+  obliv int y = feedOblivInt(plainIntY);
+  //evaluating an obliv expression
+  obliv int z = x + y + 3;
+  //...
+  obliv int orsqr = getOblivRSquared();
+  revealOblivInt(&io -> rsqr,orsqr,0);
 \end{verbatim}
 \noindent
-The {\tt obliv} qualifier built into Obliv-C's type system ensures the
-variable used is encrypted with the garbled circuit
-scheme\cite{cryptoeprint:2015:1153}. In this case, the variable is the
+The {\tt obliv} qualifier built into Obliv-C’s type system ensures
+the variable used is encrypted with the garbled circuit 
+scheme\cite{cryptoeprint:2015:1153}. {\tt x} and {\tt y} are converted 
+from plain integers into {\tt obliv}
+integers through the {\tt feedOblivInt()} API, which synchronously executes 
+by both parties. Expressions that use both {\tt obliv} data and 
+non-{\tt obliv} data results in an {\tt obliv} value.
+Other typing rules and control flow handling can be found in
+the language’s repository (\url{https://github.com/samee/obliv-c}).
+Following the last two lines of this example, the variable is the
 correlation coefficient of linear regression analysis, obtained through
 some function call to a method within the MPC protocol. The result is
 revealed to specified parties through the API {\tt revealOblivInt()},
 which works by cooperatively decrypting the encrypted value into a
 normal C struct.  Revealing an integer stores the result into a struct
-which is accessible to specified parties ("0" means all parties in this
+which is accessible to specified parties (``0'' means all parties in this
 context).
 
 \section{Preliminary Results}
