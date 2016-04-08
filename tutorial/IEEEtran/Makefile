@@ -8,7 +8,7 @@ $(NAME).pdf: $(NAME).tex $(DEPENDS)
 	rubber -f --pdf --warn all $<
 
 fast:
-	pkill Preview || true && pdflatex $(NAME).tex && bibtex $(NAME) && pdflatex $(NAME).tex & open $(NAME).pdf
+	pkill Preview || true && pdflatex $(NAME).tex && bibtex $(NAME) && pdflatex $(NAME).tex && open $(NAME).pdf
 
 open:
 	pkill Preview || true && open $(NAME).pdf
