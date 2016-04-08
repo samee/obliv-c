@@ -93,12 +93,12 @@ coefficient of a linear regression is below:
    revealOblivInt(&io -> rsqr,orsqr,0);
 \end{verbatim}
 \noindent
-The \tt{obliv} qualifier built into Obliv-C's type system ensures the
+The {\tt obliv} qualifier built into Obliv-C's type system ensures the
 variable used is encrypted with the garbled circuit
 scheme\cite{cryptoeprint:2015:1153}. In this case, the variable is the
 correlation coefficient of linear regression analysis, obtained through
 some function call to a method within the MPC protocol. The result is
-revealed to specified parties through the API \tt{revealOblivInt()},
+revealed to specified parties through the API {\tt revealOblivInt()},
 which works by cooperatively decrypting the encrypted value into a
 normal C struct.  Revealing an integer stores the result into a struct
 which is accessible to specified parties ("0" means all parties in this
@@ -157,7 +157,7 @@ matched, sorted, and comprises of comparable values. In a realistic
 scenario, it is more likely that the two parties have data for different
 individuals, and first need to match up the corresponding records.  This
 can be done using private set intersection, which has been efficiently
-implemented as an MPC~\cite{yan2012}.
+implemented as an MPC~\cite{NDSS:HuaEvaKat12}.
 
 \section{Related Work}
 
@@ -200,45 +200,7 @@ with private set intersection, improving fixed-point integer conversion
 for decimal data values used in computation, and other
 privacy-preserving applications.
 
-\begin{thebibliography}{1}
+\bibliographystyle{plain}
+\bibliography{references}
 
-\bibitem{aws:ec2}
-  \url{https://aws.amazon.com/ec2/instance-types/}.
-
-\bibitem{healthdata:ny}
-  \url{https://health.data.ny.gov/}.
-
-\bibitem{sharemind}
-Dan Bogdanov, S. Laur, and J. Willemson,
-\emph{Sharemind: A framework for fast privacypreserving
-computations}, In 13th European Symposium on Research in Computer
-Security (ESORICS), volume 5283 of LNCS, pages 192–206. Springer, 2008.
-\url{http://sharemind.cyber.ee}.
-
-\bibitem{cryptoeprint:2015:1159}
-    Dan Bogdanov, Liina Kamm, Baldur Kubo, Reimo Rebane, Ville Sokk, Riivo Talviste,
-    \emph{Students and Taxes: a Privacy-Preserving Social Study Using Secure Computation},
-    Cryptology ePrint Archive, Report 2015/1159,
-    2015,
-    \url{http://eprint.iacr.org/}.
-
-\bibitem{secretsharing}
-  Rob Hall, Stephen E. Fienberg, and Yuval Nardi, 
-  \emph{Secure multiple linear regression based on homomorphic encryption}, 
-  J. Official Statistics, vol. 27, no. 4, 2011.
-
-\bibitem{ridgeregression}
- Valeria Nikolaenko, Udi Weinsberg, Stratis Ioannidis, Marc Joye, Dan Boneh, Nina Taft,
- \emph{Privacy-Preserving Ridge Regression on Hundreds of Millions of Records},
- in 2013 IEEE Symposium on Security and Privacy (S\&P 2013), pp. 334-348, 
- IEEE Computer Society, 2013,
- \url{http://www.technicolorbayarea.com/papers/2013/NWIJBT13garbled.pdf}.
-
-\bibitem{cryptoeprint:2015:1153}
-  Samee Zahur and David Evans, \emph{Obliv-C: A Language for Extensible 
-  Data-Oblivious Computation}, Cryptology ePrint Archive, 
-  Report 2015/1153, 2015, 
-  \url{http://eprint.iacr.org/}.
-
-\end{thebibliography}
 \end{document}
