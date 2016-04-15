@@ -862,8 +862,8 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   r->unknown = true;
 }
 
-unsigned yaoGateCount()
-{ int rv = ((YaoProtocolDesc*)currentProto->extra)->gcount;
+uint64_t yaoGateCount()
+{ uint64_t rv = ((YaoProtocolDesc*)currentProto->extra)->gcount;
   if(currentProto->setBitAnd==yaoGenerateAndPair
       || currentProto->setBitAnd==yaoEvaluateHalfGatePair) // halfgate
     return rv/2;

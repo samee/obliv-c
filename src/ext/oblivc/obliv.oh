@@ -56,5 +56,5 @@ short ocBroadcastShort(short v,int source);
 long ocBroadcastLong(long v,int source);
 long long ocBroadcastLLong(long long v,int source);
 
-unsigned yaoGateCount(void);
+uint64_t yaoGateCount(void);
 #endif
