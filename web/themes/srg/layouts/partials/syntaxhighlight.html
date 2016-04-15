@@ -1,0 +1,8 @@
+  <!-- Syntax highlighting -->
+  {{ if isset .Site.Params "highlightStyle" }}
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/styles/{{ .Site.Params.highlightStyle }}.min.css">
+  {{ else }}
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/styles/tomorrow-night-bright.min.css">
+  {{ end }}
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/8.4/highlight.min.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
