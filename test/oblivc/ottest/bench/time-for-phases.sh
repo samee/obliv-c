@@ -47,13 +47,13 @@ for macro_suffix in BASE_OT EXTENSION VALIDATION PAYLOAD; do
 
   # Compile benchmark program
   $OBLIVCC -O3 $PROJECT_PATH/$BENCHSRC -o $BENCHBIN
-  ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN -DREMOTEHOST='\"$LOCAL_HOST\"'"
+  ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN"
   for ottype in M Q; do
     for ((run=0; run<5; run++)); do
-      ./$BENCHBIN $port 1 $ottype 5000000 &
+      ./$BENCHBIN $port -- $ottype 5000000 &
       sleep 0.3
       echo -n "$port $ottype $tcount" >> $0.log
-      ssh $REMOTE_HOST time $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port 2 $ottype 5000000 &>> $0.log
+      ssh $REMOTE_HOST time $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port $LOCAL_HOST $ottype 5000000 &>> $0.log
       port=$((port+1))
     done
   done

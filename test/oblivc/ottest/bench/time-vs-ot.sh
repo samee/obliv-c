@@ -56,15 +56,15 @@ fi
 cd "$PROJECT_PATH/$BENCHDIR"
 # Compilie benchmark program locally
 $OBLIVCC -O3 $PROJECT_PATH/$BENCHSRC -o $BENCHBIN
-ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN -DREMOTEHOST='\"$LOCAL_HOST\"'"
+ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN"
 port=$LOCAL_PORT
 for ottype in H M P Q; do
   for ((otcount=1000000; $otcount<=5000000; otcount=1000000+$otcount)); do
     for ((run=0; $run<6; run=$run+1)); do
-      ./$BENCHBIN $port 1 $ottype $otcount &
+      ./$BENCHBIN $port -- $ottype $otcount &
       sleep 0.3
       echo -n "$port $ottype $otcount" >> $0.log
-      ssh $REMOTE_HOST time $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port 2 $ottype $otcount &>> $0.log
+      ssh $REMOTE_HOST time $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port $LOCAL_HOST $ottype $otcount &>> $0.log
       port=$((port+1))
     done
   done

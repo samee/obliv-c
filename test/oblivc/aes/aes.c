@@ -17,16 +17,17 @@ int main(int argc,char* argv[])
     if(argc<2) fprintf(stderr,"Port number missing\n");
     else if(argc<3) fprintf(stderr,"Party missing\n");
     else fprintf(stderr,"string missing\n");
-    fprintf(stderr,"Usage: %s <port> <1|2> <string>\n",argv[0]);
-    fprintf(stderr,"  Party 1 provides key in hex\n");
-    fprintf(stderr,"  Party 2 provides plaintext in hex\n");
+    fprintf(stderr,"Usage: %s <port> <--|remote_host> <string>\n",argv[0]);
+    fprintf(stderr,"  Server provides key in hex\n");
+    fprintf(stderr,"  Client provides plaintext in hex\n");
     return 1;
   }
 
-  int i, party = (argv[2][0]=='1'?1:2);
+  const char* remote_host = (strcmp(argv[2],"--")==0?NULL:argv[2]);
+  int i, party = (!remote_host?1:2);
 
   //protocolUseStdio(&pd);
-  ocTestUtilTcpOrDie(&pd,party==1,argv[1]);
+  ocTestUtilTcpOrDie(&pd,remote_host,argv[1]);
   if(party==1) io.testkey=argv[3];
   else io.testplain=argv[3];
   setCurrentParty(&pd,party);

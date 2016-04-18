@@ -2,17 +2,18 @@
 #include<obliv.h>
 #include<obliv_common.h>
 
-// If party 1: port, party_number, opt0, opt1, n, len
-// If party 2: port, party_number, sel, n, len
+// If party 1:      --       port opt0 opt1 n len
+// If party 2: remote_server port sel n len
 int main(int argc, char* argv[])
 {
   ProtocolDesc pd;
   dhRandomInit();
   //protocolUseStdio(&pd);
-  int me = (argv[2][0]=='1'?1:2), err;
+  const char* remote_host = (strcmp(argv[1],"--")==0?NULL:argv[1]);
+  int me = (remote_host?2:1), err;
   setCurrentParty(&pd,me);
-  if(me==1) err = protocolAcceptTcp2P(&pd,argv[1]);
-  else err = protocolConnectTcp2P(&pd,"localhost",argv[1]);
+  if(me==1) err = protocolAcceptTcp2P(&pd,argv[2]);
+  else err = protocolConnectTcp2P(&pd,remote_host,argv[2]);
   if(err!=0) { fprintf(stderr,"TCP connection error\n"); return 2; }
   if(pd.thisParty==1)
   {
