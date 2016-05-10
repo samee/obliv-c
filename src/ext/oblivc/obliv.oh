@@ -8,6 +8,7 @@ bool ocInNpProto(void);
 void ocNpSetBroadcast1(bool v);
 bool ocNpGetBroadcast1(void);
 
+#ifdef __oblivious_c
 void setupOblivBool(OblivInputs* spec, obliv bool* dest, bool v);
 void setupOblivChar(OblivInputs* spec, obliv char* dest, char v);
 void setupOblivInt(OblivInputs* spec, obliv int* dest, int v);
@@ -48,6 +49,7 @@ bool revealOblivInt(int* dest, obliv int src,int party);
 bool revealOblivShort(short* dest, obliv short src,int party);
 bool revealOblivLong(long* dest, obliv long src,int party);
 bool revealOblivLLong(long long* dest, obliv long long src,int party);
+#endif
 
 bool ocBroadcastBool(bool v,int source);
 char ocBroadcastChar(char v,int source);

@@ -1,5 +1,7 @@
 #ifndef OBLIV_BITS_H
 #define OBLIV_BITS_H
+#define __oblivious_c
+
 //void* memset(void* s, int c, size_t n); // Hack, had to declare memset
 #include<string.h> // memset to zero
 #include<stdbool.h>
