@@ -10,7 +10,7 @@ module H = Hashtbl
 let rec checkOblivType t = match t with
 | TVoid a -> if hasOblivAttr a then Some "void" else None
 | TInt _ -> None
-| TFloat(_,a) -> if hasOblivAttr a then Some "unimplemented" else None
+| TFloat(_,a) -> if hasOblivAttr a then Some "float" else None (*CHANGE*)
 | TPtr(t,a) -> if hasOblivAttr a then Some "pointer" else checkOblivType t
 | TArray(t,_,a) -> if hasOblivAttr a then Some "array" else checkOblivType t
 | TFun(tres,targs,_,_) -> begin match checkOblivType tres with
@@ -49,6 +49,7 @@ let oblivIntTarget = ref dummyType
 let oblivShortTarget = ref dummyType
 let oblivLongTarget = ref dummyType
 let oblivLLongTarget = ref dummyType
+let oblivFloatTarget = ref dummyType (*CHANGE*)
 
 (* signed-ness affects code generation (e.g. signed vs unsigned comparison)
  * but not the generated data type *)
@@ -59,6 +60,11 @@ let intTargetType k = match k with
 | IShort | IUShort -> !oblivShortTarget
 | ILong | IULong -> !oblivLongTarget
 | ILongLong | IULongLong -> !oblivLLongTarget
+;;
+
+(*CHANGE*)
+let floatTargetType k = match k with
+  | FFloat -> !oblivFloatTarget
 ;;
 
 let dummyExp = Const (CChr 'x')
