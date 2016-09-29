@@ -30,8 +30,8 @@ static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
   { return transRecv(pd->trans,s,p,n); }
 
 // Maybe these 5 lines should move to bcrandom.h
-#define DHCurveName "secp192r1"
-#define DHEltBits 192
+#define DHCurveName "secp256r1"
+#define DHEltBits 256
 #define DHEltSerialBytes (((DHEltBits+7)/8+2)*2)
 
 void dhRandomInit(void);
