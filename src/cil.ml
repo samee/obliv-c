@@ -2447,6 +2447,7 @@ and bitsSizeOf t =
     E.s (E.error "You did not call Cil.initCIL before using the CIL library");
   match unrollType t with 
   | TInt(IBool,a) when hasOblivAttr a -> !oblivBitsSize
+  (* TODO: add something here for obliv floats *)
   | t when isOblivSimple t -> let base = bitsSizeOf (unoblivType t) in
                               base * !oblivBitsSize
   | TInt (ik,_) -> 8 * (bytesSizeOfInt ik)
