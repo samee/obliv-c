@@ -1,0 +1,75 @@
+#include<obliv_common.h>
+#include<obliv.oh>
+#include"copy.oh"
+#include"testcopy.h"
+
+#include<stdio.h>
+
+#ifndef USE_SHARES
+#ifdef FEED_SHARES_DIRECT
+#undef FEED_SHARES_DIRECT
+#endif
+#endif
+
+void testcopy(void* vargs)
+{
+  TestCopyIO* args = vargs;
+  int i;
+  obliv bool osel[2];
+  obliv int odata[4];
+#ifndef FEED_SHARES_DIRECT
+  feedOblivIntArray(odata,args->data,4,1);
+#endif
+  feedOblivBoolArray(osel,args->sel,2,2);
+#ifndef USE_SHARES
+  OcCopy* cpy = &ocCopyInt;
+  ocCopyCondN(cpy,odata,odata+2,osel,2);
+  revealOblivInt(&args->result[0],odata[0],0);
+  revealOblivInt(&args->result[1],odata[1],0);
+#else
+  ProtocolDesc* pd = ocCurrentProto();
+  ocShareInit(pd);
+  OcCopy* cpy = ocShareCopyNew(pd,2,sizeof(OcSharedInt));
+  OcSharedInt sh[4];
+  #ifdef FEED_SHARES_DIRECT
+    ocFeedSharedIntN(pd,sh,args->data,4,1);
+  #else
+    ocToSharedIntN(pd,sh,odata,4);
+  #endif
+  ocCopyCondN(cpy,sh,sh+2,osel,2);
+  #ifdef FEED_SHARES_DIRECT
+  ocRevealSharedIntN(pd,args->result,sh,2,0);
+  #else
+  ocFromSharedIntN(pd,odata,sh,2);
+  revealOblivInt(&args->result[0],odata[0],0);
+  revealOblivInt(&args->result[1],odata[1],0);
+  #endif
+  ocCopyRelease(cpy);
+  ocShareCleanup(pd);
+#endif
+}
+
+// I should allow implicit conversions from frozen void* to obliv int*
+
+typedef void (*ocopy)(frozen void*,frozen void*) obliv;
+
+void fun(obliv bool c,ocopy set)
+{
+  obliv int x,y;
+  obliv if(c) set(&x,&y);
+}
+void fun2(obliv bool c, void* a, void* b, ocopy set)
+{
+  obliv if(c) set(a,b);
+}
+
+// Both of this need to fail TODO
+void bad(obliv bool c, void* a,void (*f)(void*) obliv)
+{
+  int* p=a;
+  obliv if(c) f(a);
+  obliv if(c)
+  {
+    int* x = p;
+  }
+}
