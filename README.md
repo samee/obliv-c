@@ -6,7 +6,7 @@ Obliv-C is a simple GCC wrapper that makes it easy to embed secure computation p
 # Installation
 
 1. Installation of dependencies:
-  * For Ubuntu: `sudo apt-get install ocaml libgcrypt20-dev ocaml-findlib ocaml-ocamldoc`.
+  * For Ubuntu: `sudo apt-get install ocaml libgcrypt20-dev ocaml-findlib`.
   * For Fedora: `sudo dnf install glibc-devel.i686 ocaml ocaml-ocamldoc ocaml-findlib ocaml-findlib-devel libgcrypt libgcrypt-devel perl-ExtUtils-MakeMaker perl-Data-Dumper`
 
 2. Git-clone this repository, and do a `./configure && make RELEASE=1`. 
