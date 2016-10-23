@@ -36,6 +36,7 @@ stamp-h: config.h.in config.status
 	./config.status
 
 CC=@CC@
+CPP=cpp
 @DEFAULT_COMPILER@=1
 
 # We have to use _build because of OCaml's bug #0004502
@@ -111,24 +112,29 @@ else
 endif
 DEPENDDIR = $(OBJDIR)/depends
 OCSRCDIR = src/ext/oblivc
-OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils bcrandom privacy-free psi nnob
+OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils bcrandom privacy-free psi nnob copy
+OOCPARTS += copy
 
 oblivruntime: $(OBJDIR)/libobliv.a
 	
-$(OBJDIR)/libobliv.a: $(OCPARTS:%=$(OBJDIR)/%.o)
+$(OBJDIR)/libobliv.a: $(OCPARTS:%=$(OBJDIR)/%.o) $(OOCPARTS:%=$(OBJDIR)/%.oo)
 	ar cr $@ $^
 
 $(DEPENDDIR):
 	mkdir -p $(DEPENDDIR)
 
 $(OCPARTS:%=$(DEPENDDIR)/%.d): $(DEPENDDIR)/%.d: $(OCSRCDIR)/%.c $(DEPENDDIR) 
-	$(CC) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.o > $@
+	$(CPP) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.o > $@
 	echo '	$$(CC) -c $$< -o $$@ -I $$(OCSRCDIR) $$(CFLAGS)' >> $@
+
+$(OOCPARTS:%=$(DEPENDDIR)/%.od): $(DEPENDDIR)/%.od: $(OCSRCDIR)/%.oc $(DEPENDDIR) 
+	$(CPP) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.oo > $@
+	echo '	$$(BINDIR)/oblivcc -c $$< -o $$@ -I $$(OCSRCDIR) $$(CFLAGS)' >> $@
 
 # TODO update ocamlutil/Makefile.ocaml no longer used
 # CLEANING defind in ocamlutil/Makefile.ocaml based on $(MAKECMDGOALS)
 ifndef CLEANING
-  -include $(OCPARTS:%=$(DEPENDDIR)/%.d)
+  -include $(OCPARTS:%=$(DEPENDDIR)/%.d) $(OOCPARTS:%=$(DEPENDDIR)/%.od)
 endif
 # ------ end of obliv-C runtime -------------------------------
 

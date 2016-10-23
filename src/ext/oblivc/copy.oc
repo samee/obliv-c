@@ -1,0 +1,246 @@
+#include<assert.h>
+#include<obliv_common.h>
+#include<copy.oh>
+#include<obliv_copy_internal.h>
+#include<obliv_yao.h>
+#include<obliv_types.h>
+
+#include<stdio.h>
+#include<string.h>
+
+static void ocZeroBitsFill(const OcCopy*,void*,size_t);
+static void xorBits(const OcCopy*,void*,const void*,size_t);
+
+#define DEFINE_OC_COPY(t,T) \
+  void ocCopy##T##_cb(const OcCopy* c, \
+      frozen void* dest,frozen const void* src,size_t n) obliv \
+  { \
+    ~obliv(en) \
+    { \
+      bool b; \
+      if(__obliv_c__bitIsKnown(&b,&en)) \
+      { if(b && dest!=src) memcpy(dest,src,n*c->eltsize); \
+      }else \
+      { size_t lim = c->eltsize/sizeof(obliv t); \
+	obliv if(en) for(int i=0;i<n*lim;++i) \
+          ((obliv t*)dest)[i] = ((const obliv t*)src)[i]; \
+      }\
+    } \
+  } \
+  void ocCopyCond##T##_cb(const OcCopy* c, \
+      frozen void* dest,frozen const void* src, \
+      const obliv bool* cond,size_t n) obliv \
+  { \
+    size_t lim = c->eltsize/sizeof(obliv t); \
+    for(int i=0;i<n;++i) obliv if(cond[i]) \
+      for(int j=0;j<lim;++j) \
+      ((obliv t*)dest)[i*lim+j] = ((const obliv t*)src)[i*lim+j]; \
+  } \
+  const OcCopy ocCopy##T = \
+  { .go = ocCopy##T##_cb,  \
+    .goN = ocCopyCond##T##_cb, \
+    .release = NULL, \
+    .eltsize = sizeof(obliv t), \
+    .zeroFill = ocZeroBitsFill, .addN = xorBits, .subN = xorBits \
+  }; \
+  OcCopy ocCopy##T##N(size_t lim) \
+  { \
+    OcCopy rv = ocCopy##T; \
+    rv.eltsize *= lim; \
+    return rv; \
+  }
+
+DEFINE_OC_COPY(bool,Bool)
+DEFINE_OC_COPY(char,Char)
+DEFINE_OC_COPY(short,Short)
+DEFINE_OC_COPY(int,Int)
+DEFINE_OC_COPY(long,Long)
+DEFINE_OC_COPY(long long,LLong)
+
+void ocZeroBitsFill(const OcCopy* cpy,void* dest,size_t n)
+{
+  memset(dest,0,n*cpy->eltsize);
+}
+void xorBits(const OcCopy* cpy,void* dest,const void* src,size_t n)
+{
+  ProtocolDesc* pd = ocCurrentProto();
+  for(int i=0;i<n;++i)
+    __obliv_c__setBitwiseXor((char*)dest+i*cpy->eltsize,
+                             (char*)dest+i*cpy->eltsize,
+                             (char*)src +i*cpy->eltsize,
+                             cpy->eltsize/sizeof(__obliv_c__bool));
+}
+
+void ocSwapCondN(OcCopy* cpy,void* opt0,void* opt1,void* scratch,
+                 const obliv bool c[],size_t n) obliv
+{
+  ~obliv(en)
+  {
+    void* buf;
+    if(scratch) buf = scratch;
+    else
+    { buf = malloc(n*cpy->eltsize);
+      ocCopyZeroFill(cpy,buf,n);
+    }
+
+    ocCopyN(cpy,buf,opt0,n);
+    ocCopyAddN (cpy,buf,opt1,n);
+    obliv if(en) ocCopyCondN(cpy,opt0,opt1,c,n);
+    ocCopyN(cpy,opt1,buf,n);
+    ocCopySubN (cpy,opt1,opt0,n);
+    if(!scratch) free(buf);
+  }
+}
+
+// ------------------- Halfcopy function -------------------------------------
+
+/*
+typedef struct
+{ OcCopy cpy;
+  int condParty;
+} OcHCopy;
+
+// FIXME once again guilting of copy pasting from copy.oc
+
+#define DEFINE_OC_HCOPY(t,T) \
+  void ocHCopy##T##_cb(const OcCopy* c, \
+      frozen void* dest,frozen const void* src,size_t n) obliv \
+  { \
+    OcHCopy* ch = (OcHCopy*)c; \
+    ~obliv(en) \
+    { \
+      bool b; \
+      if(__obliv_c__bitIsKnown(&b,&en)) \
+      { if(b && dest!=src) memcpy(dest,src,n*c->eltsize); \
+      }else \
+      { size_t lim = c->eltsize/sizeof(obliv t); \
+        yaoHalfCondCopyGate(ocCurrentProto(),  \
+            dest,src,n*lim*ocBitSize(obliv t), \
+            __obliv_c__fatDecode(&en),ch->condParty); \
+      }\
+    } \
+  } \
+  void ocHCopyCond##T##_cb(const OcCopy* c, \
+      frozen void* dest,frozen const void* src, \
+      const obliv bool* cond,size_t n) obliv \
+  { \
+    OcHCopy* ch = (OcHCopy*)c; \
+    size_t lim = c->eltsize/sizeof(obliv t); \
+    ~obliv(en) \
+    { \
+      bool b; \
+      assert(__obliv_c__bitIsKnown(&b,&en) && b); \
+      for(int i=0;i<n;++i) \
+        yaoHalfCondCopyGate(ocCurrentProto(),    \
+            CAST((char*)dest+i*c->eltsize), \
+            CAST((const char*)src+i*c->eltsize), \
+            lim*ocBitSize(obliv t),\
+            __obliv_c__fatDecode(&cond[i]),ch->condParty); \
+    }\
+  } \
+  OcHCopy ocHCopy##T##N(size_t lim,int party) \
+  { \
+    OcCopy cpy = { \
+      .go = ocHCopy##T##_cb,  \
+      .goN = ocHCopyCond##T##_cb, \
+      .release = NULL, \
+      .eltsize = sizeof(obliv t)*lim, \
+      .zeroFill = ocZeroBitsFill, .addN = xorBits, .subN = xorBits \
+    }; \
+    OcHCopy rv = { .cpy = cpy, .condParty = party }; \
+    return rv; \
+  }
+
+DEFINE_OC_HCOPY(bool,Bool)
+DEFINE_OC_HCOPY(char,Char)
+DEFINE_OC_HCOPY(short,Short)
+DEFINE_OC_HCOPY(int,Int)
+DEFINE_OC_HCOPY(long,Long)
+DEFINE_OC_HCOPY(long long,LLong)
+*/
+
+// ------------------- Shared, packed representations ------------------------
+// Implementation relies on oblivcc implicitly including obliv_bits.h
+
+typedef struct 
+{ OcCopy cp;
+  size_t batchN;
+  char* scratch;
+  bool* conds;
+  obliv bool* wconds;
+  ProtocolDesc* pd;
+} OcShareCopy;
+
+bool ocOBoolLSB(int me,obliv bool b);
+
+void ocShareCopy1(const OcCopy* c,
+    frozen void* dest,frozen const void* src,size_t n) obliv
+{
+  OcShareCopy* cpy = CAST(c);
+  ~obliv(en)
+  {
+    bool b;
+    if(__obliv_c__bitIsKnown(&b,(const OblivBit*)&en))
+    { if(b) memcpy(dest,src,n*cpy->cp.eltsize);
+    }else {
+      int me = protoCurrentParty(cpy->pd);
+      int n2 = (cpy->batchN<n?cpy->batchN:n),elt = cpy->cp.eltsize;
+      b = ocOBoolLSB(me,en);
+      ocShareMuxes(cpy->pd,dest,dest,src,1,n2*elt,&b,&en,cpy->scratch);
+      if(n2<n) obliv if(en)
+        ocShareCopy1(cpy,(char*)dest+n2*elt,src+n2*elt,n-n2);
+    }
+  }
+}
+void ocShareCopyN(const OcCopy* cp,
+    void* dest,const void* src,const obliv bool* c,size_t n) obliv
+{
+  OcShareCopy* cpy = CAST(cp);
+  int n2 = (cpy->batchN<n?cpy->batchN:n),elt = cpy->cp.eltsize;
+  ~obliv(en)
+  {
+    int i,me = protoCurrentParty(cpy->pd);
+    for(i=0;i<n2;++i)
+    { cpy->wconds[i]=(en & c[i]);
+      cpy->conds[i] = ocOBoolLSB(me,cpy->wconds[i]);
+    }
+    ocShareMuxes(cpy->pd,dest,dest,src,n2,elt,
+        cpy->conds,cpy->wconds,cpy->scratch);
+  }
+  if(n2<n) ocShareCopyN(cp,(char*)dest+n2*elt,src+n2*elt,c+n2,n-n2);
+}
+
+void ocShareCopyRelease(OcCopy* c)
+{
+  OcShareCopy* cpy = CAST(c);
+  free(cpy->scratch);
+  free(cpy->conds);
+  free(cpy->wconds);
+  free(cpy);
+}
+static void ocShareZeroFill(const OcCopy* cpy,void* dest,size_t n)
+{
+  memset(dest,0,n*cpy->eltsize);
+}
+static void ocShareXorN(const OcCopy* cpy,void* dest,const void* src,size_t n)
+  { memxor(dest,src,n*cpy->eltsize); }
+// n is the maximum batch size we will support
+OcCopy* ocShareCopyNew(ProtocolDesc* pd,size_t n,size_t eltsize)
+{
+  OcShareCopy* cpy = malloc(sizeof(OcShareCopy));
+  cpy->scratch = malloc(4*n*eltsize);
+  cpy->conds = malloc(n*sizeof(bool));
+  cpy->wconds = malloc(n*sizeof(*cpy->wconds));
+  cpy->pd = pd;
+  cpy->batchN = n;
+
+  // TODO these callbacks. Minimize cross-over functions. I probably just
+  // need a yaoKeyLsb to work on obliv bool
+  cpy->cp.eltsize = eltsize;
+  cpy->cp.go = ocShareCopy1;
+  cpy->cp.goN = ocShareCopyN;
+  cpy->cp.release = ocShareCopyRelease;
+  cpy->cp.zeroFill = ocShareZeroFill;
+  cpy->cp.addN = cpy->cp.subN = ocShareXorN;
+  return (OcCopy*)cpy;
+}
