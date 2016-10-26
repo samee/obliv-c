@@ -1,0 +1,39 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <obliv.oh>
+#include "testFloat.h"
+#include "floatAdd.oh"
+
+void floatAddi(void* args) {
+    protocolIO *io = (protocolIO*) args;
+
+    float x = malloc(sizeof(float));
+    float y = malloc(sizeof(float));
+    check_mem(x, y, ocCurrentParty());
+    
+    obliv float ores = 0;
+  
+    load_data(io, &x, &y, ocCurrentParty());
+    
+    obliv float ox = malloc(sizeof(obliv float));
+    obliv float oy = malloc(sizeof(obliv float));
+  
+    toObliv(io, ox, x, 1);
+    toObliv(io, oy, y, 2);
+  
+    free(x);
+    free(y);
+  
+    float_addition(io, ox, oy, ores);
+    free(ox);
+    free(oy);
+}
+
+void toObliv(protocolIO *io, obliv float *oa, float *a, int party) {
+    *oa = feedOblivFloat(a, party);
+}
+
+void float_addition(protocolIO *io, obliv float ox, obliv float oy, obliv float ores) {
+    ores = ox + oy;
+    revealOblivFloat(&io->ores, ores, 0);
+}

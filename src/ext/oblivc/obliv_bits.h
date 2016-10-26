@@ -22,6 +22,7 @@ typedef struct { OblivBit bits[__bitsize(int)];   } __obliv_c__int;
 typedef struct { OblivBit bits[__bitsize(short)]; } __obliv_c__short;
 typedef struct { OblivBit bits[__bitsize(long)];  } __obliv_c__long;
 typedef struct { OblivBit bits[__bitsize(long long)]; } __obliv_c__lLong;
+typedef struct { OblivBit bits; } __obliv_c__float;
 
 // Just a cast
 static inline OblivBit* __obliv_c__bits(void* x) { return x; }
@@ -42,6 +43,7 @@ void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a);
 void __obliv_c__flipBit(OblivBit* dest); // Avoids a struct copy
+void __obliv_c__floatAdd(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 
 // Careful with this function: obliv things must be done in-sync by all parties
 // Therefore actions in if(ocCurrentParty()==me) {...} must not touch obliv data

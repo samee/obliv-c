@@ -20,6 +20,7 @@ void cleanupProtocol(ProtocolDesc*);
 
 void setCurrentParty(ProtocolDesc* pd, int party);
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
+void execFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 void execNetworkStressProtocol(ProtocolDesc* pd, int bytecount,
                                protocol_run start, void* arg);
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg);

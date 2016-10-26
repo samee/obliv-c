@@ -534,6 +534,10 @@ void setupOblivLong(OblivInputs* spec, __obliv_c__long* dest, long v)
   { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 void setupOblivLLong(OblivInputs* spec, __obliv_c__lLong* dest, long long v)
   { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
+void setupOblivFloat(OblivInputs* spec, __obliv_c__float* dest, float v)
+  {   OblivBit b;
+      b.floatValue = v;
+      dest->bits = b; }
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
   { currentProto->feedOblivInputs(currentProto,spec,count,party); }
@@ -562,6 +566,13 @@ feedOblivFun(short,short,Short)
 feedOblivFun(int,int,Int)
 feedOblivFun(long,long,Long)
 feedOblivFun(long long,lLong,LLong)
+__obliv_c__float feedOblivFloat(float v, int party)
+{
+    __obliv_c__float rv;
+    OblivInputs spec;
+    setupOblivFloat(&spec, &rv, v);
+    return rv;
+}
 
 #undef feedOblivFun
 
@@ -601,6 +612,11 @@ bool revealOblivLLong(long long* dest, __obliv_c__lLong src,int party)
   if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(long long),party)) 
     { *dest=(long long)wd; return true; }
   return false;
+}
+bool revealOblivFloat(float *dest, __obliv_c__float src, int party)
+{
+    *dest = src.bits.floatValue;
+    return true;
 }
 
 static void broadcastBits(int source,void* p,size_t n)
