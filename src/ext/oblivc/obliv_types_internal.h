@@ -8,6 +8,7 @@ typedef struct OblivBit {
   union {
     // a struct for each protocol we support goes here
     bool knownValue;
+    float floatValue;
     struct {
       // FIXME Couldn't generator just XOR R with this on a NOT?
       // generator: w is label for 0 value if inverted == false, 1 otherwise

@@ -1365,6 +1365,9 @@ let rec castTo ?(fromsource=false)
     | TFun _, TPtr _ when fromsource -> result
           
     | TInt _, TPtr _ -> result
+
+    | TFloat _, TPtr _ -> result
+    | TPtr _, TFloat _ -> result
           
     | TPtr _, TInt _ -> result
           

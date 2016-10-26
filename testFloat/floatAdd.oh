@@ -1,0 +1,2 @@
+void float_addition(protocolIO *io, obliv float x, obliv float y, obliv float ores);
+void toObliv(protocolIO *io, obliv float *oa, float *a, int party);
