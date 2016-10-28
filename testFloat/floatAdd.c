@@ -3,9 +3,10 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
+#include "floatAdd.h"
 #include <obliv.h>
-#include "testFloat.h"
 #include "../test/oblivc/common/util.h"
+#include "dbg.h"
 
 double lap;
 int currentParty;
@@ -16,7 +17,7 @@ const char* mySide() {
 }
 
 int main(int argc, char *argv[]) {
-  printf("Linear Regression\n");
+  printf("Floating Point Addition\n");
   printf("=================\n\n");
 
   // Check args
@@ -44,14 +45,14 @@ int main(int argc, char *argv[]) {
 	}
     }
 
-    // Final initializations before entering Yao protocol
+    // Final initializations before entering protogol
     currentParty = (argv[2][0]=='1'?1:2);
     setCurrentParty(&pd, currentParty); // only checks for a '1'
     io.v = currentParty; // Val?
     lap = wallClock();
 
     // Execute Float protocol and cleanup
-    execFloatProtocol(&pd, floatAddi, &io); // starts 'linReg()'
+    execYaoProtocol(&pd, floatAddi, &io); // starts 'linReg()'
     cleanupProtocol(&pd);
     double runtime = wallClock() - lap; // stop clock here 
 
@@ -67,18 +68,10 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void load_data(protocolIO *io, float &x, float &y, int party) {
+void load_data(protocolIO *io, int* x, int* y, int party) {
     if (party == 1) {
         *x = io->v;
     } else if (party == 2) {
         *y = io->v;
     }
-}
-
-void check_mem(float* x, float* y, int party) {
-  if((party == 1 && x == NULL) || (party == 2 && y == NULL)) {
-    log_err("Memory allocation failed\n");
-    clean_errno();
-    exit(1);
-  }
 }
