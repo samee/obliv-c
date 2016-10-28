@@ -1,7 +1,6 @@
 #include <obliv_common.h>
 #include <obliv_bits.h>
 #include <commitReveal.h>
-#include <nnob.h>
 #include <assert.h>
 #include <errno.h>      // libgcrypt needs ENOMEM definition
 #include <inttypes.h>
@@ -22,9 +21,12 @@ static __thread ProtocolDesc *currentProto;
 static inline bool known(const OblivBit* o) { return !o->unknown; }
 #endif
 
-//-------------------------- Debug Protocol -----------------------------------
+#ifndef FLOAT_PROTO
+#define FLOAT_PROTO
 
-static void dbgFeedOblivFloat(OblivBit* dest, int party, float a)
+//-------------------------- Float Protocol -----------------------------------
+
+static void floatFeedOblivFloat(OblivBit* dest, int party, float a)
 { 
     int curparty = ocCurrentParty();
     dest->unknown=true;
@@ -39,27 +41,27 @@ static void dbgFeedOblivFloat(OblivBit* dest, int party, float a)
     }
 }
 
-void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
+void floatProtoFeedOblivInputs(ProtocolDesc* pd,
     OblivInputs* spec,size_t count,int party)
 { 
     while(count--) { 
         int i;
         widest_t v = spec->src;
         for(i=0;i<spec->size;++i) { 
-            dbgFeedOblivFloat(spec->dest+i,party,v&1);
+            floatFeedOblivFloat(spec->dest+i,party,v&1);
             v >>= 1;
         }
         spec++;
     }
 }
 
-bool dbgProtoRevealOblivBits(float *dest, __obliv_c__float src, int party)
+bool floatProtoRevealOblivBits(float *dest, __obliv_c__float src, int party)
 {
     *dest = src.bits.floatValue;
     return true;
 }
   
-void dbgProtoFloatAdd(ProtocolDesc* pd, 
+void floatProtoAdd(ProtocolDesc* pd, 
     OblivBit* dest,const OblivBit* a,const OblivBit* b) 
 {
     dest->floatValue = (a->floatValue + b->floatValue);
@@ -71,13 +73,13 @@ void execFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
     pd->currentParty = ocCurrentPartyDefault;
     pd->error = 0;
-    pd->feedOblivFloat = dbgProtoFeedOblivFloat
-    pd->revealOblivFloat = dbgProtoRevealOblivBits;
-    pd->floatAdd = dbgProtoFloatAdd;
-    pd->partyCount= 2;
+    pd->feedOblivInputs = floatProtoFeedOblivInputs;
+    pd->revealOblivBits = floatProtoRevealOblivBits;
+    pd->partyCount = 2;
     pd->extra = NULL;
     currentProto = pd;
     currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
     start(arg);
 }
-  
+
+#endif

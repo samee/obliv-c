@@ -1,7 +1,6 @@
 #include <obliv_common.h>
 #include <obliv_bits.h>
 #include <commitReveal.h>
-#include <nnob.h>
 #include <assert.h>
 #include <errno.h>      // libgcrypt needs ENOMEM definition
 #include <inttypes.h>

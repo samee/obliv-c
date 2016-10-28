@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     lap = wallClock();
 
     // Execute Float protocol and cleanup
-    execYaoProtocol(&pd, floatAddi, &io); // starts 'linReg()'
+    execFloatProtocol(&pd, floatAddi, &io); // starts 'floatAddi()'
     cleanupProtocol(&pd);
     double runtime = wallClock() - lap; // stop clock here 
 
