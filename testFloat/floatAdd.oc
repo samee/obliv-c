@@ -3,7 +3,6 @@
 #include <obliv.oh>
 #include "floatAdd.h"
 #include "floatAdd.oh"
-#include "floatAdd.h"
 
 void floatAddi(void* args) {
     protocolIO *io = (protocolIO*) args;

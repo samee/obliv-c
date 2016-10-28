@@ -4,6 +4,7 @@
 
 #include<atomic_queue.h>
 #include<commitReveal.h>
+#include "obliv_floatProto.c"
 #include<obliv.h>
 #include<obliv_bits.h> // needed for OblivBit.*
 #include<obliv_common.h>
