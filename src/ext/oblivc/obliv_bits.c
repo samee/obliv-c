@@ -109,6 +109,14 @@ void __obliv_c__setSignedKnown
     value>>=1; dest++;
   }
 }
+
+void __obliv_c__setFloatKnown
+  (void* vdest, size_t size, float value)
+{
+  OblivBit* dest=vdest;
+  __obliv_c__assignBitKnown(dest,value);
+}
+
 void __obliv_c__setUnsignedKnown
   (void* vdest, size_t size, long long unsigned value)
 {
@@ -221,6 +229,11 @@ void __obliv_c__setPlainAdd (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size)
   { __obliv_c__setBitsAdd (vdest,NULL,vop1,vop2,NULL,size); }
+ 
+void __obliv_c__setPlainAddF (void* vdest
+                          ,const void* vop1 ,const void* vop2
+                          ,size_t size)
+    { *((float *) vdest) = *((float *) vop1) + *((float *) vop2); }
 
 void __obliv_c__setBitsSub (void* vdest, void* borrowOut
                            ,const void* vop1,const void* vop2

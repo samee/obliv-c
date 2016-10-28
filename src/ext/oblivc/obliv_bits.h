@@ -51,6 +51,9 @@ void __obliv_c__floatAdd(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 int ocCurrentParty();
 int ocCurrentPartyDefault(ProtocolDesc* pd);
 
+
+void __obliv_c__setFloatKnown
+    (void * dest, size_t size, float value);
 // Bitvector functions (these functions also work if dest and source point
 //   to the same object).
 // unconditional versions:
@@ -89,6 +92,9 @@ void __obliv_c__setRShift (void* vdest, const void* vsrc, size_t size,
 // dest and carryOut must be different objects. dest may alias with either
 //   op1, op2, or both. carryIn may alias carryOut.
 void __obliv_c__setPlainAdd (void* vdest
+                            ,const void* vop1 ,const void* vop2
+                            ,size_t size);
+void __obliv_c__setPlainAddF (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size);
 void __obliv_c__setPlainSub (void* vdest
@@ -167,6 +173,16 @@ void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size
 {
   OblivBit ov[__bitsize(widest_t)];
   __obliv_c__setSignedKnown(ov,size,val);
+  __obliv_c__ifThenElse(dest,ov,dest,size,cond);
+}
+
+// Conditionals (TODO other operators) that may be faster at times
+static inline 
+void __obliv_c__condAssignKnownF(const void* cond, void* dest, size_t size
+                                ,widest_t val)
+{
+  OblivBit ov[__bitsize(widest_t)];
+  __obliv_c__setFloatKnown(ov,size,val);
   __obliv_c__ifThenElse(dest,ov,dest,size,cond);
 }
 
