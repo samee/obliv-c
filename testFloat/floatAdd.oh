@@ -1,1 +1,1 @@
-void float_addition(protocolIO *io, obliv int x, obliv int y, obliv int ores);
+void float_addition(protocolIO *io, obliv float x, obliv float y, obliv float ores);
