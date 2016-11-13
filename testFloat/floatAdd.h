@@ -9,4 +9,4 @@ double wallClock();
 const char* mySide();
 
 void floatAddi(void* args);
-void load_data(protocolIO *io, int *x, int *y, int party);
+void load_data(protocolIO *io, float *x, float *y, int party);

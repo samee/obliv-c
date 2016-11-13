@@ -32,17 +32,16 @@ int main(int argc, char *argv[]) {
     // Make connection between two shells
     // Modified ocTestUtilTcpOrDie() function from obliv-c/test/oblivc/common/util.c
     log_info("Connecting to %s on port %s ...\n", remote_host, port);
-    if(argv[2][0] == '1') { 
-      if(protocolAcceptTcp2P(&pd,port)!=0) { 
-	log_err("TCP accept from %s failed\n", remote_host);
-	exit(1);
-      }
-    }
-    else {
-      if(protocolConnectTcp2P(&pd,remote_host,port)!=0) {
-	log_err("TCP connect to %s failed\n", remote_host);
-	exit(1);
-	}
+    if(argv[2][0] == '1') {
+        if(protocolAcceptTcp2P(&pd,port)!=0) {
+            log_err("TCP accept from %s failed\n", remote_host);
+	        exit(1);
+        }
+    } else {
+        if(protocolConnectTcp2P(&pd,remote_host,port)!=0) {
+            log_err("TCP connect to %s failed\n", remote_host);
+	        exit(1);
+	    }
     }
 
     // Final initializations before entering protogol
@@ -68,7 +67,7 @@ int main(int argc, char *argv[]) {
   return 0;
 }
 
-void load_data(protocolIO *io, int* x, int* y, int party) {
+void load_data(protocolIO *io, float* x, float* y, int party) {
     if (party == 1) {
         *x = io->v;
     } else if (party == 2) {

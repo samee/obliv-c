@@ -7,23 +7,23 @@
 void floatAddi(void* args) {
     protocolIO *io = (protocolIO*) args;
 
-    int x;
-    int y;
+    float x;
+    float y;
     
-    obliv int ores = 0;
+    obliv float ores = 0;
   
     load_data(io, &x, &y, ocCurrentParty());
     
-    obliv int ox;
-    obliv int oy;
+    obliv float ox;
+    obliv float oy;
 
-    ox = feedOblivInt(x, 1);
-    oy = feedOblivInt(y, 2);
+    ox = feedOblivFloat(x, 1);
+    oy = feedOblivFloat(y, 2);
   
     float_addition(io, ox, oy, ores);
 }
 
-void float_addition(protocolIO *io, obliv int ox, obliv int oy, obliv int ores) {
+void float_addition(protocolIO *io, obliv float ox, obliv float oy, obliv float ores) {
     ores = ox + oy;
-    revealOblivInt(&io->ores, ores, 0);
+    revealOblivFloat(&io->ores, ores, 0);
 }

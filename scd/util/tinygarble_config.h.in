@@ -1,0 +1,10 @@
+// the configured options and settings for Tutorial
+#define TinyGarble_VERSION_MAJOR @TinyGarble_VERSION_MAJOR@
+#define TinyGarble_VERSION_MINOR @TinyGarble_VERSION_MINOR@
+#define TinyGarble_VERSION_PATCH @TinyGarble_VERSION_PATCH@
+
+#define TINYGARBLE_SOURCE_DIR "@CMAKE_SOURCE_DIR@"
+#define TINYGARBLE_BINARY_DIR "@CMAKE_BINARY_DIR@"
+
+#cmakedefine ENABLE_LOG
+#cmakedefine ENABLE_DUMP
