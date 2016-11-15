@@ -104,6 +104,10 @@ void __obliv_c__setBitsAdd (void* dest,void* carryOut
                            ,const void* op1,const void* op2
                            ,const void* carryIn
                            ,size_t size);
+void __obliv_c__setBitsAddF (void* dest,void* carryOut
+                            ,const void* op1,const void* op2
+                            ,const void* carryIn
+                            ,size_t size);
 void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n);
 void __obliv_c__condNeg (const void* vcond, void* vdest
                         ,const void* vsrc, size_t n);

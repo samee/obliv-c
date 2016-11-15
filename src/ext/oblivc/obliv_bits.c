@@ -225,6 +225,17 @@ void __obliv_c__setBitsAdd (void* vdest,void* carryOut
   }
 }
 
+// carryIn and/or carryOut can be NULL, in which case they are ignored
+void __obliv_c__setBitsAddF (void* vdest,void* carryOut
+                           ,const void* vop1,const void* vop2
+                           ,const void* carryIn
+                           ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  *((float *) dest) = *((float *) op1) + *((float *) op2);
+}
+
 void __obliv_c__setPlainAdd (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size)
@@ -233,7 +244,7 @@ void __obliv_c__setPlainAdd (void* vdest
 void __obliv_c__setPlainAddF (void* vdest
                           ,const void* vop1 ,const void* vop2
                           ,size_t size)
-    { *((float *) vdest) = *((float *) vop1) + *((float *) vop2); }
+  { __obliv_c__setBitsAddF (vdest,NULL,vop1,vop2,NULL,size); }
 
 void __obliv_c__setBitsSub (void* vdest, void* borrowOut
                            ,const void* vop1,const void* vop2

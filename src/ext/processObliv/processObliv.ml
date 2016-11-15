@@ -107,7 +107,7 @@ let updateOblivBitType ci = begin
     let fargTypes = [ "dest",!oblivBitPtr,[]; "src",!oblivConstBitPtr,[]
                     ; "bitcount",intType,[] ] in
     let ftype = TFun (TVoid [], Some fargTypes, false, []) in
-    Lval (Var (makeGlobalVar "__obliv_c__copySimpleObliv" ftype),NoOffset)
+     Lval (Var (makeGlobalVar "__obliv_c__copySimpleObliv" ftype),NoOffset)
   end;
 end
 
@@ -560,13 +560,13 @@ let condSetKnownInt c v k x loc =
 
 let setKnownFloat v k x loc = 
   let fargTypes = ["dest",TPtr(typeOfLval v,[]),[]
-                  ;"bitcount",!typeOfSizeOf,[]
-                  ;"value",widestType,[]
-                  ] in
+                ;"bitcount",!typeOfSizeOf,[]
+                ;"value",widestType,[]
+                ] in
   let func = voidFunc "__obliv_c__setFloatKnown" fargTypes in
   Call(None,func,[ AddrOf v; xoBitsSizeOf (TFloat(k,[]))
-                 ; CastE(widestType,CastE(TFloat(k,[]),x))
-                 ],loc)
+               ; CastE(widestType,CastE(TFloat(k,[]),x))
+               ],loc)
 
 let condSetKnownFloat c v k x loc = 
   let fargTypes = ["cond",TPtr(oblivBoolType,[]),[]
@@ -673,7 +673,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
     | TFloat(kind, a) when hasOblivAttr a->
         begin match op with
         | PlusA  -> setArith "__obliv_c__setPlainAddF" v e1 e2 loc
-      (*| MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc
+     (* | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc
         | Mult   -> setArith "__obliv_c__setMulF" v e1 e2 loc
         | Shiftlt-> setShift "__obliv_c__setLShiftF" v e1 e2 loc
         | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
@@ -684,8 +684,8 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
         | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAndF" v e1 e2 loc
         | BXor -> setBitwiseOp "__obliv_c__setBitwiseXorF" v e1 e2 loc
-        | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOrF" v e1 e2 loc
-(* TODO | LAnd -> setLogicalOp "__obliv_c__setBitAndF" v e1 e2 loc *)
+        | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOrF" v e1 e2 loc *)
+ (*TODO | LAnd -> setLogicalOp "__obliv_c__setBitAndF" v e1 e2 loc
         | LOr  -> setLogicalOp "__obliv_c__setBitOrF"  v e1 e2 loc *)
         | _ -> instr
         end
@@ -705,6 +705,10 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
     | _ -> instr
     end
+| Set(dv,CastE(dt,Lval sv),loc) when isOblivFloat dt ->
+  begin match unrollType dt,unrollType (typeOfLval sv) with
+    | _ -> instr
+  end
 | Set(v,CastE(t,x),loc) when isOblivSimple t ->
     codegenUncondInstr (Set(v,CastE(unrollType t,x),loc))
 | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
