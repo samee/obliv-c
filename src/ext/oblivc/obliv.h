@@ -12,6 +12,7 @@
 //   In fact, user code should never be aware of OblivBits type.
 void protocolUseStdio(ProtocolDesc*);
 void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient);
+void protocolUseTcp2PKeepAlive(ProtocolDesc* pd,int sock,bool isClient);
 void protocolAddSizeCheck(ProtocolDesc* pd);
 // The old sockCount parameter (was the last param) is no longer used.
 int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port);
