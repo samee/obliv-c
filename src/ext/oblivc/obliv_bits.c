@@ -65,6 +65,7 @@ typedef struct tcp2PTransport
   bool isClient;
   FILE* sockStream;
   bool needFlush;
+  bool keepAlive;
   int sinceFlush;
 #ifdef PROFILE_NETWORK
   size_t bytes;
@@ -138,7 +139,8 @@ static void tcp2PCleanup(ProtocolTransport* pt)
 { 
   tcp2PTransport* t = CAST(pt);
   fflush(t->sockStream);
-  fclose(t->sockStream);
+  if(!t->keepAlive)
+    fclose(t->sockStream);
 #ifdef PROFILE_NETWORK
   t->flushCount++;
   if(t->parent==NULL)
@@ -192,7 +194,19 @@ static tcp2PTransport* tcp2PNew(int sock,bool isClient)
   return trans;
 }
 void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient)
-  { pd->trans = &tcp2PNew(sock,isClient)->cb; }
+{ 
+  pd->trans = &tcp2PNew(sock,isClient)->cb; 
+  tcp2PTransport* t = CAST(pd->trans);
+  t->keepAlive = false;
+}
+
+
+void protocolUseTcp2PKeepAlive(ProtocolDesc* pd,int sock,bool isClient)
+{ 
+  pd->trans = &tcp2PNew(sock,isClient)->cb; 
+  tcp2PTransport* t = CAST(pd->trans);
+  t->keepAlive = true;
+}
 
 static int getsockaddr(const char* name,const char* port, struct sockaddr* res)
 {
