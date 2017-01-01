@@ -1,3 +1,5 @@
+This test uses a tiny bash script `cycle` that oyu can find at https://github.com/samee/cmd
+
 Simply compares two integers supplied by two parties on the command line. Doesn't even open a TCP socket, but instead uses stdio to run the protocol. For testing, we use a cyclic pipe:
 
 # compile using our GCC wrapper
@@ -10,4 +12,3 @@ cycle './a.out 1 15 | ./a.out 2 10'
 # to perform this over a network, say, over SSH:
 cycle './a.out 1 15 | ssh remotemachine.server.com:/remote/path/to/a.out 2 10'
 
-The cycle command is a handy bash script that you can find at https://github.com/samee/cmd
