@@ -56,7 +56,6 @@ static struct stdioTransport stdioTransport
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
 
-//#define PROFILE_NETWORK
 // TCP connections for 2-Party protocols. Ignores src/dest parameters
 //   since there is only one remote
 typedef struct tcp2PTransport
@@ -67,26 +66,16 @@ typedef struct tcp2PTransport
   bool needFlush;
   bool keepAlive;
   int sinceFlush;
-#ifdef PROFILE_NETWORK
   size_t bytes;
   int flushCount;
   struct tcp2PTransport* parent;
-#endif
 } tcp2PTransport;
 
 size_t tcp2PBytesSent(ProtocolDesc* pd) 
-#ifdef PROFILE_NETWORK
   { return ((tcp2PTransport*)(pd->trans))->bytes; }
-#else
-  { return 0; }
-#endif
 
 int tcp2PFlushCount(ProtocolDesc* pd)
-#ifdef PROFILE_NETWORK
   { return ((tcp2PTransport*)(pd->trans))->flushCount; }
-#else
-  { return 0; }
-#endif
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { struct tcp2PTransport* tcpt = CAST(pt);
@@ -96,17 +85,13 @@ static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 	/*int res = write(tcpt->sock,n2+(char*)s,n-n2);*/
 	/*if(res<=0) { perror("TCP write error: "); return res; }*/
 	/*n2+=res;*/
-/*#ifdef PROFILE_NETWORK*/
 	/*tcpt->bytes += res;*/
-/*#endif*/
   /*}*/
   while(n>n2) {
 	int res = fwrite(n2+(char*)s,1,n-n2,tcpt->sockStream);
 	if(res<0) { perror("TCP write error: "); return res; }
 	n2+=res;
-#ifdef PROFILE_NETWORK
 	tcpt->bytes += res;
-#endif
   }
   return n2;
 }
@@ -117,9 +102,7 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 	if(tcpt->needFlush)
 	{
 		fflush(tcpt->sockStream);	
-#ifdef PROFILE_NETWORK
-                tcpt->flushCount++;
-#endif
+    tcpt->flushCount++;
 		tcpt->needFlush=false;
 	}
   /*while(n>n2)*/
@@ -141,17 +124,11 @@ static void tcp2PCleanup(ProtocolTransport* pt)
   fflush(t->sockStream);
   if(!t->keepAlive)
     fclose(t->sockStream);
-#ifdef PROFILE_NETWORK
   t->flushCount++;
-  if(t->parent==NULL)
-  { fprintf(stderr,"Total bytes sent: %zd\n",t->bytes);
-    fprintf(stderr,"Total flush done: %d\n",t->flushCount);
-  }
-  else
+  if(t->parent!=NULL)
   { t->parent->bytes+=t->bytes;
     t->parent->flushCount+=t->flushCount;
   }
-#endif
   free(pt);
 }
 
@@ -164,18 +141,11 @@ FILE* transGetFile(ProtocolTransport* t)
 }
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 
-#ifdef PROFILE_NETWORK
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
       .cleanup = tcp2PCleanup},
      .sock=0, .isClient=0, .needFlush=false, .bytes=0, .flushCount=0,
      .parent=NULL};
-#else
-static const tcp2PTransport tcp2PTransportTemplate
-  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
-      .cleanup = tcp2PCleanup},
-    .sock=0, .isClient=0, .needFlush=false};
-#endif
 
 // isClient value will only be used for the split() method, otherwise
 // its value doesn't matter. In that case, it indicates which party should be
@@ -294,9 +264,7 @@ static int sockSplit(int sock,ProtocolTransport* t,bool isClient)
     //if(write(sock,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
     if(transSend(t,0,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
     fflush(((tcp2PTransport*)t)->sockStream); 
-#ifdef PROFILE_NETWORK
     ((tcp2PTransport*)t)->flushCount++;
-#endif
     int newsock = accept(listenSock,0,0);
     close(listenSock);
     return newsock;
@@ -307,19 +275,13 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
 {
   tcp2PTransport* t = CAST(tsrc);
   fflush(t->sockStream); 
-#ifdef PROFILE_NETWORK
   ((tcp2PTransport*)t)->flushCount++;
-#endif
   // I should really rewrite sockSplit to use FILE* sockStream
   int newsock = sockSplit(t->sock,tsrc,t->isClient);
   if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
-#ifdef PROFILE_NETWORK
   if(!t->isClient) t->bytes+=sizeof(in_port_t);
-#endif
   tcp2PTransport* tnew = tcp2PNew(newsock,t->isClient);
-#ifdef PROFILE_NETWORK
   tnew->parent=t;
-#endif
   return CAST(tnew);
 }
 
@@ -899,6 +861,41 @@ void yaoReleaseOt(ProtocolDesc* pd,int me)
   if(me==1) otSenderRelease(&ypd->sender);
   else otRecverRelease(&ypd->recver);
 }
+
+void splitProtocol(ProtocolDesc* pdout, ProtocolDesc * pdin) {
+  pdout->error= pdin->error;
+  pdout->partyCount = pdin->partyCount;
+  pdout->currentParty = pdin->currentParty;
+  pdout->feedOblivInputs = pdin->feedOblivInputs;
+  pdout->revealOblivBits = pdin->revealOblivBits;
+  pdout->setBitAnd = pdin->setBitAnd;
+  pdout->setBitOr = pdin->setBitOr;
+  pdout->setBitXor = pdin->setBitXor;
+  pdout->setBitNot = pdin->setBitNot;
+  pdout->flipBit = pdin->flipBit;
+  pdout->thisParty = pdin->thisParty;
+  pdout->trans = pdin->trans->split(pdin->trans);
+  pdout->copyextra = pdin->copyextra;
+  pdout->copyextra(pdout, pdin);
+}
+
+void splitYaoProtocolExtra(ProtocolDesc* pdout, ProtocolDesc * pdin) {
+  YaoProtocolDesc* ypdin = pdin->extra;
+  YaoProtocolDesc* ypdout = malloc(sizeof(YaoProtocolDesc));
+  ypdout->protoType = ypdin->protoType;
+  ypdout->extra = NULL;
+  ypdout->fixedKeyCipher = ypdin->fixedKeyCipher;
+  if (pdout->thisParty == 1) {
+    gcry_randomize(ypdout->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    gcry_randomize(ypdout->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    ypdout->R[0] |= 1;   // flipper bit // NOTE: ASSUME POINT AND PERMUTE IS TRUE
+    //ypdout->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pdout,2));
+  } else {
+    //ypdout->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pdout,1));
+  }
+  pdout->extra=ypdout;
+}
+
 /* execYaoProtocol is divided into 2 parts which are reused by other
    protocols such as DualEx */
 void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
@@ -929,8 +926,12 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   else ypd->recver.recver=NULL;
 
   dhRandomInit();
+
+  //TODO: why is this ECB?
   gcry_cipher_open(&ypd->fixedKeyCipher,yaoFixedKeyAlgo,GCRY_CIPHER_MODE_ECB,0);
   gcry_cipher_setkey(ypd->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
+
+  pd->copyextra = splitYaoProtocolExtra;
 }
 
 // point_and_permute should always be true.
