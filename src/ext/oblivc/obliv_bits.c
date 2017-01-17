@@ -886,11 +886,13 @@ void splitYaoProtocolExtra(ProtocolDesc* pdout, ProtocolDesc * pdin) {
   ypdout->extra = NULL;
   ypdout->fixedKeyCipher = ypdin->fixedKeyCipher;
   if (pdout->thisParty == 1) {
-    gcry_randomize(ypdout->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    gcry_randomize(&ypdout->gcount,sizeof(ypdout->gcount),GCRY_STRONG_RANDOM);
+    osend(pdin,1,&ypdout->gcount,sizeof(ypdout->gcount));
+    memcpy(ypdout->R,ypdin->R,YAO_KEY_BYTES);
     gcry_randomize(ypdout->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
-    ypdout->R[0] |= 1;   // flipper bit // NOTE: ASSUME POINT AND PERMUTE IS TRUE
     //ypdout->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pdout,2));
   } else {
+    orecv(pdin,2,&ypdout->gcount,sizeof(ypdout->gcount));
     //ypdout->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pdout,1));
   }
   pdout->extra=ypdout;
