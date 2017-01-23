@@ -38,8 +38,8 @@ static inline bool curBit (OIBitSrc* s) { return s->oi[s->i].src & (1LL<<s->j); 
 static inline OblivBit* curDestBit(OIBitSrc* s) { return s->oi[s->i].dest+s->j; }
 static inline void nextBit(OIBitSrc* s) 
   { if(++(s->j)>=s->oi[s->i].size) { s->j=0; ++(s->i); } }
-static inline int bitCount(OIBitSrc* s) 
-{ int res=0,i;
+static inline size_t bitCount(OIBitSrc* s) 
+{ size_t res=0,i;
   for(i=0;i<s->n;++i) res+=s->oi[i].size;
   return res;
 }

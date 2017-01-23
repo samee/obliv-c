@@ -587,12 +587,12 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
     o->yao.inverted = false; o->unknown = true;
     yaoKeyCopy(o->yao.w,w0);
   }else 
-  { int bc = bitCount(&it);
+  { size_t bc = bitCount(&it);
     // limit memory usage
-    int batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
+    size_t batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
     char *buf0 = malloc(batch*YAO_KEY_BYTES),
          *buf1 = malloc(batch*YAO_KEY_BYTES);
-    int bp=0;
+    size_t bp=0;
     for(;hasBit(&it);nextBit(&it))
     { 
       OblivBit* o = curDestBit(&it);
@@ -621,13 +621,13 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
     o->unknown = true;
     ypd->icount++;
   }else 
-  { int bc = bitCount(&it);
+  { size_t bc = bitCount(&it);
     // limit memory usage
-    int batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
+    size_t batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
     char *buf = malloc(batch*YAO_KEY_BYTES),
          **dest = malloc(batch*sizeof(char*));
     bool *sel = malloc(batch*sizeof(bool));
-    int bp=0,i;
+    size_t bp=0,i;
     for(;hasBit(&it);nextBit(&it))
     { OblivBit* o = curDestBit(&it);
       dest[bp]=o->yao.w;
@@ -652,7 +652,7 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
 bool yaoGenrRevealOblivBits(ProtocolDesc* pd,
     widest_t* dest,const OblivBit* o,size_t n,int party)
 {
-  int i,bc=(n+7)/8;
+  size_t i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
   YaoProtocolDesc *ypd = pd->extra;
   for(i=0;i<n;++i) if(o[i].unknown)
@@ -669,7 +669,7 @@ bool yaoGenrRevealOblivBits(ProtocolDesc* pd,
 bool yaoEvalRevealOblivBits(ProtocolDesc* pd,
     widest_t* dest,const OblivBit* o,size_t n,int party)
 {
-  int i,bc=(n+7)/8;
+  size_t i,bc=(n+7)/8;
   widest_t rv=0, flipflags=0;
   YaoProtocolDesc* ypd = pd->extra;
   for(i=0;i<n;++i) if(o[i].unknown)
@@ -1865,7 +1865,7 @@ void feedOblivInputs(OblivInputs* spec, size_t count, int party)
     void feedObliv##tname##Array(__obliv_c__##ot dest[],const t src[],size_t n,\
                              int party)\
     {\
-      int i,p = protoCurrentParty(currentProto);\
+      size_t i,p = protoCurrentParty(currentProto);\
       OblivInputs *specs = malloc(n*sizeof*specs);\
       for(i=0;i<n;++i) setupObliv##tname(specs+i,dest+i,p==party?src[i]:0);\
       feedOblivInputs(specs,n,party);\
