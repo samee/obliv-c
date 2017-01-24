@@ -30,7 +30,7 @@ typedef struct OblivBit {
 
 // Dev warning: name clashes likely. Fix when it becomes a problem
 // Java-style iterator over bits in OblivInput array, assumes all sizes > 0
-typedef struct { int i,j; OblivInputs* oi; size_t n; } OIBitSrc;
+typedef struct { size_t i,j; OblivInputs* oi; size_t n; } OIBitSrc;
 static inline OIBitSrc oiBitSrc(OblivInputs* oi,size_t n) 
   { return (OIBitSrc){.i = 0, .j = 0, .oi = oi, .n = n}; }
 static inline bool hasBit (OIBitSrc* s) { return s->i<s->n; }
