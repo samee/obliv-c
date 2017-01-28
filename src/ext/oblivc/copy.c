@@ -33,7 +33,6 @@ void ocShareInit(ProtocolDesc* pd)
   struct OcShareContext* ctx = malloc(sizeof(struct OcShareContext));
   dhRandomInit();
   int me = ocCurrentParty();
-  int yu = 3-me;
   ctx->gen = newBCipherRandomGen();
   ctx->padder = newBCipherRandomGen();
   ctx->padnonce = 0;
@@ -183,7 +182,6 @@ void ocShareMuxes(ProtocolDesc* pd,char* z,
   char *t2 = t+bufsz, *t3 = t+2*bufsz, *tr = t+3*bufsz;
   struct OcShareContext* ctx = protoShareCtx(pd);
   int i;
-  int p = protoCurrentParty(pd);
   memcpy(t2,x0,bufsz); memxor(t2,x1,bufsz); // t2 = x0^x1
 #ifdef USE_PLAIN_OT
   randomizeBuffer(ctx->gen,t,bufsz);
