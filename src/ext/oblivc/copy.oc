@@ -5,7 +5,6 @@
 #include<obliv_yao.h>
 #include<obliv_types.h>
 
-#include<stdio.h>
 #include<string.h>
 
 static void ocZeroBitsFill(const OcCopy*,void*,size_t);
@@ -56,6 +55,7 @@ DEFINE_OC_COPY(short,Short)
 DEFINE_OC_COPY(int,Int)
 DEFINE_OC_COPY(long,Long)
 DEFINE_OC_COPY(long long,LLong)
+DEFINE_OC_COPY(size_t,SizeT)
 
 void ocZeroBitsFill(const OcCopy* cpy,void* dest,size_t n)
 {
@@ -89,6 +89,23 @@ void ocSwapCondN(OcCopy* cpy,void* opt0,void* opt1,void* scratch,
     ocCopyN(cpy,opt1,buf,n);
     ocCopySubN (cpy,opt1,opt0,n);
     if(!scratch) free(buf);
+  }
+}
+
+void ocSwap(OcCopy* cpy,void* opt0,void* opt1,void* scratch) obliv
+{
+  // Minimizes conditional copies if possible
+  if(cpy->addN && cpy->subN) ~obliv(en)
+  {
+    ocCopy(cpy,scratch,opt0);
+    ocCopyAddN(cpy,scratch,opt1,1); // scratch = a+b
+    obliv if(en) ocCopy(cpy,opt0,opt1);
+    ocCopy(cpy,opt1,scratch);
+    ocCopySubN(cpy,opt1,opt0,1);    // b' = (a+b)-a or (a+b)-b
+  }else
+  { ~obliv() ocCopy(cpy,scratch,opt0);
+    ocCopy(cpy,opt0,opt1);
+    ocCopy(cpy,opt1,scratch);
   }
 }
 
