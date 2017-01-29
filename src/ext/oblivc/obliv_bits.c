@@ -329,7 +329,10 @@ void protocolAddSizeCheck(ProtocolDesc* pd)
 // ---------------------------------------------------------------------------
 
 void cleanupProtocol(ProtocolDesc* pd)
-  { pd->trans->cleanup(pd->trans); }
+  {
+    pd->trans->cleanup(pd->trans);
+    if (pd->extra != NULL) pd->cleanextra(pd);
+  }
 
 void setCurrentParty(ProtocolDesc* pd, int party)
   { pd->thisParty=party; }
@@ -876,6 +879,7 @@ void splitProtocol(ProtocolDesc* pdout, ProtocolDesc * pdin) {
   pdout->thisParty = pdin->thisParty;
   pdout->trans = pdin->trans->split(pdin->trans);
   pdout->copyextra = pdin->copyextra;
+  pdout->cleanextra = pdin->cleanextra;
   pdout->copyextra(pdout, pdin);
 }
 
@@ -884,7 +888,8 @@ void splitYaoProtocolExtra(ProtocolDesc* pdout, ProtocolDesc * pdin) {
   YaoProtocolDesc* ypdout = malloc(sizeof(YaoProtocolDesc));
   ypdout->protoType = ypdin->protoType;
   ypdout->extra = NULL;
-  ypdout->fixedKeyCipher = ypdin->fixedKeyCipher;
+  gcry_cipher_open(&ypdout->fixedKeyCipher,yaoFixedKeyAlgo,GCRY_CIPHER_MODE_ECB,0);
+  gcry_cipher_setkey(ypdout->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
   if (pdout->thisParty == 1) {
     gcry_randomize(&ypdout->gcount,sizeof(ypdout->gcount),GCRY_STRONG_RANDOM);
     osend(pdin,1,&ypdout->gcount,sizeof(ypdout->gcount));
@@ -934,6 +939,7 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   gcry_cipher_setkey(ypd->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
 
   pd->copyextra = splitYaoProtocolExtra;
+  pd->cleanextra = cleanupYaoProtocol;
 }
 
 // point_and_permute should always be true.
@@ -975,6 +981,7 @@ void cleanupYaoProtocol(ProtocolDesc* pd)
   YaoProtocolDesc* ypd = pd->extra;
   gcry_cipher_close(ypd->fixedKeyCipher);
   free(ypd);
+  pd->extra = NULL;
 }
 
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)

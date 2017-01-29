@@ -67,6 +67,7 @@ struct ProtocolDesc {
 
   //helper function to copy extra field
   void (*copyextra)(ProtocolDesc*,ProtocolDesc*);
+  void (*cleanextra)(ProtocolDesc*);
 };
 
 #define OC_DYN_EXTRA_FUN(fname,Type1,Type2,type2Id)    \
