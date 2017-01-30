@@ -11,6 +11,8 @@
 #include<stdio.h>
 #define HERE printf("Party %d: %s:%d\n",p,__FILE__,__LINE__)
 
+#define USE_PLAIN_OT
+
 struct OcShareContext
 {
 #ifdef USE_PLAIN_OT
@@ -260,6 +262,30 @@ void ocFromShared_impl(ProtocolDesc* pd,
   // Let's go with malloc for now, we change that later.
   struct OcShareContext* ctx = protoShareCtx(pd);
   YaoProtocolDesc* ypd = pd->extra;
+#ifdef USE_PLAIN_OT
+  OTsender* sender;
+  OTrecver* recver;
+  if (ctx == NULL) {
+    sender = &ypd->sender;
+    recver = &ypd->recver;
+  } else {
+    sender = &ctx->sender;
+    recver = &ctx->recver;
+  }
+#else
+  struct HonestOTExtSender* sender;
+  struct HonestOTExtRecver* recver;
+  if (ctx == NULL) {
+    sender = ypd->sender;
+    recver = ypd->recver;
+  } else {
+    sender = ctx->sender;
+    recver = ctx->recver;
+  }
+#endif
+
+  
+
   int i,j,p = pd->currentParty(pd);
   if(p==1)
   {
@@ -267,11 +293,11 @@ void ocFromShared_impl(ProtocolDesc* pd,
     yao_key_t *key1 = malloc(n*bits*YAO_KEY_BYTES);
 #ifdef USE_PLAIN_OT
     for(i=0;i<n*bits;++i) yaoKeyNewPair(ypd,key0[i],key1[i]);
-    ctx->sender.send(ctx->sender.sender,
+    sender->send(sender->sender,
                      (char*)key0,(char*)key1,n*bits,YAO_KEY_BYTES);
 #else
     struct CorrFunXorArgs a = {.len=YAO_KEY_BYTES,.mask=ypd->R};
-    honestCorrelatedOTExtSend1Of2(ctx->sender,
+    honestCorrelatedOTExtSend1Of2(sender,
         (char*)key0,(char*)key1,n*bits,YAO_KEY_BYTES,corrFunSameXor,&a);
     ypd->icount+=n*bits;
 #endif
@@ -293,9 +319,9 @@ void ocFromShared_impl(ProtocolDesc* pd,
     bool *sel = malloc(n*bits*sizeof(bool));
     unpackBools(sel,n*bits,src);
 #ifdef USE_PLAIN_OT
-    ctx->recver.recv(ctx->recver.recver,(char*)key,sel,n*bits,YAO_KEY_BYTES);
+    recver->recv(recver->recver,(char*)key,sel,n*bits,YAO_KEY_BYTES);
 #else
-    honestCorrelatedOTExtRecv1Of2(ctx->recver,(char*)key,sel,n*bits,
+    honestCorrelatedOTExtRecv1Of2(recver,(char*)key,sel,n*bits,
         YAO_KEY_BYTES);
 #endif
     ypd->icount+=n*bits;
