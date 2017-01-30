@@ -64,6 +64,10 @@ struct ProtocolDesc {
 
   void* extra;  // protocol-specific information
                 // First field should be char protoType
+
+  //helper function to copy extra field
+  void (*copyextra)(ProtocolDesc*,ProtocolDesc*);
+  void (*cleanextra)(ProtocolDesc*);
 };
 
 #define OC_DYN_EXTRA_FUN(fname,Type1,Type2,type2Id)    \

@@ -18,6 +18,7 @@ void protocolAddSizeCheck(ProtocolDesc* pd);
 int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port);
 int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port);
 void cleanupProtocol(ProtocolDesc*);
+void splitProtocol(ProtocolDesc*, ProtocolDesc*);
 
 void setCurrentParty(ProtocolDesc* pd, int party);
 void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
@@ -32,5 +33,6 @@ bool execNpProtocol_Bcast1(ProtocolDesc* pd, protocol_run start, void* arg);
 void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOTs, bool useAltOTExt);
 
 size_t tcp2PBytesSent(ProtocolDesc* pd);
+int tcp2PFlushCount(ProtocolDesc* pd);
 
 #endif // OBLIV_H
