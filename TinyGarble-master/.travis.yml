@@ -1,0 +1,24 @@
+sudo: required
+
+language: cpp
+
+compiler:
+  - gcc
+
+install:
+  - sudo apt-get update
+  - sudo apt-get install build-essential
+  - sudo apt-get install libssl-dev
+  - sudo apt-get install libboost-all-dev
+  - wget --no-check-certificate https://cmake.org/files/v3.3/cmake-3.3.2.tar.gz
+  - tar xf cmake-3.3.2.tar.gz
+  - cd cmake-3.3.2
+  - ./configure --parallel=$(getconf _NPROCESSORS_ONLN)
+  - make -j $(getconf _NPROCESSORS_ONLN)
+  - sudo make install
+  - cd ..
+
+before_script:
+  - ./configure
+
+script: cd bin && make -j $(getconf _NPROCESSORS_ONLN) && ctest

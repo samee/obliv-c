@@ -11,11 +11,6 @@
 double lap;
 int currentParty;
 
-const char* mySide() {
-  if (currentParty == 1) return "Generator";
-  else return "Evaluator";
-}
-
 int main(int argc, char *argv[]) {
   printf("Floating Point Addition\n");
   printf("=================\n\n");
@@ -45,9 +40,15 @@ int main(int argc, char *argv[]) {
     }
 
     // Final initializations before entering protogol
-    currentParty = (argv[2][0]=='1'?1:2);
+    currentParty = (argv[2][0]=='1'? 1 : 2);
     setCurrentParty(&pd, currentParty); // only checks for a '1'
-    io.v = currentParty; // Val?
+    if (currentParty == 1) {
+        io.v = 1.2345;
+        io.party = 1;
+    } else {
+        io.v = 2.3456;
+        io.party = 2;
+    }
     lap = wallClock();
 
     // Execute Float protocol and cleanup
@@ -56,9 +57,9 @@ int main(int argc, char *argv[]) {
     double runtime = wallClock() - lap; // stop clock here 
 
     // Print results and store runtime data
-    log_info("%s total time: %lf seconds\n", mySide(), runtime);
+    log_info("Total time: %lf seconds\n", runtime);
     printf("\n");
-    log_info("Value   \tv = %f\n", io.v); // print val
+    log_info("Value   \tv = %f\n", io.ores); // print val
   } else {
     log_info("Usage: %s <hostname:port> <1|2> <filename>\n" 
 	     "\tHostname usage:\n" 
