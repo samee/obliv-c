@@ -13,11 +13,6 @@
 #include <unistd.h>
 #include <gcrypt.h>
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/wait.h>
-
 
 #ifndef CURRENT_PROTO
 #define CURRENT_PROTO
@@ -31,7 +26,7 @@ static inline bool known(const OblivBit* o) { return !o->unknown; }
 
 //-------------------------- Float Protocol -----------------------------------
 
-static void floatFeedOblivFloat(OblivBit* dest, int party, float a)
+/*static void floatFeedOblivFloat(OblivBit* dest, int party, float a)
 { 
     int curparty = ocCurrentParty();
     dest->unknown=true;
@@ -69,46 +64,7 @@ bool floatProtoRevealOblivBits(float *dest, __obliv_c__float src, int party)
 void floatProtoAdd(ProtocolDesc* pd, 
     OblivBit* dest,const OblivBit* a,const OblivBit* b) 
 {
-    int curparty = ocCurrentParty();
-    int pid;
-    int status;
-    int fd[2];
-    if (pipe(fd) == -1) {
-        perror("Creating pipe failed");
-        exit(EXIT_FAILURE);
-    }
-    pid = fork();
-    switch (pid) {
-        case 0:
-            close(fd[0]);
-            dup2(fd[1], 1);
-            char* const argAlice[] = {"--alice --input", (char*) &a->floatValue};
-            char* const argBob[] = {"--bob --input", (char*) &b->floatValue};
-            if (curparty == 1) {
-                execv("../scd/bin/garbled_circuit/TinyGarble", argAlice);
-            } else {
-                execv("../scd/bin/garbled_circuit/TinyGarble", argBob);
-            }
-            perror("Exec failed!");
-            exit(0);
-            break;
-        case -1:
-            perror("Fork failed");
-            exit(-1);
-        default:
-            close(fd[1]);
-            break;
-    }
-    float res;
-    char buffer[sizeof(float)];
-    while(1) {
-        int bytesRead = read(fd[0], buffer, sizeof(buffer));
-        if (bytesRead <= 0) break;
-    }
-    memcpy(&res, &buffer, sizeof(buffer));
-    waitpid(pid, &status, 0);
-    dest->floatValue = res;
-    dest->unknown = false;
+    __obliv_c__setPlainAddF(dest, a, b, __bitsize(dest))
     currentProto->debug.mulCount++;
 }
 
@@ -123,6 +79,6 @@ void execFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     currentProto = pd;
     currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
     start(arg);
-}
+}*/
 
 #endif

@@ -10,20 +10,21 @@ void floatAddi(void* args) {
     float x;
     float y;
     
-    obliv float ores = 1;
-  
-    load_data(io, &x, &y, ocCurrentParty());
+    obliv float ores = 0;
     
-    obliv float ox = 1;
-    obliv float oy = 3;
+    int party = io->party;
+    load_data(io, &x, &y, party);
+    
+    obliv float ox;
+    obliv float oy;
 
-    // ox = feedOblivFloat(x, 1);
-    // oy = feedOblivFloat(y, 2);
+    ox = feedOblivFloat(x, 1);
+    oy = feedOblivFloat(y, 2);
   
     float_addition(io, ox, oy, ores);
 }
 
 void float_addition(protocolIO *io, obliv float ox, obliv float oy, obliv float ores) {
     ores = ox + oy;
-    // revealOblivFloat(&io->ores, ores, 0);
+    revealOblivFloat(&io->ores, ores, 0);
 }

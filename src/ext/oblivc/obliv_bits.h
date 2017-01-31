@@ -21,7 +21,7 @@ typedef struct { OblivBit bits[__bitsize(int)];   } __obliv_c__int;
 typedef struct { OblivBit bits[__bitsize(short)]; } __obliv_c__short;
 typedef struct { OblivBit bits[__bitsize(long)];  } __obliv_c__long;
 typedef struct { OblivBit bits[__bitsize(long long)]; } __obliv_c__lLong;
-typedef struct { OblivBit bits; } __obliv_c__float;
+typedef struct { OblivBit bits[__bitsize(float)]; } __obliv_c__float;
 
 // Just a cast
 static inline OblivBit* __obliv_c__bits(void* x) { return x; }
