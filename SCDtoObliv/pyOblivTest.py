@@ -48,6 +48,7 @@ def toInt(inpt):
     else:
         pass
 
+# Put your generated circuit here:
 def obliv_float_add_circuit(dest, g_input, e_input):
     __obliv_0 = None
     __obliv_1 = None
@@ -4529,15 +4530,7 @@ def obliv_float_add_circuit(dest, g_input, e_input):
     dest[31] = __obliv_c__copyBit(dest[31], __obliv_1708)
 
 
-
-
-
-
-
-
-
-
-
+# End of area for generated circuit
 
 def main():
     in1 = "00000000000000000000000111111100" # 1
