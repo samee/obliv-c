@@ -1,4 +1,22 @@
+"""
+SCDtoObliv.py - Can read, evaluate, and output 
+    garbled circuits formatted for Obliv-C or
+    for the pyOblivTest program.
 
+    Instructions:
+    1) Specify a SCD circuit file as an argument to
+        the program
+    2) Redirect the output of the program to the
+        desired output destination
+
+    Also possible: evaluate the circuit with this
+    program (for rapid testing purposes).
+
+Author : Darion Cassel
+
+"""
+
+import sys
 
 class GarbledGate:
     def __init__(self):
@@ -169,65 +187,6 @@ class util_cppReadOp:
 
 
 class ReadSCD:
-    def __init__(self, filename, garbled_circuit):
-        self.f = open(filename, "r")
-        self.gc = garbled_circuit
-        self.cr = util_cppReadOp(self.f)
-
-    def readInits(self):
-        self.gc.p_init_size = int(self.cr.read())
-        self.gc.g_init_size = int(self.cr.read())
-        self.gc.e_init_size = int(self.cr.read())
-        self.gc.p_input_size = int(self.cr.read())
-        self.gc.g_input_size = int(self.cr.read())
-        self.gc.e_input_size = int(self.cr.read())
-        self.gc.dff_size = int(self.cr.read())
-        self.gc.output_size = int(self.cr.read())
-        self.gc.terminate = int(self.cr.read())
-        self.gc.gate_size = int(self.cr.read())
-        self.gc.addGates()
-
-    def readGateOutputs(self):
-        for i in range(self.gc.gate_size):
-            self.gc.garbledGates[i].output = self.gc.get_gate_lo_index() + i
-
-    def readIn0s(self):
-        for i in range(self.gc.gate_size):
-            self.gc.garbledGates[i].input0 = int(self.cr.read())
-
-    def readIn1s(self):
-        for i in range(self.gc.gate_size):
-            self.gc.garbledGates[i].input1 = int(self.cr.read())
-
-    def readGateTypes(self):
-        for i in range(self.gc.gate_size):
-            self.gc.garbledGates[i].gateType = int(self.cr.read())
-
-    def readOutputs(self):
-        for i in range(self.gc.output_size):
-            self.gc.outputs[i] = int(self.cr.read())
-
-    def readD(self):
-        for i in range(self.gc.dff_size):
-            self.gc.D[i] = int(self.cr.read())
-
-    def readI(self):
-        for i in range(self.gc.dff_size):
-            self.gc.I[i] = int(self.cr.read())
-
-    def read(self):
-        self.readInits()
-        self.readGateOutputs()
-        self.readIn0s()
-        self.readIn1s()
-        self.readGateTypes()
-        self.readOutputs()
-        self.readD()
-        self.readI()
-        self.f.close()
-
-
-class ReadSCD2:
     def __init__(self, filename, garbledCircuit):
         self.filename = filename
         self.gc = garbledCircuit
@@ -280,140 +239,6 @@ class ReadSCD2:
         self.readIn1s(self.lines[2])
         self.readTypes(self.lines[3])
         self.readOutputs(self.lines[4])
-
-
-class WriteOblivCircuit:
-    def __init__(self, garbledCircuit):
-        self.bits = []
-        self.inputStatements = []
-        self.gateOps = []
-        self.outputStatements = []
-        self.gc = garbledCircuit
-
-    def generateBits(self):
-        for i in range(64 + self.gc.gate_size + self.gc.output_size):
-            self.bits.append("OblivBit __obliv_" + str(i) + "")
-
-    def getInputs(self):
-        for i in range(32):
-            self.inputStatements.append("__obliv_c__copyBit(&__obliv_" +
-                                        str(i) + ", op1+" + str(i) + ")")
-        for i in range(32):
-            self.inputStatements.append("__obliv_c__copyBit(&__obliv_" +
-                                        str(i+32) + ", op2+" + str(i) + ")")
-
-    def gateTypeToObliv(self, typeStr):
-        typeMap = {
-            "AND": "__obliv_c__setBitAnd",
-            "XOR": "__obliv_c__setBitXor",
-            "OR": "__obliv_c__setBitOr",
-            "NOT": "__obliv_c__setBitNot",
-        }
-        return typeMap[typeStr]
-
-    def genGateInputStr(self, out, in0, in1):
-        res = "("
-        res += "&__obliv_" + str(out)
-        res += ", &__obliv_" + str(in0)
-        if in1 is not None:
-            res += ", &__obliv_" + str(in1)
-        res += ")"
-        return res
-
-    def processNOTgate(self, out, in0):
-        return self.gateTypeToObliv("NOT") + \
-            self.genGateInputStr(out, in0, None)
-
-    def processANDgate(self, out, in0, in1):
-        return self.gateTypeToObliv("AND") + \
-            self.genGateInputStr(out, in0, in1)
-
-    def processORgate(self, out, in0, in1):
-        return self.gateTypeToObliv("OR") + \
-            self.genGateInputStr(out, in0, in1)
-
-    def processXORgate(self, out, in0, in1):
-        return self.gateTypeToObliv("XOR") + \
-            self.genGateInputStr(out, in0, in1)
-
-    def processGate(self, gg):
-        st = []
-        gt = gg.gateType
-        """
-        8: "ANDGATE",
-        4: "ANDNGATE",
-        7: "NANDGATE",
-        11: "NANDNGATE",
-        14: "ORGATE",
-        13: "ORNGATE",
-        1: "NORGATE",
-        2: "NORNGATE",
-        6: "XORGATE",
-        9: "XNORGATE",
-        12: "NOTGATE",
-        -1: "DFFGATE"
-        """
-        # NOT gate
-        if gt == 12:
-            st.append(self.processNOTgate(gg.output, gg.input0))
-        # AND gate
-        elif gt == 8:
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-        # OR gate
-        elif gt == 14:
-            st.append(self.processORgate(gg.output, gg.input0, gg.input1))
-        # XOR gate
-        elif gt == 6:
-            st.append(self.processXORgate(gg.output, gg.input0, gg.input1))
-        # NAND gate
-        elif gt == 7:
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        # NANDN gate
-        elif gt == 11:
-            st.append(self.processNOTgate(gg.input1, gg.input1))
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        # ANDN gate
-        elif gt == 4:
-            st.append(self.processNOTgate(gg.input1, gg.input1))
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-        # XNOR gate
-        elif gt == 9:
-            st.append(self.processXORgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        # NOR gate
-        elif gt == 1:
-            st.append(self.processORgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        else:
-            raise Exception("Unhandled Gate! Number: " + str(gt))
-        self.gateOps.extend(st)
-
-    def setOutputs(self):
-        for i in range(len(self.gc.outputs)):
-            self.outputStatements.append("__obliv_c__copyBit(dest+" +
-                                         str(i) + ", &__obliv_" +
-                                         str(self.gc.outputs[i]) + ")")
-
-    def processSCD(self):
-        self.generateBits()
-        self.getInputs()
-        for gate in self.gc.garbledGates:
-            self.processGate(gate)
-        self.setOutputs()
-
-    def __repr__(self):
-        output = ""
-        for bit in self.bits:
-            output += bit + "\n"
-        for statement in self.inputStatements:
-            output += statement + "\n"
-        for op in self.gateOps:
-            output += op + "\n"
-        for statement in self.outputStatements:
-            output += statement + "\n"
-        return output
 
 
 class EvaluateSCD:
@@ -539,159 +364,7 @@ class EvaluateSCD:
         print(self.constructOutput())
 
 
-class WriteOblivCircuit2:
-    def __init__(self, garbledCircuit):
-        self.bits = []
-        self.inputStatements = []
-        self.gateOps = []
-        self.outputStatements = []
-        self.gc = garbledCircuit
-
-    def generateBits(self):
-        for i in range(self.gc.gate_size +
-                       self.gc.output_size + self.gc.get_input_size()):
-            self.bits.append("OblivBit __obliv_" + str(i) + ";")
-
-    def getInputs(self):
-        input_bias = self.gc.get_input_lo_index()
-        for i in range(self.gc.get_input_size()):
-            # Input belongs to p
-            if (i + input_bias) < self.gc.get_p_input_hi_index():
-                raise Exception("Not expecting a p_input!")
-            # Input belongs to g
-            elif (i + input_bias) < self.gc.get_g_input_hi_index():
-                bit_bias = i + input_bias - self.gc.get_g_input_lo_index()
-                self.inputStatements.append("__obliv_c__copyBit(&__obliv_" +
-                                            str(input_bias + i) +
-                                            ", op1+" + str(bit_bias)
-                                            + ");")
-            # Input belongs to e
-            else:
-                bit_bias = i + input_bias - self.gc.get_e_input_lo_index()
-                self.inputStatements.append("__obliv_c__copyBit(&__obliv_" +
-                                            str(input_bias + i) +
-                                            ", op2+" + str(bit_bias)
-                                            + ");")
-
-    def gateTypeToObliv(self, typeStr):
-        typeMap = {
-            "AND": "__obliv_c__setBitAnd",
-            "XOR": "__obliv_c__setBitXor",
-            "OR": "__obliv_c__setBitOr",
-            "NOT": "__obliv_c__setBitNot",
-        }
-        return typeMap[typeStr]
-
-    def genGateInputStr(self, out, in0, in1):
-        res = "("
-        res += "&__obliv_" + str(out)
-        res += ", &__obliv_" + str(in0)
-        if in1 is not None:
-            res += ", &__obliv_" + str(in1)
-        res += ");"
-        return res
-
-    def processNOTgate(self, out, in0):
-        return self.gateTypeToObliv("NOT") + \
-            self.genGateInputStr(out, in0, None)
-
-    def processANDgate(self, out, in0, in1):
-        return self.gateTypeToObliv("AND") + \
-            self.genGateInputStr(out, in0, in1)
-
-    def processORgate(self, out, in0, in1):
-        return self.gateTypeToObliv("OR") + \
-            self.genGateInputStr(out, in0, in1)
-
-    def processXORgate(self, out, in0, in1):
-        return self.gateTypeToObliv("XOR") + \
-            self.genGateInputStr(out, in0, in1)
-
-    def processGate(self, gg):
-        st = []
-        gt = gg.gateType
-        # NOT gate
-        if gt == 12:
-            st.append(self.processNOTgate(gg.output, gg.input0))
-        # AND gate
-        elif gt == 8:
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-        # OR gate
-        elif gt == 14:
-            st.append(self.processORgate(gg.output, gg.input0, gg.input1))
-        # XOR gate
-        elif gt == 6:
-            st.append(self.processXORgate(gg.output, gg.input0, gg.input1))
-        # NAND gate
-        elif gt == 7:
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        # NANDN gate
-        elif gt == 11:
-            st.append(self.processNOTgate(gg.input1, gg.input1))
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        # ANDN gate
-        elif gt == 4:
-            st.append(self.processNOTgate(gg.input1, gg.input1))
-            st.append(self.processANDgate(gg.output, gg.input0, gg.input1))
-        # XNOR gate
-        elif gt == 9:
-            st.append(self.processXORgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        # NOR gate
-        elif gt == 1:
-            st.append(self.processORgate(gg.output, gg.input0, gg.input1))
-            st.append(self.processNOTgate(gg.output, gg.output))
-        else:
-            raise Exception("Unhandled Gate! Number: " + str(gt))
-        self.gateOps.extend(st)
-
-    def setOutputs(self):
-        for i, wireNum in enumerate(self.gc.outputs):
-            self.outputStatements.append("__obliv_c__copyBit(dest+" +
-                                         str(i) + ", &__obliv_" +
-                                         str(wireNum) + ");")
-
-    def processSCD(self):
-        self.generateBits()
-        if self.gc.dff_size > 0:
-            raise Exception("Non-zero diff size not yet supported!")
-        self.getInputs()
-        for gate in self.gc.garbledGates:
-            if gate.input0 == -2:
-                raise Exception("CONST_ZERO not yet handled")
-            elif gate.input0 == -3:
-                raise Exception("CONST_ONE not yet handled")
-            elif gate.input0 >= -1 and gate.input0 < self.gc.get_wire_size():
-                pass
-            else:
-                raise Exception("Invalid input0 index: " + str(gate.input0))
-            if gate.input1 == -2:
-                raise Exception("CONST_ZERO not yet handled")
-            elif gate.input1 == -3:
-                raise Exception("CONST_ONE not yet handled")
-            elif gate.input1 >= -1 and gate.input1 < self.gc.get_wire_size():
-                pass
-            else:
-                raise Exception("Invalid input1 index: " + str(gate.input1))
-            self.processGate(gate)
-        self.setOutputs()
-
-    def __repr__(self):
-        output = ""
-        for bit in self.bits:
-            output += bit + "\n"
-        for statement in self.inputStatements:
-            output += statement + "\n"
-        for op in self.gateOps:
-            output += op + "\n"
-        for statement in self.outputStatements:
-            output += statement + "\n"
-        return output
-
-
-class WriteOblivCircuit3:
+class pyWriteOblivCircuit:
     def __init__(self, garbledCircuit):
         self.gc = garbledCircuit
         self.wires = []
@@ -878,7 +551,7 @@ class WriteOblivCircuit3:
         return output
 
 
-class WriteOblivCircuit4:
+class WriteOblivCircuit:
     def __init__(self, garbledCircuit):
         self.gc = garbledCircuit
         self.wires = []
@@ -1052,17 +725,21 @@ class WriteOblivCircuit4:
 
 
 def main():
-    filename = "float_add_syn_32_1cc.scd"
+    if len(sys.argv) > 2:
+        raise Exception("Too many args: only one arg, 'filename', expected.")
+    else:
+        filename = sys.argv[1]
     gc = GarbledCircuit()
-    reader = ReadSCD2(filename, gc)
+    reader = ReadSCD(filename, gc)
     reader.read()
-    writer = WriteOblivCircuit4(gc)
+    # Select pyWriteOblivCircuit for pyOblivTest program
+    writer = WriteOblivCircuit(gc)
     writer.processSCD()
     print(writer)
     evaluator = EvaluateSCD(gc)
+    # A circuit can be evaluated with this program
     """evaluator.evaluate("00000000000000000000000000000000",
                        "00000000000000000000000111111100",
                        "00000000000000000000000000000010")"""
-    #  01000000100110100101101000011101
 
 main()
