@@ -26,7 +26,7 @@ static inline bool known(const OblivBit* o) { return !o->unknown; }
 
 //-------------------------- Float Protocol -----------------------------------
 
-/*static void floatFeedOblivFloat(OblivBit* dest, int party, float a)
+static void floatFeedOblivFloat(OblivBit* dest, int party, float a)
 { 
     int curparty = ocCurrentParty();
     dest->unknown=true;
@@ -55,10 +55,19 @@ void floatProtoFeedOblivInputs(ProtocolDesc* pd,
     }
 }
 
-bool floatProtoRevealOblivBits(float *dest, __obliv_c__float src, int party)
-{
-    *dest = src.bits.floatValue;
-    return true;
+void floatProtoRevealOblivBits
+  (ProtocolDesc* pd,widest_t* dest,const OblivBit* src,size_t size,int party)
+{ widest_t rv=0;
+  if(currentProto->thisParty==1)
+  { src+=size;
+    while(size-->0) rv = (rv<<1)+!!(--src)->knownValue;
+    if(party==0 || party==2) osend(pd,2,&rv,sizeof(rv));
+    if(party==2) return false;
+    else { *dest=rv; return true; }
+  }else // assuming thisParty==2
+  { if(party==0 || party==2) { orecv(pd,1,dest,sizeof(*dest)); return true; }
+    else return false;
+  }
 }
   
 void floatProtoAdd(ProtocolDesc* pd, 
@@ -79,6 +88,6 @@ void execFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     currentProto = pd;
     currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
     start(arg);
-}*/
+}
 
 #endif
