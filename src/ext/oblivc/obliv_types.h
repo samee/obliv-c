@@ -140,7 +140,7 @@ struct OblivInputs {
   union {
     unsigned long long src;
     float src_f;
-  }
+  };
   struct OblivBit* dest;
   size_t size;
 };

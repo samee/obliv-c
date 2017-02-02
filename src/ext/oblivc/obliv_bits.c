@@ -1495,7 +1495,7 @@ void __obliv_c__flipBit(OblivBit* dest)
   else currentProto->flipBit(currentProto,dest); 
 }
 
-void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
+void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit* dest
                                      ,widest_t v,size_t size)
 { spec->dest=dest;
   spec->src=v;
