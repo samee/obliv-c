@@ -6,7 +6,7 @@ CONNECTION = $(REMOTE_HOST):$(PORT)
 CILPATH=../
 CFLAGS=-g -Wall
 LOADLIBES=-lm
-testName=testfloatAdd
+testName=floatAdd
 
 ./a.out: $(testName).oc $(testName).c ../test/oblivc/common/util.c $(RUNTIME)
 	$(OBLIVCC) $(CFLAGS) -I . $(testName).oc $(testName).c ../test/oblivc/common/util.c $(LOADLIBES)

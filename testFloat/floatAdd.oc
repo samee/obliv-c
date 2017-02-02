@@ -18,13 +18,13 @@ void floatAddi(void* args) {
     obliv float ox;
     obliv float oy;
 
-    ox = feedOblivFloat(x, 1);
-    oy = feedOblivFloat(y, 2);
+    ox = io->floatFeedOblivFloat(x, 1);
+    oy = io->floatFeedOblivFloat(y, 2);
   
     float_addition(io, ox, oy, ores);
 }
 
 void float_addition(protocolIO *io, obliv float ox, obliv float oy, obliv float ores) {
-    ores = ox + oy;
-    revealOblivFloat(&io->ores, ores, 0);
+    io->floatProtoAdd(ores, ox, oy, 32);
+    io->revealOblivFloat(&io->ores, ores, 0);
 }
