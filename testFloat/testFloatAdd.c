@@ -1,9 +1,34 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <obliv.h>
 #include <obliv.oh>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+#include "../test/oblivc/common/util.h"
+#include "dbg.h"
+
+double lap;
+int currentParty;
+
+typedef struct {
+  float v; // Value
+  int party;
+  float ores;
+} protocolIO;
+
+void load_data(protocolIO *io, float* x, float* y, int party) 
+{
+    if (party == 1) {
+        *x = io->v;
+    } else if (party == 2) {
+        *y = io->v;
+    }
+}
 
 
-void floatFeedOblivFloat(OblivBit* dest, int party, bool a) {
+void floatFeedOblivFloat(OblivBit* dest, int party, bool a) 
+{
     int curparty = 1;
     dest->unknown=true;
     if(party==1) { if(curparty==1) dest->knownValue=a; }
@@ -39,7 +64,8 @@ void floatProtoFeedOblivInputs(ProtocolDesc* pd,
 }
 
 bool floatProtoRevealOblivBits(ProtocolDesc* pd,widest_t* dest,
-        const OblivBit* src,size_t size,int party) {
+        const OblivBit* src,size_t size,int party) 
+{
     int float_byte_size = sizeof(float);
     int byte_size = sizeof(char) * 8;
     int tmp = 0;
@@ -78,6 +104,7 @@ bool floatProtoRevealOblivBits(ProtocolDesc* pd,widest_t* dest,
     }
 }
 
+/*
 void genOblivFloat(OblivBit* dest, float x, int size) {
     int float_byte_size = sizeof(float);
     int byte_size = sizeof(char) * 8;
@@ -114,6 +141,7 @@ void revOblivFloat(float* dest, OblivBit* bits, int size) {
     }
     memcpy(dest, floatBytes, float_byte_size);
 }
+*/
 
 void printAsBinary(float x) {
     int float_byte_size = sizeof(float);
@@ -130,40 +158,36 @@ void printAsBinary(float x) {
     printf("\n");
 }
 
-void printOblivBits(OblivBit* bits) {
+void printOblivBits(__obliv_c__float n) {
     int float_byte_size = sizeof(float);
     int byte_size = sizeof(char) * 8;
     for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
-        printf("%i", bits[i].knownValue);
+        printf("%i", n.bits[i].knownValue);
     }
     printf("\n");
 }
 
-int main() {
+void floatAddi(protocolIO* io) {
+    float x;
+    float y;
+
+    load_data(io, &x, &y, io->party);
+
     __obliv_c__float obliv_x;
     __obliv_c__float obliv_y;
     __obliv_c__float obliv_z;
     
-    float x = 345.678;
+    
     printf("%f\n", x);
     printAsBinary(x);
-
-    OblivBit obliv_xa[32];
-    genOblivFloat(obliv_xa,x,32);
-    printOblivBits(obliv_xa);
-
     
     OblivInputs spec_x;
     setupOblivFloat(&spec_x,&obliv_x,x);
     spec_x.src_f = x;
-    printf("%f\n", spec_x.src_f);
     floatProtoFeedOblivInputs(NULL, &spec_x, 1, 2);
-    printOblivBits(spec_x.dest);
-    // float x2;
-    // revOblivFloat(&x2, obliv_x, 32);
-    // printf("%f\n", x2);
+    printOblivBits(obliv_x);
     
-    float y = 256.123;
+    
     printf("%f\n", y);
     printAsBinary(y);
 
@@ -171,10 +195,7 @@ int main() {
     setupOblivFloat(&spec_y,&obliv_y,y);
     spec_y.src_f = y;
     floatProtoFeedOblivInputs(NULL, &spec_y, 1, 2);
-    // printOblivBits(obliv_y);
-    // float y2;
-    // revOblivFloat(&y2, obliv_y, 32);
-    // printf("%f\n", y2);
+    printOblivBits(obliv_y);
     
     float z = 0;
 
@@ -186,7 +207,64 @@ int main() {
     floatProtoRevealOblivBits(NULL, &z, spec_z.dest, 32, 0);
     printf("Res: %f\n", z);
     printAsBinary(z);
-    // printOblivBits(obliv_z);
+    printOblivBits(obliv_z);
 
-    return 0;
+}
+
+int main(int argc, char *argv[]) {
+  printf("Floating Point Addition\n");
+  printf("=================\n\n");
+
+  // Check args
+  if (argc == 3) {
+ 
+    // Initialize protocols and obtain connection information
+    const char *remote_host = strtok(argv[1], ":");
+    const char *port = strtok(NULL, ":");
+    ProtocolDesc pd;
+    protocolIO io;
+    
+    // Make connection between two shells
+    // Modified ocTestUtilTcpOrDie() function from obliv-c/test/oblivc/common/util.c
+    log_info("Connecting to %s on port %s ...\n", remote_host, port);
+    if(argv[2][0] == '1') {
+        if(protocolAcceptTcp2P(&pd,port)!=0) {
+            log_err("TCP accept from %s failed\n", remote_host);
+            exit(1);
+        }
+    } else {
+        if(protocolConnectTcp2P(&pd,remote_host,port)!=0) {
+            log_err("TCP connect to %s failed\n", remote_host);
+            exit(1);
+        }
+    }
+
+    // Final initializations before entering protogol
+    currentParty = (argv[2][0]=='1'? 1 : 2);
+    setCurrentParty(&pd, currentParty); // only checks for a '1'
+    if (currentParty == 1) {
+        io.v = 1.2345;
+        io.party = 1;
+    } else {
+        io.v = 2.3456;
+        io.party = 2;
+    }
+    lap = wallClock();
+
+    // Execute Float protocol and cleanup
+    // execFloatProtocol(&pd, floatAddi, &io); // starts 'floatAddi()'
+    floatAddi(&io);
+    cleanupProtocol(&pd);
+    double runtime = wallClock() - lap; // stop clock here 
+
+    // Print results and store runtime data
+    log_info("Total time: %lf seconds\n", runtime);
+    printf("\n");
+    log_info("Value   \tv = %f\n", io.ores); // print val
+  } else {
+    log_info("Usage: %s <hostname:port> <1|2> <filename>\n" 
+         "\tHostname usage:\n" 
+         "\tlocal -> 'localhost' remote -> IP address or DNS name\n", argv[0]);
+  }
+  return 0;
 }
