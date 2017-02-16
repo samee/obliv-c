@@ -8,8 +8,30 @@
 #include "../test/oblivc/common/util.h"
 #include "dbg.h"
 
+#include <obliv_common.h>
+#include <obliv_bits.h>
+#include <commitReveal.h>
+#include <assert.h>
+#include <errno.h>      // libgcrypt needs ENOMEM definition
+#include <inttypes.h>
+#include <stdio.h>      // for protoUseStdio()
+#include <string.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netdb.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <gcrypt.h>
+
+#ifndef CURRENT_PROTO
+#define CURRENT_PROTO
+// Right now, we do not support multiple protocols at the same time
+static __thread ProtocolDesc *currentProto;
+static inline bool known(const OblivBit* o) { return !o->unknown; }
+#endif
+
 double lap;
-int currentParty;
+int cp;
 
 typedef struct {
   float v; // Value
@@ -17,29 +39,35 @@ typedef struct {
   float ores;
 } protocolIO;
 
-void load_data(protocolIO *io, float* x, float* y, int party) 
+int ocCurrentParty2() 
 {
-    if (party == 1) {
-        *x = io->v;
-    } else if (party == 2) {
-        *y = io->v;
-    }
+    return currentProto->currentParty(currentProto);
 }
 
 
 void floatFeedOblivFloat(OblivBit* dest, int party, bool a) 
 {
-    int curparty = 1;
-    dest->unknown=true;
-    if(party==1) { if(curparty==1) dest->knownValue=a; }
-    else if(party==2 && curparty == 1)  {
-        // orecv(currentProto,2,&dest->knownValue,sizeof(bool));
-        __obliv_c__assignBitKnown(dest, a);
+    /**************************/
+    int curparty = ocCurrentParty2();
+    /**************************/
+
+    dest->unknown = false; // true;
+
+    if(party == 1) {
+        if (curparty == 1) {
+            dest->knownValue = a;
+        }
+    } else if(party == 2 && curparty == 1)  {
+        // CHANGE currentProto to pd before ship
+        orecv(currentProto, 2, &dest->knownValue, sizeof(bool));
+        // __obliv_c__assignBitKnown(dest, a);
+    } else if(party == 2 && curparty == 2) {
+        // CHANGE currentProto to pd before ship
+        osend(currentProto, 1, &a, sizeof(bool));
+        // __obliv_c__assignBitKnown(dest, a);
+    } else {
+        fprintf(stderr, "Error: This is a 2 party protocol\n");
     }
-    else if(party==2 && curparty == 2) {
-        // osend(currentProto,1,&a,sizeof(bool));
-    }
-    else fprintf(stderr,"Error: This is a 2 party protocol\n");
 }
 
 void floatProtoFeedOblivInputs(ProtocolDesc* pd,
@@ -85,65 +113,35 @@ bool floatProtoRevealOblivBits(ProtocolDesc* pd,widest_t* dest,
     }
     float rv = 0;
     memcpy(&rv, floatBytes, float_byte_size);
-    if(2==1)
+
+    /**************************/
+    if (currentProto->thisParty == 1)
+    /**************************/
     {
-        if(party==0 || party==2) {
-            // osend(pd,2,&rv,sizeof(rv));
+        if(party == 0 || party == 2) {
+            // CHANGE currentProto to pd before ship
+            osend(currentProto, 2, &rv, sizeof(rv));
+            // memcpy(dest, &rv, float_byte_size);
         }
-        if(party==2) return false;
-        else { 
+        if(party == 2) {
+            return false;
+        } else { 
             *dest=rv; return true; 
         }
     } else { 
-        if(party==0 || party==2) { 
-            // orecv(pd,1,dest,sizeof(*dest)); 
-            memcpy(dest, &rv, float_byte_size);
+        if(party == 0 || party == 2) {
+            // CHANGE currentProto to pd before ship
+            orecv(currentProto, 1, dest, sizeof(*dest)); 
+            // memcpy(dest, &rv, float_byte_size);
             return true; 
-        }
-        else return false;
-    }
-}
-
-/*
-void genOblivFloat(OblivBit* dest, float x, int size) {
-    int float_byte_size = sizeof(float);
-    int byte_size = sizeof(char) * 8;
-    unsigned char* float_bytes = (unsigned char*) &x;
-    int bit_number;
-    int this_bit;
-    for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
-        bit_number = i % byte_size;
-        this_bit = (*float_bytes >> bit_number) & 1;
-        __obliv_c__assignBitKnown(dest+(i), this_bit);
-        if ( bit_number == byte_size - 1 ) {
-            float_bytes++;
+        } else {
+            return false;
         }
     }
 }
 
-void revOblivFloat(float* dest, OblivBit* bits, int size) {
-    int float_byte_size = sizeof(float);
-    int byte_size = sizeof(char) * 8;
-    int tmp = 0;
-    unsigned char floatBytes[float_byte_size];
-    memcpy(floatBytes, (unsigned char*) &tmp, float_byte_size);
-    int j = 0;
-    unsigned char currentByte = floatBytes[j];
-    int bit_number;
-    for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
-        bit_number = i % byte_size;
-        currentByte |= (bits[i].knownValue << bit_number);
-        if (bit_number == byte_size - 1) {
-            floatBytes[j] = currentByte;
-            j++;
-            currentByte = floatBytes[j];
-        }
-    }
-    memcpy(dest, floatBytes, float_byte_size);
-}
-*/
-
-void printAsBinary(float x) {
+void printAsBinary(float x) 
+{
     int float_byte_size = sizeof(float);
     int byte_size = sizeof(char) * 8;
     unsigned char* float_bytes = (unsigned char*) &x;
@@ -158,7 +156,8 @@ void printAsBinary(float x) {
     printf("\n");
 }
 
-void printOblivBits(__obliv_c__float n) {
+void printOblivBits(__obliv_c__float n)
+{
     int float_byte_size = sizeof(float);
     int byte_size = sizeof(char) * 8;
     for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
@@ -167,11 +166,68 @@ void printOblivBits(__obliv_c__float n) {
     printf("\n");
 }
 
-void floatAddi(protocolIO* io) {
+void printOblivInput(OblivInputs n)
+{
+    int float_byte_size = sizeof(float);
+    int byte_size = sizeof(char) * 8;
+    for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
+        printf("%i", n.dest[i].knownValue);
+    }
+    printf("\n");
+}
+
+void load_data(protocolIO *io, float* x, float* y, int party) 
+{
+    if (party == 1) {
+        *x = io->v;
+    } else if (party == 2) {
+        *y = io->v;
+    }
+}
+
+void floatProtoSetBitAnd(ProtocolDesc* pd,
+    OblivBit* dest,const OblivBit* a,const OblivBit* b)
+{
+  dest->knownValue= (a->knownValue&& b->knownValue);
+  dest->unknown = true;
+  currentProto->debug.mulCount++;
+}
+
+void floatProtoSetBitOr(ProtocolDesc* pd,
+    OblivBit* dest,const OblivBit* a,const OblivBit* b)
+{
+  dest->knownValue= (a->knownValue|| b->knownValue);
+  dest->unknown = true;
+  currentProto->debug.mulCount++;
+}
+void floatProtoSetBitXor(ProtocolDesc* pd,
+    OblivBit* dest,const OblivBit* a,const OblivBit* b)
+{
+  dest->knownValue= (!!a->knownValue != !!b->knownValue);
+  dest->unknown = true;
+  currentProto->debug.xorCount++;
+}
+
+void floatProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
+{
+  dest->knownValue= !a->knownValue;
+  dest->unknown = a->unknown;
+}
+
+void floatProtoFlipBit(ProtocolDesc* pd,OblivBit* dest) 
+  { dest->knownValue = !dest->knownValue; }
+
+void floatAddi(protocolIO* io) 
+{
     float x;
     float y;
+    float z = 0;
 
-    load_data(io, &x, &y, io->party);
+    /**************************/
+    int curparty = ocCurrentParty2();
+    /**************************/
+    
+    load_data(io, &x, &y, ocCurrentParty2());
 
     __obliv_c__float obliv_x;
     __obliv_c__float obliv_y;
@@ -184,8 +240,9 @@ void floatAddi(protocolIO* io) {
     OblivInputs spec_x;
     setupOblivFloat(&spec_x,&obliv_x,x);
     spec_x.src_f = x;
-    floatProtoFeedOblivInputs(NULL, &spec_x, 1, 2);
+    floatProtoFeedOblivInputs(NULL, &spec_x, 1, 1);
     printOblivBits(obliv_x);
+    printOblivInput(spec_x);
     
     
     printf("%f\n", y);
@@ -196,12 +253,13 @@ void floatAddi(protocolIO* io) {
     spec_y.src_f = y;
     floatProtoFeedOblivInputs(NULL, &spec_y, 1, 2);
     printOblivBits(obliv_y);
-    
-    float z = 0;
+    printOblivInput(spec_y);
+
 
     OblivInputs spec_z;
     setupOblivFloat(&spec_z,&obliv_z,z);
-    floatProtoFeedOblivInputs(NULL, &spec_z, 1, 2);
+    spec_z.src_f = z;
+    // floatProtoFeedOblivInputs(NULL, &spec_z, 1, curparty);
 
     __obliv_c__setPlainAddF(spec_z.dest, spec_x.dest, spec_y.dest, 32);
     floatProtoRevealOblivBits(NULL, &z, spec_z.dest, 32, 0);
@@ -209,9 +267,29 @@ void floatAddi(protocolIO* io) {
     printAsBinary(z);
     printOblivBits(obliv_z);
 
+    io->ores = z;
 }
 
-int main(int argc, char *argv[]) {
+void execThisFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+{
+    pd->currentParty = ocCurrentPartyDefault;
+    pd->error = 0;
+    pd->partyCount= 2;
+    pd->extra = NULL;
+    pd->feedOblivInputs = floatProtoFeedOblivInputs;
+    pd->revealOblivBits = floatProtoRevealOblivBits;
+    pd->setBitAnd = floatProtoSetBitAnd;
+    pd->setBitOr  = floatProtoSetBitOr;
+    pd->setBitXor = floatProtoSetBitXor;
+    pd->setBitNot = floatProtoSetBitNot;
+    pd->flipBit   = floatProtoFlipBit;
+    currentProto = pd;
+    currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
+    start(arg);
+}
+
+int main(int argc, char *argv[]) 
+{
   printf("Floating Point Addition\n");
   printf("=================\n\n");
 
@@ -239,21 +317,18 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Final initializations before entering protogol
-    currentParty = (argv[2][0]=='1'? 1 : 2);
-    setCurrentParty(&pd, currentParty); // only checks for a '1'
-    if (currentParty == 1) {
+    // Final initializations before entering protocol
+    cp = (argv[2][0]=='1'? 1 : 2);
+    setCurrentParty(&pd, cp); // only checks for a '1'
+    if (cp == 1) {
         io.v = 1.2345;
-        io.party = 1;
     } else {
         io.v = 2.3456;
-        io.party = 2;
     }
     lap = wallClock();
 
     // Execute Float protocol and cleanup
-    // execFloatProtocol(&pd, floatAddi, &io); // starts 'floatAddi()'
-    floatAddi(&io);
+    execThisFloatProtocol(&pd, floatAddi, &io); // starts 'floatAddi()'
     cleanupProtocol(&pd);
     double runtime = wallClock() - lap; // stop clock here 
 

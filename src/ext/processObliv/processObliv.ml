@@ -705,10 +705,6 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
     | _ -> instr
     end
-| Set(dv,CastE(dt,Lval sv),loc) when isOblivFloat dt ->
-  begin match unrollType dt,unrollType (typeOfLval sv) with
-    | _ -> instr
-  end
 | Set(v,CastE(t,x),loc) when isOblivSimple t ->
     codegenUncondInstr (Set(v,CastE(unrollType t,x),loc))
 | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
