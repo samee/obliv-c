@@ -44,10 +44,8 @@ int main(int argc, char *argv[]) {
     setCurrentParty(&pd, currentParty); // only checks for a '1'
     if (currentParty == 1) {
         io.v = 1.2345;
-        io.party = 1;
     } else {
         io.v = 2.3456;
-        io.party = 2;
     }
     lap = wallClock();
 

@@ -12,8 +12,8 @@ void floatAddi(void* args) {
     
     obliv float ores = 0;
     
-    int party = io->party;
-    load_data(io, &x, &y, party);
+    int curparty = ocCurrentParty();
+    load_data(io, &x, &y, curparty);
     
     obliv float ox;
     obliv float oy;
@@ -25,7 +25,7 @@ void floatAddi(void* args) {
 }
 
 void float_addition(protocolIO *io, obliv float ox, obliv float oy, obliv float ores) {
-    /* floatProtoAdd(ores, ox, oy, 32);
-    __obliv_c__setPlainAddF(ores, ox, oy, 32); */
+    /* floatProtoAdd(ores, ox, oy, 32); */
+    __obliv_c__setPlainAddF(ores, ox, oy, 32);
     revealOblivFloat(&io->ores, ores, 0);
 }

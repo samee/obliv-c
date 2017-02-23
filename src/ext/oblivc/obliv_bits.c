@@ -1996,6 +1996,7 @@ void feedOblivInputs(OblivInputs* spec, size_t count, int party)
     { __obliv_c__##ot rv; \
       OblivInputs spec; \
       setupObliv##tname(&spec,&rv,v); \
+      spec.src_f = v; \
       feedOblivInputs(&spec,1,party); \
       return rv; \
     }\
