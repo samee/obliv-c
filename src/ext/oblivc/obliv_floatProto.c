@@ -141,7 +141,7 @@ void floatProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
     dest->knownValue = !dest->knownValue; 
 }
 
-void execThisFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+void execFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
     pd->currentParty = ocCurrentPartyDefault;
     pd->error = 0;
