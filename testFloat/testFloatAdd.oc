@@ -8,8 +8,8 @@ void floatAddi(void* args)
 {
     protocolIO *io = (protocolIO*) args;
 
-    float x;
-    float y;
+    float x = 0;
+    float y = 0;
     float z = 0;
     
     load_data(io, &x, &y, ocCurrentParty());
@@ -22,16 +22,22 @@ void floatAddi(void* args)
     printAsBinary(x);
     
     obliv_x = feedOblivFloat(x, 1);
+    float x_r = 0;
+    revealOblivFloat(&x_r, obliv_x, 1);
+    printAsBinary(x_r);
       
     printf("Y: %f\n", y);
     printAsBinary(y);
 
     obliv_y = feedOblivFloat(y, 2);
+    float y_r = 0;
+    revealOblivFloat(&y_r, obliv_y, 2);
+    printAsBinary(y_r);
 
     __obliv_c__setPlainAddF(&obliv_z, &obliv_x, &obliv_y, 32);
-    printf("Added!");
-    revealOblivFloat(&z, obliv_z, 0);
+    printf("Added!\n");
     
+    revealOblivFloat(&z, obliv_z, 0);
     printf("Res: %f\n", z);
     printAsBinary(z);
 

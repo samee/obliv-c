@@ -40,7 +40,7 @@ void printAsBinary(float x)
     printf("\n");
 }
 
-/*
+
 void printOblivBits(__obliv_c__float n)
 {
     int float_byte_size = sizeof(float);
@@ -51,6 +51,7 @@ void printOblivBits(__obliv_c__float n)
     printf("\n");
 }
 
+/*
 void printOblivInput(OblivInputs n)
 {
     int float_byte_size = sizeof(float);
@@ -103,6 +104,7 @@ int main(int argc, char *argv[])
     // Final initializations before entering protocol
     cp = (argv[2][0]=='1'? 1 : 2);
     setCurrentParty(&pd, cp); // only checks for a '1'
+    pd.thisParty = cp;
     if (cp == 1) {
         io.v = 1.2345;
     } else {

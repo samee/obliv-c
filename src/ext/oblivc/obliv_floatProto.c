@@ -21,24 +21,11 @@ static __thread ProtocolDesc *currentProto;
 static inline bool known(const OblivBit* o) { return !o->unknown; }
 #endif
 
-#ifndef FLOAT_PROTO
-#define FLOAT_PROTO
-
 //-------------------------- Float Protocol -----------------------------------
-
-int ocCurrentParty2() 
-{
-    return currentProto->currentParty(currentProto);
-}
 
 void floatFeedOblivFloat(OblivBit* dest, int party, bool a) 
 {
-    /**************************/
-    // This needs to be changed to ocCurrentParty()
-    // which is for some reason segfaulting..
     int curparty =  ocCurrentParty();
-    /**************************/
-
     dest->unknown = false; // Change this to true and fix accordingly.
     if(party == 1) {
         if (curparty == 1) {
@@ -61,7 +48,7 @@ void floatProtoFeedOblivInputs(ProtocolDesc* pd,
     int bit_number;
     int this_bit;
     while(count--){
-        unsigned char* float_bytes = (unsigned char*) &(spec->src);
+        unsigned char* float_bytes = (unsigned char*) &(spec->src_f);
         for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
             bit_number = i % byte_size;
             this_bit = (*float_bytes >> bit_number) & 1;
@@ -97,7 +84,6 @@ bool floatProtoRevealOblivBits(ProtocolDesc* pd,widest_t* dest,
     }
     widest_t rv = 0;
     memcpy(&rv, floatBytes, float_byte_size);
-
     if (currentProto->thisParty == 1) {
         if(party == 0 || party == 2) {
             osend(pd, 2, &rv, sizeof(rv));
@@ -116,6 +102,7 @@ bool floatProtoRevealOblivBits(ProtocolDesc* pd,widest_t* dest,
             return false;
         }
     }
+    printf("Revealed float\n");
 }
 
 void floatProtoSetBitAnd(ProtocolDesc* pd,
@@ -162,10 +149,8 @@ void execFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     pd->setBitXor = floatProtoSetBitXor;
     pd->setBitNot = floatProtoSetBitNot;
     pd->flipBit   = floatProtoFlipBit;
-    // currentProto = pd;
+    currentProto = pd;
     ocSetCurrentProto(pd);
     printf("Current Proto Set\n");
     start(arg);
 }
-
-#endif
