@@ -26,13 +26,20 @@ static inline bool known(const OblivBit* o) { return !o->unknown; }
 
 //-------------------------- Float Protocol -----------------------------------
 
+int ocCurrentParty2() 
+{
+    return currentProto->currentParty(currentProto);
+}
+
 void floatFeedOblivFloat(OblivBit* dest, int party, bool a) 
 {
     /**************************/
-    int curparty = ocCurrentParty();
+    // This needs to be changed to ocCurrentParty()
+    // which is for some reason segfaulting..
+    int curparty =  ocCurrentParty();
     /**************************/
 
-    dest->unknown = false; // true;
+    dest->unknown = false; // Change this to true and fix accordingly.
     if(party == 1) {
         if (curparty == 1) {
             dest->knownValue = a;
@@ -65,6 +72,7 @@ void floatProtoFeedOblivInputs(ProtocolDesc* pd,
         }
         spec++;
     }
+    printf("Float Input Fed\n");
 }
 
 bool floatProtoRevealOblivBits(ProtocolDesc* pd,widest_t* dest,
@@ -154,7 +162,9 @@ void execFloatProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
     pd->setBitXor = floatProtoSetBitXor;
     pd->setBitNot = floatProtoSetBitNot;
     pd->flipBit   = floatProtoFlipBit;
-    currentProto = pd;
+    // currentProto = pd;
+    ocSetCurrentProto(pd);
+    printf("Current Proto Set\n");
     start(arg);
 }
 

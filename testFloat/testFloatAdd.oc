@@ -11,10 +11,6 @@ void floatAddi(void* args)
     float x;
     float y;
     float z = 0;
-
-    /**************************/
-    // int curparty = ocCurrentParty2();
-    /**************************/
     
     load_data(io, &x, &y, ocCurrentParty());
 
@@ -25,37 +21,19 @@ void floatAddi(void* args)
     printf("X: %f\n", x);
     printAsBinary(x);
     
-    /*OblivInputs spec_x;
-    setupOblivFloat(&spec_x,&obliv_x,x);
-    spec_x.src_f = x;
-    feedOblivInputs(&spec_x, 1, 1);
-    printOblivBits(obliv_x);
-    printOblivInput(spec_x);*/
     obliv_x = feedOblivFloat(x, 1);
-    
-    
+      
     printf("Y: %f\n", y);
     printAsBinary(y);
 
-    /*OblivInputs spec_y;
-    setupOblivFloat(&spec_y,&obliv_y,y);
-    spec_y.src_f = y;
-    feedOblivInputs(&spec_y, 1, 2);
-    printOblivBits(obliv_y);
-    printOblivInput(spec_y);*/
     obliv_y = feedOblivFloat(y, 2);
 
-
-    /*OblivInputs spec_z;
-    setupOblivFloat(&spec_z,&obliv_z,z);
-    spec_z.src_f = z;*/
-
     __obliv_c__setPlainAddF(&obliv_z, &obliv_x, &obliv_y, 32);
-    // revealOblivFloat(&z, obliv_z, 32, 0);
+    printf("Added!");
     revealOblivFloat(&z, obliv_z, 0);
-    // printf("Res: %f\n", z);
-    // printAsBinary(z);
-    // printOblivBits(obliv_z);
+    
+    printf("Res: %f\n", z);
+    printAsBinary(z);
 
     io->ores = z;
 }
