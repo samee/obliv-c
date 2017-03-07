@@ -3,7 +3,7 @@ OCCPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/../ && pwd )"
 OCLIB=$OCCPATH/src/ext/oblivc
 COMPILE_ONLY=0
 CCARGS=""
-CILLYARGS=""
+CILLYARGS=
 OCSRC=()
 GCRYPT="-lgcrypt"
 if [ "$OBLIVC_BITS" = "no" ]; then
@@ -21,7 +21,7 @@ while [ $# -ge 1 ]; do
   shift
 done
 
-$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations  --keepunused --doprocessObliv --markImplicitCasts $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv $GCRYPT -pthread $CCARGS 
+$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations --keepunused --doprocessObliv --markImplicitCasts  $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv $GCRYPT -pthread $CCARGS 
 
 if false; then
 while [ $# -ge 1 ]; do
@@ -57,6 +57,6 @@ for src in ${OCSRC[*]}; do
   $OCCPATH/bin/cilobliv $src -I $OCLIB $CILLYARGS || exit
 done
 
-gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/_build $GCRYPT -pthread
+gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv  -L$OCCPATH/_build $GCRYPT -pthread
 fi
 
