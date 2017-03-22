@@ -41,12 +41,12 @@ void printAsBinary(float x)
 }
 
 
-void printOblivBits(__obliv_c__float n)
+void printOblivBits(OblivBit* n)
 {
     int float_byte_size = sizeof(float);
     int byte_size = sizeof(char) * 8;
     for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
-        printf("%i", n.bits[i].knownValue);
+        printf("%i", n[i].__annonCompField5.knownValue & 1);
     }
     printf("\n");
 }
