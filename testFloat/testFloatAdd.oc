@@ -25,6 +25,7 @@ void floatAddi(void* args)
     float x_r = 0;
     revealOblivFloat(&x_r, obliv_x, 1);
     printAsBinary(x_r);
+    printf("X_r: %f\n", x_r);
       
     printf("Y: %f\n", y);
     printAsBinary(y);
@@ -33,6 +34,7 @@ void floatAddi(void* args)
     float y_r = 0;
     revealOblivFloat(&y_r, obliv_y, 2);
     printAsBinary(y_r);
+    printf("Y_r: %f\n", y_r);
 
     __obliv_c__setPlainAddF(&obliv_z, &obliv_x, &obliv_y, 32);
     printf("Added!\n");

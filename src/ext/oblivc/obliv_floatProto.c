@@ -47,6 +47,7 @@ void floatProtoFeedOblivInputs(ProtocolDesc* pd,
     int byte_size = sizeof(char) * 8;
     int bit_number;
     int this_bit;
+    printf("Feeding: %f\n", spec->src_f);
     while(count--){
         unsigned char* float_bytes = (unsigned char*) &(spec->src_f);
         for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
@@ -69,6 +70,7 @@ bool floatProtoRevealOblivBits(ProtocolDesc* pd,widest_t* dest,
     int byte_size = sizeof(char) * 8;
     int tmp = 0;
     unsigned char floatBytes[float_byte_size];
+    // Zero out floatBytes allocation
     memcpy(floatBytes, (unsigned char*) &tmp, float_byte_size);
     int j = 0;
     unsigned char currentByte = floatBytes[j];
