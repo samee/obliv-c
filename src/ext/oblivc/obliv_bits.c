@@ -364,7 +364,14 @@ void protocolAddSizeCheck(ProtocolDesc* pd)
   t->cb.recv=sizeCheckRecv;
   t->cb.cleanup=sizeCheckCleanup;
 }
-// ---------------------------------------------------------------------------
+
+// --------------------------- Protocols -----------------------------------
+
+int ocCurrentParty() { return currentProto->currentParty(currentProto); }
+int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
+
+ProtocolDesc* ocCurrentProto() { return currentProto; }
+void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
 
 void cleanupProtocol(ProtocolDesc* pd)
   { pd->trans->cleanup(pd->trans); }
@@ -372,16 +379,7 @@ void cleanupProtocol(ProtocolDesc* pd)
 void setCurrentParty(ProtocolDesc* pd, int party)
   { pd->thisParty=party; }
 
-void __obliv_c__assignBitKnown(OblivBit* dest, bool value)
-  { dest->knownValue = value; dest->unknown=false; }
-
-void __obliv_c__copyBit(OblivBit* dest,const OblivBit* src)
-  { if(dest!=src) *dest=*src; }
-
-bool __obliv_c__bitIsKnown(bool* v,const OblivBit* bit)
-{ if(known(bit)) *v=bit->knownValue;
-  return known(bit);
-}
+// --------------------------- Debug Protocol ----------------------------
 
 // TODO all sorts of identical parameter optimizations
 // Implementation note: remember that all these pointers may alias each other
@@ -414,6 +412,66 @@ void dbgProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
 }
 void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest) 
   { dest->knownValue = !dest->knownValue; }
+
+static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
+{ 
+  int curparty = ocCurrentParty();
+  
+  dest->unknown=true;
+  if(party==1) { if(curparty==1) dest->knownValue=a; }
+  else if(party==2 && curparty == 1) 
+    orecv(currentProto,2,&dest->knownValue,sizeof(bool));
+  else if(party==2 && curparty == 2) osend(currentProto,1,&a,sizeof(bool));
+  else fprintf(stderr,"Error: This is a 2 party protocol\n");
+}
+
+void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
+    OblivInputs* spec,size_t count,int party)
+{ while(count--)
+  { int i;
+    widest_t v = spec->src;
+    for(i=0;i<spec->size;++i) 
+    { dbgFeedOblivBool(spec->dest+i,party,v&1);
+      v>>=1;
+    }
+    spec++;
+  }
+}
+
+bool dbgProtoRevealOblivBits
+  (ProtocolDesc* pd,widest_t* dest,const OblivBit* src,size_t size,int party)
+{ widest_t rv=0;
+  if(currentProto->thisParty==1)
+  { src+=size;
+    while(size-->0) rv = (rv<<1)+!!(--src)->knownValue;
+    if(party==0 || party==2) osend(pd,2,&rv,sizeof(rv));
+    if(party==2) return false;
+    else { *dest=rv; return true; }
+  }else // assuming thisParty==2
+  { if(party==0 || party==2) { orecv(pd,1,dest,sizeof(*dest)); return true; }
+    else return false;
+  }
+}
+
+bool ocInDebugProto(void) { return ocCurrentProto()->extra==NULL; }
+
+void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
+{
+  pd->currentParty = ocCurrentPartyDefault;
+  pd->error = 0;
+  pd->feedOblivInputs = dbgProtoFeedOblivInputs;
+  pd->revealOblivBits = dbgProtoRevealOblivBits;
+  pd->setBitAnd = dbgProtoSetBitAnd;
+  pd->setBitOr  = dbgProtoSetBitOr;
+  pd->setBitXor = dbgProtoSetBitXor;
+  pd->setBitNot = dbgProtoSetBitNot;
+  pd->flipBit   = dbgProtoFlipBit;
+  pd->partyCount= 2;
+  pd->extra = NULL;
+  currentProto = pd;
+  currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
+  start(arg);
+}
 
 //-------------------- Yao Protocol (honest but curious) -------------
 
@@ -1151,6 +1209,9 @@ void yaoEHalfSwapGate(ProtocolDesc* pd,
   }
   free(x);
 }
+
+// --------------------------- NNOB protocol ---------------------------------
+
 /*void nnobAndGatesCount(ProtocolDesc* pd, protocol_run start, void* arg)*/
 /*{*/
   /*pd->currentParty = ocCurrentPartyDefault;*/
@@ -1289,6 +1350,19 @@ void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOT
 }
 #endif // ENABLE_NNOB
 
+// --------------------------- Obliv-c primitives --------------------------------
+
+void __obliv_c__assignBitKnown(OblivBit* dest, bool value)
+  { dest->knownValue = value; dest->unknown=false; }
+
+void __obliv_c__copyBit(OblivBit* dest,const OblivBit* src)
+  { if(dest!=src) *dest=*src; }
+
+bool __obliv_c__bitIsKnown(bool* v,const OblivBit* bit)
+{ if(known(bit)) *v=bit->knownValue;
+  return known(bit);
+}
+
 void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   if(known(a) || known(b))
@@ -1297,6 +1371,7 @@ void __obliv_c__setBitAnd(OblivBit* dest,const OblivBit* a,const OblivBit* b)
     else __obliv_c__assignBitKnown(dest,false);
   }else currentProto->setBitAnd(currentProto,dest,a,b);
 }
+
 void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   if(known(a) || known(b))
@@ -1305,6 +1380,7 @@ void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b)
     else __obliv_c__assignBitKnown(dest,true);
   }else currentProto->setBitOr(currentProto,dest,a,b);
 }
+
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
 {
   bool v;
@@ -1324,55 +1400,11 @@ void __obliv_c__flipBit(OblivBit* dest)
   else currentProto->flipBit(currentProto,dest); 
 }
 
-static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
-{ 
-  int curparty = ocCurrentParty();
-  
-  dest->unknown=true;
-  if(party==1) { if(curparty==1) dest->knownValue=a; }
-  else if(party==2 && curparty == 1) 
-    orecv(currentProto,2,&dest->knownValue,sizeof(bool));
-  else if(party==2 && curparty == 2) osend(currentProto,1,&a,sizeof(bool));
-  else fprintf(stderr,"Error: This is a 2 party protocol\n");
-}
-  /*
-void __obliv_c__feedOblivBits(OblivBit* dest, int party
-                             ,const bool* src,size_t size)
-  { while(size--) __obliv_c__feedOblivBool(dest++,party,*(src++)); }
-*/
-
 void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
                                      ,widest_t v,size_t size)
 { spec->dest=dest;
   spec->src=v;
   spec->size=size;
-}
-void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
-    OblivInputs* spec,size_t count,int party)
-{ while(count--)
-  { int i;
-    widest_t v = spec->src;
-    for(i=0;i<spec->size;++i) 
-    { dbgFeedOblivBool(spec->dest+i,party,v&1);
-      v>>=1;
-    }
-    spec++;
-  }
-}
-
-bool dbgProtoRevealOblivBits
-  (ProtocolDesc* pd,widest_t* dest,const OblivBit* src,size_t size,int party)
-{ widest_t rv=0;
-  if(currentProto->thisParty==1)
-  { src+=size;
-    while(size-->0) rv = (rv<<1)+!!(--src)->knownValue;
-    if(party==0 || party==2) osend(pd,2,&rv,sizeof(rv));
-    if(party==2) return false;
-    else { *dest=rv; return true; }
-  }else // assuming thisParty==2
-  { if(party==0 || party==2) { orecv(pd,1,dest,sizeof(*dest)); return true; }
-    else return false;
-  }
 }
 
 static void broadcastBits(int source,void* p,size_t n)
@@ -1383,35 +1415,9 @@ static void broadcastBits(int source,void* p,size_t n)
       osend(currentProto,i,p,n);
 }
 
-void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
-{
-  pd->currentParty = ocCurrentPartyDefault;
-  pd->error = 0;
-  pd->feedOblivInputs = dbgProtoFeedOblivInputs;
-  pd->revealOblivBits = dbgProtoRevealOblivBits;
-  pd->setBitAnd = dbgProtoSetBitAnd;
-  pd->setBitOr  = dbgProtoSetBitOr;
-  pd->setBitXor = dbgProtoSetBitXor;
-  pd->setBitNot = dbgProtoSetBitNot;
-  pd->flipBit   = dbgProtoFlipBit;
-  pd->partyCount= 2;
-  pd->extra = NULL;
-  currentProto = pd;
-  currentProto->debug.mulCount = currentProto->debug.xorCount = 0;
-  start(arg);
-}
-
 bool __obliv_c__revealOblivBits (widest_t* dest, const OblivBit* src
                                 ,size_t size, int party)
   { return currentProto->revealOblivBits(currentProto,dest,src,size,party); }
-
-int ocCurrentParty() { return currentProto->currentParty(currentProto); }
-int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
-
-ProtocolDesc* ocCurrentProto() { return currentProto; }
-void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
-
-bool ocInDebugProto(void) { return ocCurrentProto()->extra==NULL; }
 
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)
