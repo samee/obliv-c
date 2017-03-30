@@ -10,6 +10,7 @@
 //   keep it a valid obliv-C file after preprocessing. So e.g., no magic
 //   conversion from obliv int to OblivBits* inside inline functions.
 //   In fact, user code should never be aware of OblivBits type.
+void transportEnableProfiling(bool);
 void protocolUseStdio(ProtocolDesc*);
 void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient);
 void protocolUseTcp2PKeepAlive(ProtocolDesc* pd,int sock,bool isClient);
@@ -32,5 +33,6 @@ bool execNpProtocol_Bcast1(ProtocolDesc* pd, protocol_run start, void* arg);
 void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOTs, bool useAltOTExt);
 
 size_t tcp2PBytesSent(ProtocolDesc* pd);
+size_t tcp2PFlushCount(ProtocolDesc* pd);
 
 #endif // OBLIV_H
