@@ -109,13 +109,9 @@ static int tcp2PSendProfiled(ProtocolTransport* pt,int dest,const void* s,size_t
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { 
+  struct tcp2PTransport* tcpt = CAST(pt);
   int res=0,n2=0;
-	struct tcp2PTransport* tcpt = CAST(pt);
-	if(tcpt->needFlush)
-	{
-		fflush(tcpt->sockStream);	
-		tcpt->needFlush=false;
-	}
+	pt->flush(pt);
   while(n>n2)
   { 
     res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
@@ -125,11 +121,25 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
   return res;
 }
 
-static int tcp2PRecvProfiled(ProtocolTransport* pt,int src,void* s,size_t n)
+static int tcp2PFlush(ProtocolTransport* pt)
+{
+  struct tcp2PTransport* tcpt = CAST(pt);
+  if(tcpt->needFlush)
+  {
+    tcpt->needFlush=false;
+    return fflush(tcpt->sockStream); 
+  }
+  else
+  {
+    return 0;
+  }
+}
+
+static int tcp2PFlushProfiled(ProtocolTransport* pt)
 {
   struct tcp2PTransport* tcpt = CAST(pt);
   if(tcpt->needFlush) tcpt->flushCount++;
-  return tcp2PRecv(pt, src, s, n);
+  return tcp2PFlush(pt);
 }
 
 static void tcp2PCleanup(ProtocolTransport* pt)
@@ -163,14 +173,14 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
 static ProtocolTransport* tcp2PSplitProfiled(ProtocolTransport* tsrc);
 
 static const tcp2PTransport tcp2PTransportTemplate
-  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv,
+  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv, .flush=tcp2PFlush,
       .cleanup = tcp2PCleanup},
      .sock=0, .isClient=0, .needFlush=false, .bytes=0, .flushCount=0,
      .parent=NULL};
 
 static const tcp2PTransport tcp2PProfiledTransportTemplate
-  = {{.maxParties=2, .split=tcp2PSplitProfiled, .send=tcp2PSendProfiled, .recv=tcp2PRecvProfiled,
-      .cleanup = tcp2PCleanupProfiled},
+  = {{.maxParties=2, .split=tcp2PSplitProfiled, .send=tcp2PSendProfiled, .recv=tcp2PRecv,
+     .flush=tcp2PFlushProfiled, .cleanup = tcp2PCleanupProfiled},
      .sock=0, .isClient=0, .needFlush=false, .bytes=0, .flushCount=0,
      .parent=NULL};
 
@@ -373,8 +383,40 @@ int ocCurrentPartyDefault(ProtocolDesc* pd) { return pd->thisParty; }
 ProtocolDesc* ocCurrentProto() { return currentProto; }
 void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
 
+void ocSplitProto(ProtocolDesc* pdout, ProtocolDesc * pdin)
+{
+  *pdout = (struct ProtocolDesc) {
+    .error = pdin->error,
+    .partyCount = pdin->error,
+    .currentParty = pdin->currentParty,
+    .feedOblivInputs = pdin->feedOblivInputs,
+    .revealOblivBits = pdin->revealOblivBits,
+    .setBitAnd = pdin->setBitAnd,
+    .setBitOr = pdin->setBitOr,
+    .setBitXor = pdin->setBitXor,
+    .setBitNot = pdin->setBitNot,
+    .flipBit = pdin->flipBit,
+    .thisParty = pdin->thisParty,
+    .trans = pdin->trans->split(pdin->trans),
+    .splitextra = pdin->splitextra,
+    .cleanextra = pdin->cleanextra,
+    .extra = NULL
+  };
+  if (pdout->splitextra != NULL && pdin->extra != NULL) pdout->splitextra(pdout, pdin);
+  oflush(pdin); oflush(pdout);
+}
+
+void ocCleanupProto(ProtocolDesc* pd)
+  {
+    pd->trans->cleanup(pd->trans);
+    if (pd->extra != NULL) pd->cleanextra(pd);
+  }
+
 void cleanupProtocol(ProtocolDesc* pd)
-  { pd->trans->cleanup(pd->trans); }
+{
+  ocCleanupProto(pd);
+}
+
 
 void setCurrentParty(ProtocolDesc* pd, int party)
   { pd->thisParty=party; }
@@ -635,7 +677,7 @@ void yaoSetHashMask(YaoProtocolDesc* ypd,
 // Why am I using SHA1 as a PRG? Not necessarily safe. TODO change to AES
 void yaoKeyNewPair(YaoProtocolDesc* pd,yao_key_t w0,yao_key_t w1)
 {
-  unsigned* ic = &pd->icount;
+  uint64_t* ic = &pd->icount;
   char buf[YAO_KEY_BYTES+sizeof(*ic)], dest[20];
   memcpy(buf,pd->I,YAO_KEY_BYTES);
   memcpy(buf+YAO_KEY_BYTES,ic,sizeof(*ic));
@@ -935,7 +977,7 @@ void yaoEvaluateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
 }
 
 uint64_t yaoGateCount()
-{ uint64_t rv = ((YaoProtocolDesc*)currentProto->extra)->gcount;
+{ uint64_t rv = ((YaoProtocolDesc*)currentProto->extra)->gcount - ((YaoProtocolDesc*)currentProto->extra)->gcount_offset;
   if(currentProto->setBitAnd==yaoGenerateAndPair
       || currentProto->setBitAnd==yaoEvaluateHalfGatePair) // halfgate
     return rv/2;
@@ -954,9 +996,36 @@ void yaoUseNpot(ProtocolDesc* pd,int me)
 // Used with yaoUseNpot
 void yaoReleaseOt(ProtocolDesc* pd,int me)
 { YaoProtocolDesc* ypd = pd->extra;
-  if(me==1) otSenderRelease(&ypd->sender);
-  else otRecverRelease(&ypd->recver);
+  if (ypd->ownOT) {
+    if(me==1) otSenderRelease(&ypd->sender);
+    else otRecverRelease(&ypd->recver);
+  }
 }
+
+void splitYaoProtocolExtra(ProtocolDesc* pdout, ProtocolDesc * pdin) {
+  YaoProtocolDesc* ypdin = pdin->extra;
+  YaoProtocolDesc* ypdout = malloc(sizeof(YaoProtocolDesc));
+  pdout->extra=ypdout;
+
+  ypdout->protoType = ypdin->protoType;
+  ypdout->extra = NULL;
+  ypdout->icount = ypdout->ocount = 0;
+  ypdout->ownOT = true; // For now we don't do anything special for OT on forked protocols
+  gcry_cipher_open(&ypdout->fixedKeyCipher,yaoFixedKeyAlgo,GCRY_CIPHER_MODE_ECB,0);
+  gcry_cipher_setkey(ypdout->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
+  if (pdout->thisParty == 1) {
+    memcpy(ypdout->R,ypdin->R,YAO_KEY_BYTES);
+    gcry_randomize(ypdout->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    gcry_randomize(&ypdout->gcount_offset,sizeof(ypdout->gcount_offset),GCRY_STRONG_RANDOM);
+    osend(pdout,2,&ypdout->gcount_offset,sizeof(ypdout->gcount_offset));
+    ypdout->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pdout,2));
+  } else {
+    orecv(pdout,1,&ypdout->gcount_offset,sizeof(ypdout->gcount_offset));
+    ypdout->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pdout,1));
+  }
+  ypdout->gcount = ypdout->gcount_offset;
+}
+
 /* execYaoProtocol is divided into 2 parts which are reused by other
    protocols such as DualEx */
 void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
@@ -989,6 +1058,9 @@ void setupYaoProtocol(ProtocolDesc* pd,bool halfgates)
   dhRandomInit();
   gcry_cipher_open(&ypd->fixedKeyCipher,yaoFixedKeyAlgo,GCRY_CIPHER_MODE_ECB,0);
   gcry_cipher_setkey(ypd->fixedKeyCipher,yaoFixedKey,sizeof(yaoFixedKey)-1);
+
+  pd->splitextra = splitYaoProtocolExtra;
+  pd->cleanextra = cleanupYaoProtocol;
 }
 
 // point_and_permute should always be true.
@@ -998,8 +1070,8 @@ void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
 {
   YaoProtocolDesc* ypd = pd->extra;
   int me = pd->thisParty;
-  bool ownOT=false;
-  ypd->gcount = ypd->icount = ypd->ocount = 0;
+  ypd->ownOT=false;
+  ypd->gcount = ypd->gcount_offset = ypd->icount = ypd->ocount = 0;
   if(me==1)
   {
     gcry_randomize(ypd->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
@@ -1007,29 +1079,26 @@ void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
     if(point_and_permute) ypd->R[0] |= 1;   // flipper bit
 
     if(ypd->sender.sender==NULL)
-    { ownOT=true;
+    { ypd->ownOT=true;
       ypd->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
     }
   }else 
     if(ypd->recver.recver==NULL)
-    { ownOT=true;
+    { ypd->ownOT=true;
       ypd->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,1));
     }
 
   currentProto = pd;
   start(arg);
-
-  if(ownOT)
-  { if(me==1) otSenderRelease(&ypd->sender);
-    else otRecverRelease(&ypd->recver);
-  }
 }
 
 void cleanupYaoProtocol(ProtocolDesc* pd)
 {
   YaoProtocolDesc* ypd = pd->extra;
   gcry_cipher_close(ypd->fixedKeyCipher);
+  yaoReleaseOt(pd, pd->thisParty);
   free(ypd);
+  pd->extra = NULL;
 }
 
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
@@ -1043,7 +1112,7 @@ void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   setupYaoProtocol(pd,false);
   mainYaoProtocol(pd,true,start,arg);
-  free(pd->extra);
+  cleanupYaoProtocol(pd);
 }
 
 // Special purpose gates, meant to be used if you like doing low-level

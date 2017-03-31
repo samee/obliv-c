@@ -64,6 +64,11 @@ struct ProtocolDesc {
 
   void* extra;  // protocol-specific information
                 // First field should be char protoType
+
+  // helper functions to split extra protocol info for new threads, and clean up
+  // split protocols when they're done
+  void (*splitextra)(ProtocolDesc*,ProtocolDesc*);
+  void (*cleanextra)(ProtocolDesc*);
 };
 
 #define OC_DYN_EXTRA_FUN(fname,Type1,Type2,type2Id)    \
@@ -105,8 +110,9 @@ typedef OTrecver COTrecver; // Strong typedef would have been nice
 typedef struct YaoProtocolDesc {
   char protoType;
   yao_key_t R,I; // LSB of R needs to be 1
-  uint64_t gcount;
-  unsigned icount, ocount;
+  uint64_t gcount, gcount_offset;
+  uint64_t icount, ocount;
+  bool ownOT;
   void (*nonFreeGate)(struct ProtocolDesc*,OblivBit*,char,
       const OblivBit*,const OblivBit*);
   union { OTsender sender; OTrecver recver; };
@@ -126,6 +132,7 @@ struct ProtocolTransport {
   ProtocolTransport* (*split)(ProtocolTransport*);
   int (*send)(ProtocolTransport*,int,const void*,size_t);
   int (*recv)(ProtocolTransport*,int,      void*,size_t);
+  int (*flush)(ProtocolTransport*);
   void (*cleanup)(ProtocolTransport*);
 };
 
