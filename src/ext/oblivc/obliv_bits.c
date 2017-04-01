@@ -25,14 +25,6 @@ static __thread ProtocolDesc *currentProto;
 
 static inline bool known(const OblivBit* o) { return !o->unknown; }
 
-// --------------------------- Transports -----------------------------------
-
-static bool transportProfilingEnabled = false;
-
-void setTransportProfiling(bool newVal) {
-  transportProfilingEnabled = newVal;
-}
-
 // --------------------------- STDIO trans -----------------------------------
 
 struct stdioTransport
@@ -73,6 +65,7 @@ typedef struct tcp2PTransport
 { ProtocolTransport cb;
   int sock;
   bool isClient;
+  bool isProfiled;
   FILE* sockStream;
   bool needFlush;
   bool keepAlive;
@@ -188,14 +181,15 @@ static const tcp2PTransport tcp2PProfiledTransportTemplate
 // its value doesn't matter. In that case, it indicates which party should be
 // the server vs. client for the new connections (which is usually the same as
 // the old roles).
-static tcp2PTransport* tcp2PNew(int sock,bool isClient)
+static tcp2PTransport* tcp2PNew(int sock,bool isClient, bool isProfiled)
 { tcp2PTransport* trans = malloc(sizeof(*trans));
-  if (transportProfilingEnabled) {
+  if (isProfiled) {
     *trans = tcp2PProfiledTransportTemplate;  
   } else {
     *trans = tcp2PTransportTemplate;
   }
   trans->sock = sock;
+  trans->isProfiled=isProfiled;
   trans->isClient=isClient;
   trans->sockStream=fdopen(sock, "rb+");
   trans->sinceFlush = 0;
@@ -207,14 +201,21 @@ static tcp2PTransport* tcp2PNew(int sock,bool isClient)
 
 void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient)
 { 
-  pd->trans = &tcp2PNew(sock,isClient)->cb; 
+  pd->trans = &tcp2PNew(sock,isClient, false)->cb; 
+  tcp2PTransport* t = CAST(pd->trans);
+  t->keepAlive = false;
+}
+
+void protocolUseTcp2PProfiled(ProtocolDesc* pd,int sock,bool isClient)
+{ 
+  pd->trans = &tcp2PNew(sock,isClient, true)->cb; 
   tcp2PTransport* t = CAST(pd->trans);
   t->keepAlive = false;
 }
 
 void protocolUseTcp2PKeepAlive(ProtocolDesc* pd,int sock,bool isClient)
 { 
-  pd->trans = &tcp2PNew(sock,isClient)->cb; 
+  pd->trans = &tcp2PNew(sock,isClient, false)->cb; 
   tcp2PTransport* t = CAST(pd->trans);
   t->keepAlive = true;
 }
@@ -247,6 +248,15 @@ int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port)
   return 0;
 }
 
+int protocolConnectTcp2PProfiled(ProtocolDesc* pd,const char* server,const char* port)
+{
+  struct sockaddr_in sa;
+  if(getsockaddr(server,port,(struct sockaddr*)&sa)<0) return -1; // dns error
+  int sock=tcpConnect(&sa); if(sock<0) return -1;
+  protocolUseTcp2PProfiled(pd,sock,true);
+  return 0;
+}
+
 // used as sock=tcpListenAny(...); sock2=accept(sock); ...; close(both);
 static int tcpListenAny(const char* portn)
 {
@@ -271,6 +281,16 @@ int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port)
   listenSock = tcpListenAny(port);
   if((sock=accept(listenSock,0,0))<0) return -1;
   protocolUseTcp2P(pd,sock,false);
+  close(listenSock);
+  return 0;
+}
+
+int protocolAcceptTcp2PProfiled(ProtocolDesc* pd,const char* port)
+{
+  int listenSock, sock;
+  listenSock = tcpListenAny(port);
+  if((sock=accept(listenSock,0,0))<0) return -1;
+  protocolUseTcp2PProfiled(pd,sock,false);
   close(listenSock);
   return 0;
 }
@@ -319,7 +339,7 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
   // I should really rewrite sockSplit to use FILE* sockStream
   int newsock = sockSplit(t->sock,tsrc,t->isClient);
   if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
-  tcp2PTransport* tnew = tcp2PNew(newsock,t->isClient);
+  tcp2PTransport* tnew = tcp2PNew(newsock,t->isClient,t->isProfiled);
   tnew->parent=t;
   return CAST(tnew);
 }
