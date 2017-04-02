@@ -104,7 +104,7 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { 
   struct tcp2PTransport* tcpt = CAST(pt);
   int res=0,n2=0;
-  pt->flush(pt);
+  transFlush(pt);
   while(n>n2)
   { 
     res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
@@ -163,7 +163,6 @@ FILE* transGetFile(ProtocolTransport* t)
 }
 
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc);
-static ProtocolTransport* tcp2PSplitProfiled(ProtocolTransport* tsrc);
 
 static const tcp2PTransport tcp2PTransportTemplate
   = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSend, .recv=tcp2PRecv, .flush=tcp2PFlush,
@@ -172,7 +171,7 @@ static const tcp2PTransport tcp2PTransportTemplate
      .parent=NULL};
 
 static const tcp2PTransport tcp2PProfiledTransportTemplate
-  = {{.maxParties=2, .split=tcp2PSplitProfiled, .send=tcp2PSendProfiled, .recv=tcp2PRecv,
+  = {{.maxParties=2, .split=tcp2PSplit, .send=tcp2PSendProfiled, .recv=tcp2PRecv,
      .flush=tcp2PFlushProfiled, .cleanup = tcp2PCleanupProfiled},
      .sock=0, .isClient=0, .needFlush=false, .bytes=0, .flushCount=0,
      .parent=NULL};
@@ -325,7 +324,7 @@ static int sockSplit(int sock,ProtocolTransport* t,bool isClient)
     if(getsockname(listenSock,(struct sockaddr*)&sa,&sz)<0) return -1;
     //if(write(sock,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
     if(transSend(t,0,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
-    fflush(((tcp2PTransport*)t)->sockStream); 
+    transFlush(t);
     int newsock = accept(listenSock,0,0);
     close(listenSock);
     return newsock;
@@ -335,22 +334,13 @@ static int sockSplit(int sock,ProtocolTransport* t,bool isClient)
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
 {
   tcp2PTransport* t = CAST(tsrc);
-  fflush(t->sockStream); 
+  transFlush(tsrc); 
   // I should really rewrite sockSplit to use FILE* sockStream
   int newsock = sockSplit(t->sock,tsrc,t->isClient);
   if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
   tcp2PTransport* tnew = tcp2PNew(newsock,t->isClient,t->isProfiled);
   tnew->parent=t;
   return CAST(tnew);
-}
-
-static ProtocolTransport* tcp2PSplitProfiled(ProtocolTransport* tsrc)
-{
-  tcp2PTransport* t = CAST(tsrc);
-  ((tcp2PTransport*)t)->flushCount+=2;
-  if(!t->isClient) t->bytes+=sizeof(in_port_t);
-  
-  return tcp2PSplit(tsrc);
 }
 
 typedef struct 
