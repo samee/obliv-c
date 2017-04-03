@@ -105,10 +105,10 @@ $(OCAMLBUILD_TARGETS): ocamlbuild
 	@:
 
 # ------ these lines were added for obliv-C runtime -----------
-ifeq ($(RELEASE),1)
-  CFLAGS=-O3
-else
+ifeq ($(DEBUG),1)
   CFLAGS=-g
+else
+  CFLAGS=-O3
 endif
 DEPENDDIR = $(OBJDIR)/depends
 OCSRCDIR = src/ext/oblivc

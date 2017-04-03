@@ -10,7 +10,10 @@
 // import common types
 #include<obliv_types_internal.h>
 
+ProtocolDesc* ocCurrentProto(void);
 void ocSetCurrentProto(ProtocolDesc* pd);
+void ocSplitProto(ProtocolDesc*, ProtocolDesc*);
+void ocCleanupProto(ProtocolDesc*);
 
 #define __bitsize(type) (8*sizeof(type))
 

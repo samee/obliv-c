@@ -13,13 +13,8 @@
 
 struct OcShareContext
 {
-#ifdef USE_PLAIN_OT
   OTsender sender;
   OTrecver recver;
-#else
-  struct HonestOTExtSender* sender;
-  struct HonestOTExtRecver* recver;
-#endif
   BCipherRandomGen *gen,*padder;
   size_t padnonce;
 };
@@ -36,7 +31,6 @@ void ocShareInit(ProtocolDesc* pd)
   ctx->gen = newBCipherRandomGen();
   ctx->padder = newBCipherRandomGen();
   ctx->padnonce = 0;
-#ifdef USE_PLAIN_OT
   if(me==1)
   { ctx->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
     ctx->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,2));
@@ -44,15 +38,6 @@ void ocShareInit(ProtocolDesc* pd)
   { ctx->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,1));
     ctx->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,1));
   }
-#else
-  if(me==1)
-  { ctx->sender = honestOTExtSenderNew(pd,2);
-    ctx->recver = honestOTExtRecverNew(pd,2);
-  }else
-  { ctx->recver = honestOTExtRecverNew(pd,1);
-    ctx->sender = honestOTExtSenderNew(pd,1);
-  }
-#endif
   // TODO eventually I should move this to a dedicated
   // That would also allow proper splitting on multithreaded
   ypd->extra = ctx;
@@ -66,13 +51,8 @@ void ocShareCleanup(ProtocolDesc* pd)
 {
   YaoProtocolDesc* ypd = pd->extra;
   struct OcShareContext* ctx = ypd->extra;
-#ifdef USE_PLAIN_OT
   otSenderRelease(&ctx->sender);
   otRecverRelease(&ctx->recver);
-#else
-  honestOTExtSenderRelease(ctx->sender);
-  honestOTExtRecverRelease(ctx->recver);
-#endif
   releaseBCipherRandomGen(ctx->gen);
   releaseBCipherRandomGen(ctx->padder);
   free(ctx);
@@ -183,7 +163,6 @@ void ocShareMuxes(ProtocolDesc* pd,char* z,
   struct OcShareContext* ctx = protoShareCtx(pd);
   int i;
   memcpy(t2,x0,bufsz); memxor(t2,x1,bufsz); // t2 = x0^x1
-#ifdef USE_PLAIN_OT
   randomizeBuffer(ctx->gen,t,bufsz);
   memxor(t2,t,bufsz);
   if(protoCurrentParty(pd)==1)
@@ -193,18 +172,6 @@ void ocShareMuxes(ProtocolDesc* pd,char* z,
   { ctx->recver.recv(ctx->recver.recver,tr,c,n,eltsize);
     ctx->sender.send(ctx->sender.sender,t,t2,n,eltsize);
   }
-#else
-  struct CorrFunXorArgs a = {.len=eltsize,.mask=t2};
-  if(protoCurrentParty(pd)==1)
-  { genrGateToShare(pd,ctx,t,t2,wc,n,eltsize);
-    //honestCorrelatedOTExtSend1Of2(ctx->sender,t,t3,n,eltsize,corrFunXor,&a);
-    honestCorrelatedOTExtRecv1Of2(ctx->recver,tr,c,n,eltsize);
-  }else
-  { evalGateToShare(pd,ctx,tr,wc,n,eltsize);
-    //honestCorrelatedOTExtRecv1Of2(ctx->recver,tr,c,n,eltsize);
-    honestCorrelatedOTExtSend1Of2(ctx->sender,t,t3,n,eltsize,corrFunXor,&a);
-  }
-#endif
   for(i=0;i<n;++i) memmove(z+i*eltsize,(c[i]?x1:x0)+i*eltsize,eltsize);
   memxor(z,tr,bufsz);
   memxor(z,t ,bufsz);
@@ -260,21 +227,26 @@ void ocFromShared_impl(ProtocolDesc* pd,
   // Let's go with malloc for now, we change that later.
   struct OcShareContext* ctx = protoShareCtx(pd);
   YaoProtocolDesc* ypd = pd->extra;
+  OTsender* sender;
+  OTrecver* recver;
+  if (ctx == NULL) {
+    sender = &ypd->sender;
+    recver = &ypd->recver;
+  } else {
+    sender = &ctx->sender;
+    recver = &ctx->recver;
+  }
+
+  
+
   int i,j,p = pd->currentParty(pd);
   if(p==1)
   {
     yao_key_t *key0 = malloc(n*bits*YAO_KEY_BYTES);
     yao_key_t *key1 = malloc(n*bits*YAO_KEY_BYTES);
-#ifdef USE_PLAIN_OT
     for(i=0;i<n*bits;++i) yaoKeyNewPair(ypd,key0[i],key1[i]);
-    ctx->sender.send(ctx->sender.sender,
+    sender->send(sender->sender,
                      (char*)key0,(char*)key1,n*bits,YAO_KEY_BYTES);
-#else
-    struct CorrFunXorArgs a = {.len=YAO_KEY_BYTES,.mask=ypd->R};
-    honestCorrelatedOTExtSend1Of2(ctx->sender,
-        (char*)key0,(char*)key1,n*bits,YAO_KEY_BYTES,corrFunSameXor,&a);
-    ypd->icount+=n*bits;
-#endif
     for(i=0;i<n;++i)
     { OblivBit* dbit = __obliv_c__bits(i*bytes+(char*)dest);
       for(j=0;j<bits;++j)
@@ -292,12 +264,7 @@ void ocFromShared_impl(ProtocolDesc* pd,
     yao_key_t *key = malloc(n*bits*YAO_KEY_BYTES);
     bool *sel = malloc(n*bits*sizeof(bool));
     unpackBools(sel,n*bits,src);
-#ifdef USE_PLAIN_OT
-    ctx->recver.recv(ctx->recver.recver,(char*)key,sel,n*bits,YAO_KEY_BYTES);
-#else
-    honestCorrelatedOTExtRecv1Of2(ctx->recver,(char*)key,sel,n*bits,
-        YAO_KEY_BYTES);
-#endif
+    recver->recv(recver->recver,(char*)key,sel,n*bits,YAO_KEY_BYTES);
     ypd->icount+=n*bits;
     for(i=0;i<n;++i)
     { OblivBit* dbit = __obliv_c__bits(i*bytes+(char*)dest);

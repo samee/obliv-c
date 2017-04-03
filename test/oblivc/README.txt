@@ -1,11 +1,12 @@
 Folders:
-  common/   - Utility files used by test cases
-  editdist/ - Computes Levenstein distance between strings
-  hamming/  - Computes hamming distance between strings
-  million/  - Compares two int to see which is greater
-  aes/      - Computes AES of a single block (with key expansion)
-  ottest/   - Various microbenchmarks for OT protocols
-  psi/      - Private set intersection between sets of random ints
+  common/     - Utility files used by test cases
+  editdist/   - Computes Levenstein distance between strings
+  hamming/    - Computes hamming distance between strings
+  million/    - Compares two int to see which is greater
+  aes/        - Computes AES of a single block (with key expansion)
+  ottest/     - Various microbenchmarks for OT protocols
+  psi/        - Private set intersection between sets of random ints
+  protosplit/ - Tests for multithreading and protocol splitting
 
 To run these tests (assuming the project has been already built), you should
 just go to the folder and run the respective Makefile. This should give you

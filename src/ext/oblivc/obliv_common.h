@@ -2,6 +2,7 @@
 #define OBLIV_COMMON_H
 
 #include<obliv_types.h>
+#include<obliv_bits.h>
 //#include<stdio.h>
 //FILE* transGetFile(ProtocolTransport* t); // Debugging API
 
@@ -10,8 +11,6 @@
 // Java-style redundant "say the type twice" practice
 #define CAST(p) ((void*)p)
 
-struct ProtocolDesc* ocCurrentProto(void);
-int ocCurrentParty(void);
 static inline int protoCurrentParty(ProtocolDesc* pd)
     { return pd->currentParty(pd); }
 static inline char ocCurrentProtoType()
@@ -24,10 +23,15 @@ static inline int transSend(ProtocolTransport* t,int d,const void* p,size_t n)
   { return t->send(t,d,p,n); }
 static inline int transRecv(ProtocolTransport* t,int s,void* p,size_t n)
   { return t->recv(t,s,p,n); }
+static inline int transFlush(ProtocolTransport* t)
+  { if (t->flush) return t->flush(t); else return 0; }
 static inline int osend(ProtocolDesc* pd,int d,const void* p,size_t n)
   { return transSend(pd->trans,d,p,n); }
 static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)
   { return transRecv(pd->trans,s,p,n); }
+static inline int oflush(ProtocolDesc* pd)
+  { return transFlush(pd->trans); }
+
 
 // Maybe these 5 lines should move to bcrandom.h
 #define DHCurveName "secp256r1"
