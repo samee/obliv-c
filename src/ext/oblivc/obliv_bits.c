@@ -415,7 +415,6 @@ void ocSplitProto(ProtocolDesc* pdout, ProtocolDesc * pdin)
     .extra = NULL
   };
   if (pdout->splitextra != NULL && pdin->extra != NULL) pdout->splitextra(pdout, pdin);
-  oflush(pdin); oflush(pdout);
 }
 
 void ocCleanupProto(ProtocolDesc* pd)
@@ -1032,6 +1031,7 @@ void splitYaoProtocolExtra(ProtocolDesc* pdout, ProtocolDesc * pdin) {
     ypdout->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pdout,1));
   }
   ypdout->gcount = ypdout->gcount_offset;
+  oflush(pdin); oflush(pdout);
 }
 
 /* execYaoProtocol is divided into 2 parts which are reused by other
