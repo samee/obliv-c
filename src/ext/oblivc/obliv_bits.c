@@ -43,16 +43,23 @@ static int stdioSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 
 static int stdioRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { 
-  bool *p = stdioFlushFlag(pt);
-  if(*p) { fflush(stdout); *p=false; }
+  pt->flush(pt);
   return fread(s,1,n,stdin); 
 }
 
-static void stdioCleanup(ProtocolTransport* pt) {}
+static int stdioFlush(ProtocolTransport* pt) {
+  bool *p = stdioFlushFlag(pt);
+  if(*p) { fflush(stdout); *p=false; }
+}
+
+static void stdioCleanup(ProtocolTransport* pt) {
+  pt->flush(pt);
+}
 
 // Extremely simple, no multiplexing: two parties, one connection
-static struct stdioTransport stdioTransport 
-  = {{2, NULL, stdioSend, stdioRecv, stdioCleanup},false};
+static struct stdioTransport stdioTransport
+  = {{.maxParties=2, .split=NULL, .send=stdioSend, .recv=stdioRecv, .flush=stdioFlush,
+      .cleanup = stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
