@@ -1,6 +1,7 @@
 #include <obliv.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #define ELCT 2000
 
