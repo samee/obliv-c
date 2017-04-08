@@ -1772,6 +1772,15 @@ void __obliv_c__setMulF (void* vdest
   obliv_float_mult_circuit(dest, op1, op2);
 }
 
+void __obliv_c__setDivF (void* vdest
+                        ,const void* vop1,const void* vop2
+                        ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_div_circuit(dest, op1, op2);
+}
+
 // All parameters have equal number of bits
 void __obliv_c__setDivModUnsigned (void* vquot, void* vrem
                                   ,const void* vop1, const void* vop2

@@ -675,6 +675,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | PlusA  -> setArith "__obliv_c__setPlainAddF" v e1 e2 loc
      (* | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc *)
         | Mult   -> setArith "__obliv_c__setMulF" v e1 e2 loc
+        | Div    -> setArith "__obliv_c__setDivF" v e1 e2 loc
      (* | Shiftlt-> setShift "__obliv_c__setLShiftF" v e1 e2 loc
         | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
         | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
