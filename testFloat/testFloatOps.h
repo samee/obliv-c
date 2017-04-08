@@ -6,7 +6,7 @@ typedef struct {
   float ores;
 } protocolIO;
 
-void floatAddi(void* args);
+void floatOps(void* args);
 void load_data(protocolIO *io, float *x, float *y, int party);
 
 void printAsBinary(float x);

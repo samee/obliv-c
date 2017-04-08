@@ -7,7 +7,7 @@
 #include "../test/oblivc/common/util.h"
 #include "dbg.h"
 
-#include "testFloatAdd.h"
+#include "testFloatOps.h"
 
 
 void printAsBinary(float x) 
@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     lap = wallClock();
 
     // Execute Yao's protocol and cleanup
-    execYaoProtocol(&pd, floatAddi, &io);
+    execYaoProtocol(&pd, floatOps, &io);
     cleanupProtocol(&pd);
     double runtime = wallClock() - lap; // stop clock here 
 
