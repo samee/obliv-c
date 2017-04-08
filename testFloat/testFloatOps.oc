@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <obliv.oh>
 
-#include "testFloatAdd.h"
+#include "testFloatOps.h"
 
-void floatAddi(void* args) 
+void floatOps(void* args) 
 {
     protocolIO *io = (protocolIO*) args;
 
@@ -35,13 +35,28 @@ void floatAddi(void* args)
     revealOblivFloat(&y_r, obliv_y, 2);
     printAsBinary(y_r);
     printf("Y_r: %f\n", y_r);
+    printf("\n");
 
-    obliv_z = obliv_x / obliv_y;
-    printf("Added!\n");
-    
+    // Addition
+    obliv_z = obliv_x + obliv_y;
     revealOblivFloat(&z, obliv_z, 0);
-    printf("Res: %f\n", z);
+    printf("Addition: %f\n", z);
     printAsBinary(z);
+    printf("\n");
+
+    // Multiplication
+    obliv_z = obliv_x * obliv_y;    
+    revealOblivFloat(&z, obliv_z, 0);
+    printf("Multiplication: %f\n", z);
+    printAsBinary(z);
+    printf("\n");
+
+    // Division
+    obliv_z = obliv_x / obliv_y;
+    revealOblivFloat(&z, obliv_z, 0);
+    printf("Division: %f\n", z);
+    printAsBinary(z);
+    printf("\n");
 
     io->ores = z;
 }
