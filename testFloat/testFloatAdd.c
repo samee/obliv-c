@@ -80,9 +80,9 @@ int main(int argc, char *argv[])
     setCurrentParty(&pd, cp); // only checks for a '1'
     pd.thisParty = cp;
     if (cp == 1) {
-        io.v = 1123.1231;
+        io.v = 1.234;
     } else {
-        io.v = 2123.1232;
+        io.v = 2.345;
     }
     lap = wallClock();
 

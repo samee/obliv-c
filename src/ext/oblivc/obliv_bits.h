@@ -116,6 +116,9 @@ void __obliv_c__condNeg (const void* vcond, void* vdest
 void __obliv_c__setMul (void* vdest
                        ,const void* vop1 ,const void* vop2
                        ,size_t size);
+void __obliv_c__setMulF (void* vdest
+                        ,const void* vop1 ,const void* vop2
+                        ,size_t size);
 void __obliv_c__setDivModUnsigned (void* vquot, void* vrem
                                   ,const void* vop1, const void* vop2
                                   ,size_t size);

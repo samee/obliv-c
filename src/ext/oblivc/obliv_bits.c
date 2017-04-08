@@ -3,7 +3,10 @@
 #include "obliv_yao.c"
 #include "obliv_nnob.c"
 #include "obliv_debugProto.c"
+// ---- Float circuits -------
 #include "obliv_float_add.c"
+#include "obliv_float_mult.c"
+// ---------------------------
 #include <obliv_common.h>
 #include <obliv_bits.h>
 #include <commitReveal.h>
@@ -348,6 +351,15 @@ void __obliv_c__setMul (void* vdest
     __obliv_c__setPlainAdd(sum+i,sum+i,temp,size-i);
   }
   __obliv_c__copyBits(vdest,sum,size);
+}
+
+void __obliv_c__setMulF (void* vdest
+                        ,const void* vop1,const void* vop2
+                        ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_mult_circuit(dest, op1, op2);
 }
 
 // All parameters have equal number of bits

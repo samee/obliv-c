@@ -673,9 +673,9 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
     | TFloat(kind, a) when hasOblivAttr a->
         begin match op with
         | PlusA  -> setArith "__obliv_c__setPlainAddF" v e1 e2 loc
-     (* | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc
+     (* | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc *)
         | Mult   -> setArith "__obliv_c__setMulF" v e1 e2 loc
-        | Shiftlt-> setShift "__obliv_c__setLShiftF" v e1 e2 loc
+     (* | Shiftlt-> setShift "__obliv_c__setLShiftF" v e1 e2 loc
         | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
         | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
         | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
