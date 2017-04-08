@@ -22,11 +22,16 @@ static inline bool known(const OblivBit* o) { return !o->unknown; }
 #endif
 
 //-------------------------- Float Protocol -----------------------------------
+//
+//      Only use this for testing purposes! This is not a secure protocol
+//      as it operates only on known values (see floatFeedOblivFloat)
+//
+//-----------------------------------------------------------------------------
 
 void floatFeedOblivFloat(OblivBit* dest, int party, bool a) 
 {
     int curparty =  ocCurrentParty();
-    dest->unknown = false; // Change this to true and fix accordingly.
+    dest->unknown = false; // Warning!
     if(party == 1) {
         if (curparty == 1) {
             dest->knownValue = a;

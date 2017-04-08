@@ -9,20 +9,6 @@
 
 #include "testFloatAdd.h"
 
-/*
-#ifndef CURRENT_PROTO
-#define CURRENT_PROTO
-// Right now, we do not support multiple protocols at the same time
-static __thread ProtocolDesc *currentProto;
-static inline bool known(const OblivBit* o) { return !o->unknown; }
-#endif
-*/
-
-/*int ocCurrentParty2() 
-{
-    return currentProto->currentParty(currentProto);
-}*/
-
 
 void printAsBinary(float x) 
 {
@@ -50,18 +36,6 @@ void printOblivBits(OblivBit* n)
     }
     printf("\n");
 }
-
-/*
-void printOblivInput(OblivInputs n)
-{
-    int float_byte_size = sizeof(float);
-    int byte_size = sizeof(char) * 8;
-    for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
-        printf("%i", n.dest[i].knownValue);
-    }
-    printf("\n");
-}
-*/
 
 void load_data(protocolIO *io, float* x, float* y, int party) 
 {
@@ -106,14 +80,14 @@ int main(int argc, char *argv[])
     setCurrentParty(&pd, cp); // only checks for a '1'
     pd.thisParty = cp;
     if (cp == 1) {
-        io.v = 1.2345;
+        io.v = 1123.1231;
     } else {
-        io.v = 2.3456;
+        io.v = 2123.1232;
     }
     lap = wallClock();
 
-    // Execute Float protocol and cleanup
-    execFloatProtocol(&pd, floatAddi, &io); // starts 'floatAddi()'
+    // Execute Yao's protocol and cleanup
+    execYaoProtocol(&pd, floatAddi, &io);
     cleanupProtocol(&pd);
     double runtime = wallClock() - lap; // stop clock here 
 
