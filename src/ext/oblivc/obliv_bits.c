@@ -1,6 +1,6 @@
 // TODO I need to fix some int sizes
 #include <obliv_bits.h>
-#include <obliv_float_add.h>
+#include <obliv_float_ops.h>
 #include <obliv_yao.h>
 #include <commitReveal.h>
 #include <nnob.h>
@@ -1761,6 +1761,15 @@ void __obliv_c__setMul (void* vdest
     __obliv_c__setPlainAdd(sum+i,sum+i,temp,size-i);
   }
   __obliv_c__copyBits(vdest,sum,size);
+}
+
+void __obliv_c__setMulF (void* vdest
+                        ,const void* vop1,const void* vop2
+                        ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_mult_circuit(dest, op1, op2);
 }
 
 // All parameters have equal number of bits

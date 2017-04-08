@@ -36,7 +36,7 @@ void floatAddi(void* args)
     printAsBinary(y_r);
     printf("Y_r: %f\n", y_r);
 
-    obliv_z = obliv_x + obliv_y;
+    obliv_z = obliv_x * obliv_y;
     printf("Added!\n");
     
     revealOblivFloat(&z, obliv_z, 0);
