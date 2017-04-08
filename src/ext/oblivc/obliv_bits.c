@@ -6,6 +6,7 @@
 // ---- Float circuits -------
 #include "obliv_float_add.c"
 #include "obliv_float_mult.c"
+#include "obliv_float_div.c"
 // ---------------------------
 #include <obliv_common.h>
 #include <obliv_bits.h>
@@ -360,6 +361,15 @@ void __obliv_c__setMulF (void* vdest
   OblivBit *dest=vdest;
   const OblivBit *op1=vop1, *op2=vop2;
   obliv_float_mult_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setDivF (void* vdest
+                        ,const void* vop1,const void* vop2
+                        ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_div_circuit(dest, op1, op2);
 }
 
 // All parameters have equal number of bits
