@@ -58,5 +58,29 @@ void floatOps(void* args)
     printAsBinary(z);
     printf("\n");
 
+    // Not Equal
+    bool r;
+    obliv bool o_r = obliv_x != obliv_y;
+    revealOblivBool(&r, o_r, 0);
+    if (r) {
+        printf("Not Equal\n");
+    } else {
+        printf("Equal\n");
+    }
+    printAsBinary(r);
+    printf("\n");
+
+    // Equal
+    bool r;
+    obliv bool o_r = obliv_x == obliv_y;
+    revealOblivBool(&r, o_r, 0);
+    if (r) {
+        printf("Not Equal\n");
+    } else {
+        printf("Equal\n");
+    }
+    printAsBinary(r);
+    printf("\n");
+
     io->ores = z;
 }

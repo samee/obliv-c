@@ -1951,6 +1951,17 @@ void __obliv_c__setEqualTo (void* vdest
   __obliv_c__flipBit(dest);
 }
 
+void __obliv_c__setEqualToF (void* vdest
+                            ,const void* vop1,const void* vop2
+                            ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  __obliv_c__assignBitKnown(dest,0);
+  obliv_float_eq_circuit(dest, op1, op2);
+}
+
+
 void __obliv_c__setNotEqual (void* vdest
                             ,const void* vop1,const void* vop2
                             ,size_t size)
@@ -1964,6 +1975,18 @@ void __obliv_c__setNotEqual (void* vdest
     __obliv_c__setBitOr(dest,dest,&t);
   }
 }
+
+void __obliv_c__setNotEqualF (void* vdest
+                             ,const void* vop1,const void* vop2
+                             ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  __obliv_c__assignBitKnown(dest,0);
+  obliv_float_eq_circuit(dest, op1, op2);
+  __obliv_c__flipBit(dest);
+}
+
 void __obliv_c__setLogicalNot (void* vdest,const void* vop,size_t size)
 { OblivBit t;
   OblivBit *dest=vdest;
