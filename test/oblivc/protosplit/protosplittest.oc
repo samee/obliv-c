@@ -1,4 +1,5 @@
 #include <obliv.oh>
+#include <obliv_common.h>
 #include "protosplittest.h"
 
 void reducelist(obliv uint32_t * output, uint32_t * inputs, int len, ProtocolDesc * pd) {

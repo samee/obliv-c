@@ -43,16 +43,23 @@ static int stdioSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 
 static int stdioRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { 
-  bool *p = stdioFlushFlag(pt);
-  if(*p) { fflush(stdout); *p=false; }
+  pt->flush(pt);
   return fread(s,1,n,stdin); 
 }
 
-static void stdioCleanup(ProtocolTransport* pt) {}
+static int stdioFlush(ProtocolTransport* pt) {
+  bool *p = stdioFlushFlag(pt);
+  if(*p) { fflush(stdout); *p=false; }
+}
+
+static void stdioCleanup(ProtocolTransport* pt) {
+  pt->flush(pt);
+}
 
 // Extremely simple, no multiplexing: two parties, one connection
-static struct stdioTransport stdioTransport 
-  = {{2, NULL, stdioSend, stdioRecv, stdioCleanup},false};
+static struct stdioTransport stdioTransport
+  = {{.maxParties=2, .split=NULL, .send=stdioSend, .recv=stdioRecv, .flush=stdioFlush,
+      .cleanup = stdioCleanup},false};
 
 void protocolUseStdio(ProtocolDesc* pd)
   { pd->trans = &stdioTransport.cb; }
@@ -395,26 +402,37 @@ void setCurrentParty(ProtocolDesc* pd, int party)
 ProtocolDesc* ocCurrentProto() { return currentProto; }
 void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
 
-void ocSplitProto(ProtocolDesc* pdout, ProtocolDesc * pdin)
+bool ocCanSplitProto(ProtocolDesc * pdin)
 {
-  *pdout = (struct ProtocolDesc) {
-    .error = pdin->error,
-    .partyCount = pdin->error,
-    .currentParty = pdin->currentParty,
-    .feedOblivInputs = pdin->feedOblivInputs,
-    .revealOblivBits = pdin->revealOblivBits,
-    .setBitAnd = pdin->setBitAnd,
-    .setBitOr = pdin->setBitOr,
-    .setBitXor = pdin->setBitXor,
-    .setBitNot = pdin->setBitNot,
-    .flipBit = pdin->flipBit,
-    .thisParty = pdin->thisParty,
-    .trans = pdin->trans->split(pdin->trans),
-    .splitextra = pdin->splitextra,
-    .cleanextra = pdin->cleanextra,
-    .extra = NULL
-  };
-  if (pdout->splitextra != NULL && pdin->extra != NULL) pdout->splitextra(pdout, pdin);
+  return pdin->trans->split != NULL
+        && pdin->splitextra != NULL
+        && pdin->extra != NULL;
+}
+
+bool ocSplitProto(ProtocolDesc* pdout, ProtocolDesc * pdin)
+{ if (!ocCanSplitProto(pdin)) return false;
+  else
+  {
+    *pdout = (struct ProtocolDesc) {
+      .error = pdin->error,
+      .partyCount = pdin->error,
+      .currentParty = pdin->currentParty,
+      .feedOblivInputs = pdin->feedOblivInputs,
+      .revealOblivBits = pdin->revealOblivBits,
+      .setBitAnd = pdin->setBitAnd,
+      .setBitOr = pdin->setBitOr,
+      .setBitXor = pdin->setBitXor,
+      .setBitNot = pdin->setBitNot,
+      .flipBit = pdin->flipBit,
+      .thisParty = pdin->thisParty,
+      .trans = pdin->trans->split(pdin->trans),
+      .splitextra = pdin->splitextra,
+      .cleanextra = pdin->cleanextra,
+      .extra = NULL
+    };
+    pdout->splitextra(pdout, pdin);
+    return true;
+  }
 }
 
 void ocCleanupProto(ProtocolDesc* pd)
