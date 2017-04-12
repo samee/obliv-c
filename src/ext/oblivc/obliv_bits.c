@@ -402,7 +402,12 @@ void setCurrentParty(ProtocolDesc* pd, int party)
 ProtocolDesc* ocCurrentProto() { return currentProto; }
 void ocSetCurrentProto(ProtocolDesc* pd) { currentProto=pd; }
 
-bool ocCanSplitProto(ProtocolDesc * pdin) { return (pdin->trans->split != NULL && pdin->splitextra != NULL && pdin->extra != NULL); }
+bool ocCanSplitProto(ProtocolDesc * pdin)
+{
+  return pdin->trans->split != NULL
+        && pdin->splitextra != NULL
+        && pdin->extra != NULL;
+}
 
 bool ocSplitProto(ProtocolDesc* pdout, ProtocolDesc * pdin)
 { if (!ocCanSplitProto(pdin)) return false;
