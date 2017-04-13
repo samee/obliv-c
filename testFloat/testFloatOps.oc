@@ -82,5 +82,53 @@ void floatOps(void* args)
     printAsBinary(r);
     printf("\n");
 
+    // Less Than
+    bool r;
+    obliv bool o_r = obliv_x < obliv_y;
+    revealOblivBool(&r, o_r, 0);
+    if (r) {
+        printf("Less than\n");
+    } else {
+        printf("Not less than\n");
+    }
+    printAsBinary(r);
+    printf("\n");
+
+    // Greater Than
+    bool r;
+    obliv bool o_r = obliv_x > obliv_y;
+    revealOblivBool(&r, o_r, 0);
+    if (r) {
+        printf("Greater than\n");
+    } else {
+        printf("Not greater than\n");
+    }
+    printAsBinary(r);
+    printf("\n");
+
+    // Less Than or Equal to
+    bool r;
+    obliv bool o_r = obliv_x <= obliv_y;
+    revealOblivBool(&r, o_r, 0);
+    if (r) {
+        printf("Less than or equal to\n");
+    } else {
+        printf("Not less than or equal to\n");
+    }
+    printAsBinary(r);
+    printf("\n");
+
+    // Greater Than or Equal to
+    bool r;
+    obliv bool o_r = obliv_x >= obliv_y;
+    revealOblivBool(&r, o_r, 0);
+    if (r) {
+        printf("Greater than or equal to\n");
+    } else {
+        printf("Not greater than or equal to\n");
+    }
+    printAsBinary(r);
+    printf("\n");
+
     io->ores = z;
 }

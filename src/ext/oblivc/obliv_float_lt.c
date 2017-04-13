@@ -1,6 +1,6 @@
 #include <obliv_types.h>
 
-void obliv_float_eq_circuit(OblivBit* dest, const OblivBit* op1, const OblivBit* op2)
+void obliv_float_lt_circuit(OblivBit* dest, const OblivBit* op1, const OblivBit* op2)
 {
 	OblivBit __obliv_0;
 	OblivBit __obliv_1;
@@ -873,5 +873,5 @@ void obliv_float_eq_circuit(OblivBit* dest, const OblivBit* op1, const OblivBit*
 	__obliv_c__setBitAnd(&__obliv_301, &__obliv_300, &__obliv_225a301);
 	__obliv_c__setBitOr(&__obliv_302, &__obliv_297, &__obliv_301);
 	__obliv_c__setBitNot(&__obliv_302, &__obliv_302);
-	__obliv_c__copyBit(dest+0, &__obliv_301);
+	__obliv_c__copyBit(dest+0, &__obliv_302);
 }

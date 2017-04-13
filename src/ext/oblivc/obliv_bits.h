@@ -172,6 +172,12 @@ void __obliv_c__setEqualTo (void* dest
 void __obliv_c__setNotEqualF (void* vdest
                              ,const void* vop1,const void* vop2
                              ,size_t size);
+void __obliv_c__setLessthanF (void* vdest
+                             ,const void* vop1,const void* vop2
+                             ,size_t size);
+void __obliv_c__setLessThanEqF (void* vdest
+                               ,const void* vop1,const void* vop2
+                               ,size_t size);
 void __obliv_c__setNotEqual (void* dest
                             ,const void* op1,const void* op2
                             ,size_t size);

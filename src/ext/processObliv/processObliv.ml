@@ -465,8 +465,13 @@ let voidFunc name argTypes =
 
 let cmpLtFuncs = ("__obliv_c__setLessThanUnsigned"
                  ,"__obliv_c__setLessThanSigned")
+let cmpLtFuncsF = ("__obliv_c__setLessThanF"
+                  ,"__obliv_c__setLessThanF")
 let cmpLeFuncs = ("__obliv_c__setLessOrEqualUnsigned"
                  ,"__obliv_c__setLessOrEqualSigned")
+let cmpLeFuncsF = ("__obliv_c__setLessThanEqF"
+                  ,"__obliv_c__setLessThanEqF")
+
 
 let setComparison fname dest s1 s2 loc = 
   let optype = typeOfLval s1 in
@@ -496,6 +501,7 @@ let setComparisonUS fnames dest s1 s2 loc =
   let optype = typeOfLval s1 in
   let fname = match unrollType optype with
   | TInt(k,_) -> if isSigned k then snd fnames else fst fnames
+  | TFloat(k,_) -> fst fnames
   | _ -> E.s (E.error "Cannot operate on obliv values of type %a" d_type optype)
   in
   setComparison fname dest s1 s2 loc
@@ -670,7 +676,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
             | _ -> instr
             end
         end
-    | TFloat(kind, a) when hasOblivAttr a->
+    | TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
         | PlusA  -> setArith "__obliv_c__setPlainAddF" v e1 e2 loc
      (* | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc *)
@@ -679,11 +685,11 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
      (* | Shiftlt-> setShift "__obliv_c__setLShiftF" v e1 e2 loc *)
         | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
         | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
-     (* | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
-        | Gt -> setComparisonUS cmpLtFuncs v e2 e1 loc
-        | Le -> setComparisonUS cmpLeFuncs v e1 e2 loc
-        | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
-        | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAndF" v e1 e2 loc
+        | Lt -> setComparisonUS cmpLtFuncsF v e1 e2 loc
+        | Gt -> setComparisonUS cmpLtFuncsF v e2 e1 loc
+        | Le -> setComparisonUS cmpLeFuncsF v e1 e2 loc
+        | Ge -> setComparisonUS cmpLeFuncsF v e2 e1 loc
+     (* | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAndF" v e1 e2 loc
         | BXor -> setBitwiseOp "__obliv_c__setBitwiseXorF" v e1 e2 loc
         | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOrF" v e1 e2 loc *)
  (*TODO | LAnd -> setLogicalOp "__obliv_c__setBitAndF" v e1 e2 loc

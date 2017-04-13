@@ -8,6 +8,8 @@
 #include "obliv_float_mult.c"
 #include "obliv_float_div.c"
 #include "obliv_float_eq.c"
+#include "obliv_float_lt.c"
+#include "obliv_float_le.c"
 // ---------------------------
 #include <obliv_common.h>
 #include <obliv_bits.h>
@@ -577,6 +579,26 @@ void __obliv_c__setNotEqualF (void* vdest
   __obliv_c__assignBitKnown(dest,0);
   obliv_float_eq_circuit(dest, op1, op2);
   __obliv_c__flipBit(dest);
+}
+
+void __obliv_c__setLessThanF (void* vdest
+                             ,const void* vop1,const void* vop2
+                             ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  __obliv_c__assignBitKnown(dest,0);
+  obliv_float_lt_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setLessThanEqF (void* vdest
+                               ,const void* vop1,const void* vop2
+                               ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  __obliv_c__assignBitKnown(dest,0);
+  obliv_float_le_circuit(dest, op1, op2);
 }
 
 void __obliv_c__setLogicalNot (void* vdest,const void* vop,size_t size)
