@@ -682,7 +682,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
      (* | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc *)
         | Mult   -> setArith "__obliv_c__setMulF" v e1 e2 loc
         | Div    -> setArith "__obliv_c__setDivF" v e1 e2 loc
-     (* | Shiftlt-> setShift "__obliv_c__setLShiftF" v e1 e2 loc *)
+        | Shiftlt-> E.s (E.error "Shift operation on float invalid!\n")
         | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
         | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
         | Lt -> setComparisonUS cmpLtFuncsF v e1 e2 loc
