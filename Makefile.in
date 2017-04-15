@@ -36,7 +36,7 @@ stamp-h: config.h.in config.status
 	./config.status
 
 CC=@CC@
-CPP=cpp
+CPP=@CPP@
 @DEFAULT_COMPILER@=1
 
 # We have to use _build because of OCaml's bug #0004502
@@ -58,7 +58,7 @@ CILLIB_TARGETS=
 CILLY_EXE_FILES=
 
 CIL_PLUGINS_DIR = src/ext
-CIL_EXCLUDE_PLUGINS =
+CIL_EXCLUDE_PLUGINS = oblivc
 CIL_PLUGINS = $(addprefix $(OBJDIR)/,$(filter-out $(addprefix $(CIL_PLUGINS_DIR)/, $(CIL_EXCLUDE_PLUGINS)),$(wildcard $(CIL_PLUGINS_DIR)/*)))
 
 CIL_DEFAULT_PLUGINS = $(patsubst $(CIL_PLUGINS_DIR)/%/default,cil.%,$(wildcard $(CIL_PLUGINS_DIR)/*/default))
@@ -128,7 +128,7 @@ $(OCPARTS:%=$(DEPENDDIR)/%.d): $(DEPENDDIR)/%.d: $(OCSRCDIR)/%.c $(DEPENDDIR)
 	echo '	$$(CC) -c $$< -o $$@ -I $$(OCSRCDIR) $$(CFLAGS)' >> $@
 
 $(OOCPARTS:%=$(DEPENDDIR)/%.od): $(DEPENDDIR)/%.od: $(OCSRCDIR)/%.oc $(DEPENDDIR) 
-	$(CPP) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.oo > $@
+	$(CPP) -x c -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.oo > $@
 	echo '	$$(BINDIR)/oblivcc -c $$< -o $$@ -I $$(OCSRCDIR) $$(CFLAGS)' >> $@
 
 # TODO update ocamlutil/Makefile.ocaml no longer used
