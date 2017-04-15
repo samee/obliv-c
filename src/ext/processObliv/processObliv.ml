@@ -634,7 +634,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | BNot -> setUnop "__obliv_c__setBitwiseNot" v e loc
         | LNot -> setUnop "__obliv_c__setLogicalNot" v e loc
         end
-      (*| TFloat(kind, a) when hasOblivAttr a ->
+  (*| TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
         | Neg -> setUnop "__obliv_c__setNegF" v e loc
         | BNot -> setUnop "__obliv_c__setBitwiseNotF" v e loc
@@ -689,9 +689,9 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | Gt -> setComparisonUS cmpLtFuncsF v e2 e1 loc
         | Le -> setComparisonUS cmpLeFuncsF v e1 e2 loc
         | Ge -> setComparisonUS cmpLeFuncsF v e2 e1 loc
-     (* | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAndF" v e1 e2 loc
-        | BXor -> setBitwiseOp "__obliv_c__setBitwiseXorF" v e1 e2 loc
-        | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOrF" v e1 e2 loc *)
+        | BAnd -> E.s (E.error "Bitwise operation on float invalid!\n")
+        | BXor -> E.s (E.error "Bitwise operation on float invalid!\n")
+        | BOr  -> E.s (E.error "Bitwise operation on float invalid!\n")
  (*TODO | LAnd -> setLogicalOp "__obliv_c__setBitAndF" v e1 e2 loc
         | LOr  -> setLogicalOp "__obliv_c__setBitOrF"  v e1 e2 loc *)
         | _ -> instr
