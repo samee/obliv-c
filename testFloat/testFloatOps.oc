@@ -128,7 +128,7 @@ void floatOps(void* args)
         printf("Not greater than or equal to\n");
     }
     printAsBinary(r);
-    printf("\n");  
+    printf("\n");
 
     io->ores = z;
 }
