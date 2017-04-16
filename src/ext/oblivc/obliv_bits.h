@@ -144,6 +144,13 @@ void __obliv_c__setModSigned (void* vdest
 void __obliv_c__setBitsSub (void* dest,void* borrowOut
                            ,const void* op1,const void* op2
                            ,const void* borrowIn,size_t size);
+void __obliv_c__setBitsSubF (void* vdest,void* carryOut
+                            ,const void* vop1,const void* vop2
+                            ,const void* carryIn
+                            ,size_t size);
+void __obliv_c__setPlainSubF (void* vdest
+                             ,const void* vop1 ,const void* vop2
+                             ,size_t size);
 void __obliv_c__setSignExtend (void* dest, size_t dsize
                               ,const void* src, size_t ssize);
 void __obliv_c__setZeroExtend (void* dest, size_t dsize
