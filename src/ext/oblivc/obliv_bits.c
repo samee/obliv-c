@@ -1710,6 +1710,21 @@ void __obliv_c__setPlainSub (void* vdest
                             ,size_t size)
   { __obliv_c__setBitsSub (vdest,NULL,vop1,vop2,NULL,size); }
 
+void __obliv_c__setBitsSubF (void* vdest,void* carryOut
+                            ,const void* vop1,const void* vop2
+                            ,const void* carryIn
+                            ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_sub_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setPlainSubF (void* vdest
+                             ,const void* vop1 ,const void* vop2
+                             ,size_t size)
+  { __obliv_c__setBitsSubF (vdest,NULL,vop1,vop2,NULL,size); }
+
 #define MAX_BITS (8*sizeof(widest_t))
 // dest = c?src:0;
 static void setZeroOrVal (OblivBit* dest

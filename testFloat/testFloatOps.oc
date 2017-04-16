@@ -44,6 +44,13 @@ void floatOps(void* args)
     printAsBinary(z);
     printf("\n");
 
+    // Addition
+    obliv_z = obliv_x - obliv_y;
+    revealOblivFloat(&z, obliv_z, 0);
+    printf("Subtraction: %f\n", z);
+    printAsBinary(z);
+    printf("\n");
+
     // Multiplication
     obliv_z = obliv_x * obliv_y;    
     revealOblivFloat(&z, obliv_z, 0);

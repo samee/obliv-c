@@ -679,7 +679,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
     | TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
         | PlusA  -> setArith "__obliv_c__setPlainAddF" v e1 e2 loc
-     (* | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc *)
+        | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc
         | Mult   -> setArith "__obliv_c__setMulF" v e1 e2 loc
         | Div    -> setArith "__obliv_c__setDivF" v e1 e2 loc
         | Shiftlt-> E.s (E.error "Shift operation on float invalid!\n")
