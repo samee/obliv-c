@@ -8,6 +8,7 @@
 #include "obliv_float_sub.c"
 #include "obliv_float_mult.c"
 #include "obliv_float_div.c"
+#include "obliv_float_neg.c"
 #include "obliv_float_eq.c"
 #include "obliv_float_lt.c"
 #include "obliv_float_le.c"
@@ -355,6 +356,19 @@ static void setAbs (void* vdest, void* vsign, const void* vsrc, size_t n)
 void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n)
 {
   __obliv_c__condNeg(&__obliv_c__trueCond,vdest,vsrc,n);
+}
+
+void __obliv_c__condNegF (const void* vcond, void* vdest
+                        ,const void* vsrc, size_t n)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vsrc, *op2=vcond;
+  obliv_float_neg_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n)
+{
+  __obliv_c__condNegF(&__obliv_c__trueCond,vdest,vsrc,n);
 }
 
 void __obliv_c__setMul (void* vdest

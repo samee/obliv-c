@@ -65,6 +65,13 @@ void floatOps(void* args)
     printAsBinary(z);
     printf("\n");
 
+    // Negation
+    obliv_z = -obliv_x;
+    revealOblivFloat(&z, obliv_z, 0);
+    printf("Negation: %f\n", z);
+    printAsBinary(z);
+    printf("\n");
+
     // Not Equal
     bool r;
     obliv bool o_r = obliv_x != obliv_y;

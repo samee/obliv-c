@@ -634,12 +634,12 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | BNot -> setUnop "__obliv_c__setBitwiseNot" v e loc
         | LNot -> setUnop "__obliv_c__setLogicalNot" v e loc
         end
-  (*| TFloat(kind, a) when hasOblivAttr a ->
+    | TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
         | Neg -> setUnop "__obliv_c__setNegF" v e loc
-        | BNot -> setUnop "__obliv_c__setBitwiseNotF" v e loc
-        | LNot -> setUnop "__obliv_c__setLogicalNotF" v e loc
-        end *)
+        | BNot -> E.s (E.error "Bitwise operation on float invalid!\n")
+(* TODO | LNot -> setUnop "__obliv_c__setLogicalNotF" v e loc *)
+        end
     | _ -> instr
     end
 | Set(v,BinOp(op,Lval e1,Lval e2,t),loc) ->
