@@ -1,0 +1,116 @@
+// Samuel Havron <havron@virginia.edu>
+// https://www.github.com/samuelhavron
+// MIT License
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <obliv.oh>
+#include "linReg.h"
+#include "linReg.oh"
+#include "dbg.h"
+
+void linReg(void* args) {
+  protocolIO *io = (protocolIO*) args;
+
+  int *x = malloc(sizeof(int) * ALLOC);
+  int *y = malloc(sizeof(int) * ALLOC);
+  check_mem(x, y, ocCurrentParty());
+
+  obliv int om = 0; // RESULTS
+  obliv int ob = 0;
+  obliv int or = 0;
+  
+  load_data(io, &x, &y, ocCurrentParty());
+  check_input_count(io);
+  
+  obliv int *ox = malloc(sizeof(obliv int) * io->n);
+  obliv int *oy = malloc(sizeof(obliv int) * io->n);
+  
+  toObliv(io, ox, x, 1);
+  toObliv(io, oy, y, 2);
+  free(x);
+  free(y);
+  
+  linear_regression(io, ox, oy, om, ob, or);
+  free(ox);
+  free(oy);
+}
+
+void toObliv(protocolIO *io, obliv int *oa, int *a, int party) {
+ int i, res;
+ for(i = 0; i < io->n; i++) {
+  oa[i] = feedOblivInt(a[i], party);
+ }
+}
+
+void linear_regression(protocolIO *io, obliv int *ox, obliv int *oy, obliv int om, obliv int ob, obliv int or) {
+  
+  int n = io->n;
+  obliv int sumx = sum(ox, n); // sum of x
+  obliv int sumxx = dotProd(ox, ox, n); // sum of each x squared
+  obliv int sumy = sum(oy, n); // sum of y
+  obliv int sumyy = dotProd(oy, oy, n); // sum of each y squared
+  obliv int sumxy = dotProd(ox, oy, n); // sum of each x * y
+
+  // Compute least-squares best fit straight line
+  om = fixed_div(n * sumxy - fixed_mul(sumx, sumy), n * sumxx - osqr(sumx)); // slope
+  ob = fixed_div(fixed_mul(sumy, sumxx) - fixed_mul(sumx, sumxy), n * sumxx - osqr(sumx)); // y-intercept
+
+  obliv int ocov = (n*sumxy - fixed_mul(sumx, sumy));
+  obliv int ostddevs = fixed_mul((n*sumxx) - osqr(sumx), (n*sumyy) - osqr(sumy));
+  obliv int orsqr = fixed_div(osqr(ocov), ostddevs); // sqrt(revealed rsqr) = r
+
+  revealOblivInt(&io->rsqr, orsqr, 0);
+  revealOblivInt(&io->m, om, 0);
+  revealOblivInt(&io->b, ob, 0);
+}
+
+obliv int osqr(obliv int x) {
+  return fixed_mul(x, x);
+}
+
+obliv int dotProd(obliv int *oa, obliv int *ob, int n) {
+  obliv int dotProd = 0;
+  int i;
+  for (i = 0; i < n; i++) {
+    dotProd += fixed_mul(oa[i], ob[i]);
+  }
+  return dotProd;
+}
+
+obliv int sum(obliv int *a, int n) {
+  obliv int sum = 0;
+  int i;
+  for (i = 0; i < n; i++) {
+    sum += a[i];
+  }
+  return sum;
+}
+
+obliv int fixed_mul(obliv int oa, obliv int ob) { // prevent overflow of scaled values and maintain SCALE factor
+ obliv int res = 0;
+ obliv long long int lloa = (obliv long long int) oa;
+ obliv long long int llob = (obliv long long int) ob;
+ res = DESCALE((lloa*llob));
+ return res;
+}
+
+obliv int fixed_div(obliv int oa, obliv int ob) { // maintain SCALE factor
+ obliv int res = 0;
+ obliv long long int lloa = (obliv long long int) oa;
+ obliv long long int llob = (obliv long long int) ob;
+ res = (lloa*SCALE/llob);
+ return res;
+}
+
+void check_input_count(protocolIO *io) {
+ int nx = ocBroadcastInt(io->n, 1);
+ int ny = ocBroadcastInt(io->n, 2);
+ if (nx != ny) {
+    log_err("Unequal amount of data points.\n\t"
+    "X data points (party 1): %d\n\t"
+    "Y data points (party 2): %d\n", nx, ny);
+    clean_errno();	  
+    exit(1);
+  }
+}
