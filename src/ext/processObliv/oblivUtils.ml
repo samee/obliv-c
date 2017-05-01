@@ -63,5 +63,5 @@ let oblivBitsSizeOf t = begin match t with
 | _ -> bitsSizeOf t
 end
 
-let xoBitsSizeOf t =kinteger !kindOfSizeOf (oblivBitsSizeOf (unoblivType t))
+let xoBitsSizeOf t = kinteger !kindOfSizeOf (oblivBitsSizeOf (unoblivType t))
 

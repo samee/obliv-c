@@ -144,5 +144,12 @@ void floatOps(void* args)
     printAsBinary(r);
     printf("\n");
 
+    float x_test_r;
+    obliv float x_test = 55;
+    revealOblivFloat(&x_test_r, x_test, 0);
+    printf("X_test_r: %f\n", x_test_r);
+    printAsBinary(x_test_r);
+    printf("\n");
+
     io->ores = z;
 }

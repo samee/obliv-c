@@ -638,7 +638,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         begin match op with
         | Neg -> setUnop "__obliv_c__setNegF" v e loc
         | BNot -> E.s (E.error "Bitwise operation on float invalid!\n")
-(* TODO | LNot -> setUnop "__obliv_c__setLogicalNotF" v e loc *)
+        | LNot -> E.s (E.error "Logical operation on float not supported!\n")
         end
     | _ -> instr
     end
@@ -692,8 +692,8 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | BAnd -> E.s (E.error "Bitwise operation on float invalid!\n")
         | BXor -> E.s (E.error "Bitwise operation on float invalid!\n")
         | BOr  -> E.s (E.error "Bitwise operation on float invalid!\n")
- (*TODO | LAnd -> setLogicalOp "__obliv_c__setBitAndF" v e1 e2 loc
-        | LOr  -> setLogicalOp "__obliv_c__setBitOrF"  v e1 e2 loc *)
+        | LAnd -> E.s (E.error "Logical operation on float not supported!\n")
+        | LOr  -> E.s (E.error "Logical operation on float not supported!\n")
         | _ -> instr
         end
     | _ -> instr
