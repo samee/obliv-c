@@ -63,8 +63,5 @@ let oblivBitsSizeOf t = begin match t with
 | _ -> bitsSizeOf t
 end
 
-let xoBitsSizeOf t = begin match t with
-  |TInt(k,a) -> kinteger !kindOfSizeOf (oblivBitsSizeOf (unoblivType t))
-  |TFloat(k,a) -> sizeOf (unoblivType t)
-end
+let xoBitsSizeOf t = kinteger !kindOfSizeOf (oblivBitsSizeOf (unoblivType t))
 
