@@ -111,11 +111,19 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { 
   struct tcp2PTransport* tcpt = CAST(pt);
   int res=0,n2=0;
-  transFlush(pt);
+  if (tcpt->needFlush)
+  {
+    transFlush(pt);
+    tcpt->needFlush=true;
+  }
   while(n>n2)
   { 
     res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
-    if(res<0 || feof(tcpt->sockStream)) { perror("TCP read error: "); return res; }
+    if(res<0 || feof(tcpt->sockStream))
+    {
+      perror("TCP read error: ");
+      return res;
+    }
     n2+=res;
   }
   return res;
@@ -124,15 +132,7 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 static int tcp2PFlush(ProtocolTransport* pt)
 {
   struct tcp2PTransport* tcpt = CAST(pt);
-  if(tcpt->needFlush)
-  {
-    tcpt->needFlush=false;
-    return fflush(tcpt->sockStream); 
-  }
-  else
-  {
-    return 0;
-  }
+  return fflush(tcpt->sockStream);
 }
 
 static int tcp2PFlushProfiled(ProtocolTransport* pt)
