@@ -47,6 +47,7 @@ bool dualexGenrRevealOblivBits(ProtocolDesc* pdb,
   widest_t destx; // result from the other round
   // Reveals to evaluator only, should always return false
   bool res = yaoGenrRevealOblivBits(pdb,dest,o,n,2);
+  oflush(pdb);
   const char* R = ((YaoProtocolDesc*)pd->ypd.extra)->R;
   yao_key_t z = {0};
   atomic_queue_read(pd->queue,&destx);
