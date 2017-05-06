@@ -39,7 +39,7 @@ void atomic_queue_release(atomic_queue_t q)
 // Not that errno values always make sense to the caller, 
 //   but better than no error checking
 // Assumes an int status local variable available for use
-#define propagate_on_error(call) if((status=call)!=0) return status
+#define propagate_on_error(call) if((status=(call))!=0) return status
 
 int atomic_queue_write(atomic_queue_t q,const void* buf)
 {
