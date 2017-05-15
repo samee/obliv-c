@@ -66,12 +66,9 @@ int main(int argc, char *argv[])
         cleanupProtocol(&pd);
         double runtime = wallClock() - lap; // stop clock here 
 
-        // Print results and store runtime data
+        // Print results and gate count
         log_info("Total time: %lf seconds\n", runtime);
-
-        // int gates = yaoGateCount();
-        // log_info("Yao Gate Count: %u\n", gates);
-
+        log_info("Yao Gate Count: %u\n", yaoGateCount());
         printf("\n");
         log_info("Slope   \tm = %15.6e\n", io.m); // print slope
         log_info("y-intercept\tb = %15.6e\n", io.b); // print y-intercept
