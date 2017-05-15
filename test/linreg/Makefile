@@ -7,6 +7,8 @@ CILPATH=../../
 CFLAGS=-g -Wall
 LOADLIBES=-lm
 testName=linreg
+TX=tx.dat
+TY=ty.dat
 
 ./a.out: $(testName).oc $(testName).c ../oblivc/common/util.c $(RUNTIME)
 	$(OBLIVCC) $(CFLAGS) -I . $(testName).oc $(testName).c ../oblivc/common/util.c $(LOADLIBES)
@@ -17,8 +19,8 @@ clean:
 # Run tests quickly
 t1:
 	$(./a.out)
-	./a.out $(CONNECTION) 1
+	./a.out $(CONNECTION) 1 $(TX)
 
 t2:
 	$(./a.out) 
-	./a.out $(CONNECTION) 2
+	./a.out $(CONNECTION) 2 $(TY)
