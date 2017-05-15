@@ -32,7 +32,7 @@ void printOblivBits(OblivBit* n)
     int float_byte_size = sizeof(float);
     int byte_size = sizeof(char) * 8;
     for ( int i = 0; i < float_byte_size * byte_size; i++ ) {
-        printf("%i", n[i].__annonCompField5.knownValue & 1);
+        printf("%i", n[i].knownValue & 1);
     }
     printf("\n");
 }
@@ -78,7 +78,6 @@ int main(int argc, char *argv[])
     // Final initializations before entering protocol
     cp = (argv[2][0]=='1'? 1 : 2);
     setCurrentParty(&pd, cp); // only checks for a '1'
-    pd.thisParty = cp;
     if (cp == 1) {
         io.v = 1.234;
     } else {
