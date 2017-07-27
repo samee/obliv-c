@@ -113,7 +113,7 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
   if (tcpt->needFlush)
   {
     transFlush(pt);
-    tcpt->needFlush=true;
+    tcpt->needFlush=false;
   }
   while(n>n2)
   { 
