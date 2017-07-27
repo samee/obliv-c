@@ -2,7 +2,6 @@
 #define OBLIV_COMMON_H
 
 #include<obliv_types.h>
-#include<obliv_bits.h>
 //#include<stdio.h>
 //FILE* transGetFile(ProtocolTransport* t); // Debugging API
 
@@ -10,6 +9,18 @@
 // Because I am evil and I do not like 
 // Java-style redundant "say the type twice" practice
 #define CAST(p) ((void*)p)
+
+ProtocolDesc* ocCurrentProto(void);
+void ocSetCurrentProto(ProtocolDesc* pd);
+bool ocCanSplitProto(ProtocolDesc*);
+bool ocSplitProto(ProtocolDesc*, ProtocolDesc*);
+void ocCleanupProto(ProtocolDesc*);
+
+// Careful with this function: obliv things must be done in-sync by all parties
+// Therefore actions in if(ocCurrentParty()==me) {...} must not touch obliv data
+//   This is not checked by the compiler in any way; you have been warned
+int ocCurrentParty();
+int ocCurrentPartyDefault(ProtocolDesc* pd);
 
 static inline int protoCurrentParty(ProtocolDesc* pd)
     { return pd->currentParty(pd); }

@@ -1,5 +1,4 @@
 // TODO I need to fix some int sizes
-#include <obliv_common.h>
 #include <obliv_bits.h>
 #include <obliv_yao.h>
 #include <commitReveal.h>

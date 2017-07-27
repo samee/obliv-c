@@ -9,12 +9,7 @@
 
 // import common types
 #include<obliv_types_internal.h>
-
-ProtocolDesc* ocCurrentProto(void);
-void ocSetCurrentProto(ProtocolDesc* pd);
-bool ocCanSplitProto(ProtocolDesc*);
-bool ocSplitProto(ProtocolDesc*, ProtocolDesc*);
-void ocCleanupProto(ProtocolDesc*);
+#include<obliv_common.h>
 
 #define __bitsize(type) (8*sizeof(type))
 
@@ -46,12 +41,6 @@ void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a);
 void __obliv_c__flipBit(OblivBit* dest); // Avoids a struct copy
-
-// Careful with this function: obliv things must be done in-sync by all parties
-// Therefore actions in if(ocCurrentParty()==me) {...} must not touch obliv data
-//   This is not checked by the compiler in any way; you have been warned
-int ocCurrentParty();
-int ocCurrentPartyDefault(ProtocolDesc* pd);
 
 // Bitvector functions (these functions also work if dest and source point
 //   to the same object).
