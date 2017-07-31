@@ -33,7 +33,7 @@ typedef struct OblivBit OblivBit;
 
 typedef char yao_key_t[YAO_KEY_BYTES];
 
-#define NNOB_KEY_BYTES 10 
+#define NNOB_KEY_BYTES 10
 typedef char nnob_key_t[NNOB_KEY_BYTES];
 typedef struct NnobKey {
 	nnob_key_t key;
@@ -47,7 +47,7 @@ struct ProtocolDesc {
   int partyCount, thisParty, error;
   struct ProtocolTransport* trans;
   union // a struct for each protocol-specific info
-  { 
+  {
     struct { unsigned mulCount,xorCount; } debug;
   };
 
@@ -73,7 +73,7 @@ struct ProtocolDesc {
 
 #define OC_DYN_EXTRA_FUN(fname,Type1,Type2,type2Id)    \
   Type2* fname(Type1* s1)                              \
-  { if(*(char*)s1->extra==(type2Id)) return s1->extra; \
+  { if(*(char*)s1->extra==(type2Id)) return (Type2*) s1->extra; \
     else return NULL;                                  \
   }
 
