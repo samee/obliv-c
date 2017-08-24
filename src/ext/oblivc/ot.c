@@ -236,7 +236,7 @@ static void npotSend_roundRecvKey(NpotSender* s,NpotSenderState* q)
   { q->PK0 = dhRecv(s->pd,s->destParty); }
 
 // x,y,z are scratch
-static void gcry_mpi_point_copy(gcry_mpi_point_t w, gcry_mpi_point_t v,
+static void oblivc_mpi_point_copy(gcry_mpi_point_t w, gcry_mpi_point_t v,
       gcry_mpi_t x,gcry_mpi_t y,gcry_mpi_t z)
 {
   gcry_mpi_point_get(x,y,z,v);
@@ -354,7 +354,7 @@ static void npotRecv_roundSendKey(NpotRecver* r,NpotRecverState* q,int seli,
   gk = gcry_mpi_point_new(0);
   PK0 = gcry_mpi_point_new(0);
   gcry_mpi_ec_mul(gk,q->k,DHg,r->ctx);
-  gcry_mpi_point_copy(PK0,gk,r->scratchx,r->scratchy,r->scratchz);
+  oblivc_mpi_point_copy(PK0,gk,r->scratchx,r->scratchy,r->scratchz);
 
   if(seli==0) { i=0; p=&gk; }
   else { i=seli-1; p=&PK0; }
