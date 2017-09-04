@@ -42,7 +42,6 @@ void __obliv_c__setBitOr(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a);
 void __obliv_c__flipBit(OblivBit* dest); // Avoids a struct copy
-void __obliv_c__floatAdd(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 
 void __obliv_c__setFloatKnown
     (void * dest, size_t size, float value);
@@ -96,16 +95,10 @@ void __obliv_c__setBitsAdd (void* dest,void* carryOut
                            ,const void* op1,const void* op2
                            ,const void* carryIn
                            ,size_t size);
-void __obliv_c__setBitsAddF (void* dest,void* carryOut
-                            ,const void* op1,const void* op2
-                            ,const void* carryIn
-                            ,size_t size);
 void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n);
 void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n);
 void __obliv_c__condNeg (const void* vcond, void* vdest
                         ,const void* vsrc, size_t n);
-void __obliv_c__condNegF (const void* vcond, void* vdest
-                         ,const void* vsrc, size_t n);
 // Fun fact: product of n-bit numbers, when truncated to n-bits, is the 
 //   same whether the numbers are signed or unsigned
 void __obliv_c__setMul (void* vdest
@@ -139,10 +132,6 @@ void __obliv_c__setModSigned (void* vdest
 void __obliv_c__setBitsSub (void* dest,void* borrowOut
                            ,const void* op1,const void* op2
                            ,const void* borrowIn,size_t size);
-void __obliv_c__setBitsSubF (void* vdest,void* carryOut
-                            ,const void* vop1,const void* vop2
-                            ,const void* carryIn
-                            ,size_t size);
 void __obliv_c__setPlainSubF (void* vdest
                              ,const void* vop1 ,const void* vop2
                              ,size_t size);

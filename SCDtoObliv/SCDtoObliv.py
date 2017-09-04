@@ -1,7 +1,12 @@
 """
-SCDtoObliv.py - Can read, evaluate, and output 
-    garbled circuits formatted for Obliv-C or
-    for the pyOblivTest program.
+SCDtoObliv.py - Parses an SCD file for various purposes.
+    SCD circuit files are obtained from TinyGarble at
+    https://github.com/esonghori/TinyGarble.
+    After parsing, this tool can either:
+      * Evaluate the circuit.
+      * Produce Python code for evaluating the circuit
+         (e.g. pyOblivTest.py).
+      * Produce Obliv-C code for the circuit.
 
     Instructions:
     1) Specify a SCD circuit file as an argument to

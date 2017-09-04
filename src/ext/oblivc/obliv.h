@@ -38,6 +38,4 @@ void execNnobProtocol(ProtocolDesc* pd, protocol_run start, void* arg, int numOT
 size_t tcp2PBytesSent(ProtocolDesc* pd);
 size_t tcp2PFlushCount(ProtocolDesc* pd);
 
-uint64_t yaoGateCount(void);
-
 #endif // OBLIV_H

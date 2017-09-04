@@ -10,7 +10,8 @@ module H = Hashtbl
 let rec checkOblivType t = match t with
 | TVoid a -> if hasOblivAttr a then Some "void" else None
 | TInt _ -> None
-| TFloat(_,a) -> None
+| TFloat(FFloat, _) -> None
+| TFloat(_,a) -> if hasOblivAttr a then Some "unimplemented" else None
 | TPtr(t,a) -> if hasOblivAttr a then Some "pointer" else checkOblivType t
 | TArray(t,_,a) -> if hasOblivAttr a then Some "array" else checkOblivType t
 | TFun(tres,targs,_,_) -> begin match checkOblivType tres with
@@ -107,7 +108,7 @@ let updateOblivBitType ci = begin
     let fargTypes = [ "dest",!oblivBitPtr,[]; "src",!oblivConstBitPtr,[]
                     ; "bitcount",intType,[] ] in
     let ftype = TFun (TVoid [], Some fargTypes, false, []) in
-     Lval (Var (makeGlobalVar "__obliv_c__copySimpleObliv" ftype),NoOffset)
+    Lval (Var (makeGlobalVar "__obliv_c__copySimpleObliv" ftype),NoOffset)
   end;
 end
 
@@ -241,7 +242,7 @@ class typeCheckVisitor = object(self)
   method vtype vtype = match checkOblivType vtype with
     | None -> DoChildren
     | Some cat -> if cat = "unimplemented" 
-                    then E.s (E.unimp "obliv double/enum")
+                    then E.s (E.unimp "obliv double/long double/enum")
                     else E.s (E.error "%s:%i: %s cannot be obliv-type" 
                               !currentLoc.file !currentLoc.line cat)
 
@@ -342,7 +343,7 @@ class typeCheckVisitor = object(self)
       if isOblivSimple st && not (isOblivSimple t) then
         let isint = function TInt _ -> true | _ -> false in
         let isfloat = function TFloat _ -> true | _ -> false in
-        if (isint st && isint t) || (isfloat st && isfloat st) 
+        if (isint st && isint t) || (isfloat st && isfloat t) 
           then CastE(addOblivType t,e)
         else
         begin
@@ -465,12 +466,8 @@ let voidFunc name argTypes =
 
 let cmpLtFuncs = ("__obliv_c__setLessThanUnsigned"
                  ,"__obliv_c__setLessThanSigned")
-let cmpLtFuncsF = ("__obliv_c__setLessThanF"
-                  ,"__obliv_c__setLessThanF")
 let cmpLeFuncs = ("__obliv_c__setLessOrEqualUnsigned"
                  ,"__obliv_c__setLessOrEqualSigned")
-let cmpLeFuncsF = ("__obliv_c__setLessThanEqF"
-                  ,"__obliv_c__setLessThanEqF")
 
 
 let setComparison fname dest s1 s2 loc = 
@@ -501,7 +498,6 @@ let setComparisonUS fnames dest s1 s2 loc =
   let optype = typeOfLval s1 in
   let fname = match unrollType optype with
   | TInt(k,_) -> if isSigned k then snd fnames else fst fnames
-  | TFloat(k,_) -> fst fnames
   | _ -> E.s (E.error "Cannot operate on obliv values of type %a" d_type optype)
   in
   setComparison fname dest s1 s2 loc
@@ -564,7 +560,7 @@ let condSetKnownInt c v k x loc =
                  ; CastE(widestType,CastE(TInt(k,[]),x))
                  ],loc)
 
-let setKnownFloat v k x loc = 
+let setKnownFloat v k x loc =
   let fargTypes = ["dest",TPtr(typeOfLval v,[]),[]
                 ;"bitcount",!typeOfSizeOf,[]
                 ;"value",widestType,[]
@@ -574,7 +570,7 @@ let setKnownFloat v k x loc =
                ; CastE(widestType,CastE(TFloat(k,[]),x))
                ],loc)
 
-let condSetKnownFloat c v k x loc = 
+let condSetKnownFloat c v k x loc =
   let fargTypes = ["cond",TPtr(oblivBoolType,[]),[]
                   ;"dest",TPtr(typeOfLval v,[]),[]
                   ;"size",!typeOfSizeOf,[]
@@ -685,10 +681,10 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | Shiftlt-> E.s (E.error "Shift operation on float invalid!\n")
         | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
         | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
-        | Lt -> setComparisonUS cmpLtFuncsF v e1 e2 loc
-        | Gt -> setComparisonUS cmpLtFuncsF v e2 e1 loc
-        | Le -> setComparisonUS cmpLeFuncsF v e1 e2 loc
-        | Ge -> setComparisonUS cmpLeFuncsF v e2 e1 loc
+        | Lt -> setComparison "__obliv_c__setLessThanF" v e1 e2 loc
+        | Gt -> setComparison "__obliv_c__setLessThanF" v e2 e1 loc
+        | Le -> setComparison "__obliv_c__setLessThanEqF" v e1 e2 loc
+        | Ge -> setComparison "__obliv_c__setLessThanEqF" v e2 e1 loc
         | BAnd -> E.s (E.error "Bitwise operation on float invalid!\n")
         | BXor -> E.s (E.error "Bitwise operation on float invalid!\n")
         | BOr  -> E.s (E.error "Bitwise operation on float invalid!\n")
@@ -725,7 +721,7 @@ let isTaggedTemp lv = hasAttribute SimplifyTagged.simplifyTempTok
  * curCond : generated instructions should only have an effect if this is true
  * tmpVar: creates a new temporary var in current function
  * isDeepVar: checks if a given varinfo is declared at current block scope (vs.
- *              some outer scope
+ *              some outer scope)
  * instr: the instruction to be compiled *)
 let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list = 
   let setUsingTmp v x loc = 
@@ -743,7 +739,8 @@ let rec codegenInstr curCond tmpVar isDeepVar (instr:instr) : instr list =
         [condAssign curCond v v2 loc]
       else setUsingTmp v (Lval v2) loc
   | Set(v,(BinOp(_,_,_,t) as x),loc) when isOblivSimple t -> setUsingTmp v x loc
-  | Set(v,(CastE(t,x) as xf),loc) when (isOblivInt t || isOblivFloat t) && isOblivSimple (typeOfLval v) ->
+  | Set(v,(CastE(t,x) as xf),loc)
+      when (isOblivInt t || isOblivFloat t) && isOblivSimple (typeOfLval v) ->
       if isOblivSimple (typeOf x) then setUsingTmp v xf loc
       else begin match unrollType t with
            | TInt(k,_) -> [condSetKnownInt curCond v k x loc]
