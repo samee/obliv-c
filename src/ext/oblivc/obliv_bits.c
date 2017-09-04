@@ -1747,11 +1747,17 @@ void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n)
   __obliv_c__condNeg(&__obliv_c__trueCond,vdest,vsrc,n);
 }
 
-void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n)
+void __obliv_c__condNegF (const void* vcond, void* vdest
+                        ,const void* vsrc, size_t n)
 {
   OblivBit *dest=vdest;
   const OblivBit *op1=vsrc, *op2=vcond;
   obliv_float_neg_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n)
+{
+  __obliv_c__condNegF(&__obliv_c__trueCond,vdest,vsrc,n);
 }
 
 void __obliv_c__setMul (void* vdest
