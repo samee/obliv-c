@@ -113,31 +113,31 @@ void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit* dest
 void __obliv_c__setSignedKnown
   (void* vdest, size_t size, long long signed value)
 {
-    OblivBit* dest=vdest;
-    while(size-- > 0) { 
-        __obliv_c__assignBitKnown(dest, value & 1);
-        value >>= 1; 
-        dest++;
-    }
+  OblivBit* dest=vdest;
+  while(size-->0)
+  { __obliv_c__assignBitKnown(dest,value&1);
+    value>>=1;
+    dest++;
+  }
 }
 
 void __obliv_c__setFloatKnown(void* vdest, size_t size, float value) {
-    unsigned char* floatBytes = (unsigned char*) &value;
-    OblivBit* dest = vdest;
-    int i = 0;
-    int j = 0;
-    unsigned char currentByte = floatBytes[j];
-    while(size-- > 0) { 
-        __obliv_c__assignBitKnown(dest, currentByte & 0x01);
-        currentByte >>= 1; 
-        dest++;
-        i++;
-        if (i == 8) {
-            i = 0;
-            j++;
-            currentByte = floatBytes[j];
-        }
+  unsigned char* floatBytes = (unsigned char*) &value;
+  OblivBit* dest = vdest;
+  int i = 0;
+  int j = 0;
+  unsigned char currentByte = floatBytes[j];
+  while(size-- > 0)
+  { __obliv_c__assignBitKnown(dest, currentByte & 0x01);
+    currentByte >>= 1; 
+    dest++;
+    i++;
+    if (i == 8)
+    { i = 0;
+      j++;
+      currentByte = floatBytes[j];
     }
+  }
 }
 
 void __obliv_c__setUnsignedKnown
@@ -248,17 +248,6 @@ void __obliv_c__setBitsAdd (void* vdest,void* carryOut
   }
 }
 
-// carryIn and/or carryOut can be NULL, in which case they are ignored
-void __obliv_c__setBitsAddF (void* vdest,void* carryOut
-                           ,const void* vop1,const void* vop2
-                           ,const void* carryIn
-                           ,size_t size)
-{
-  OblivBit *dest=vdest;
-  const OblivBit *op1=vop1, *op2=vop2;
-  obliv_float_add_circuit(dest, op1, op2);
-}
-
 void __obliv_c__setPlainAdd (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size)
@@ -267,7 +256,10 @@ void __obliv_c__setPlainAdd (void* vdest
 void __obliv_c__setPlainAddF (void* vdest
                           ,const void* vop1 ,const void* vop2
                           ,size_t size)
-  { __obliv_c__setBitsAddF (vdest,NULL,vop1,vop2,NULL,size); }
+{ OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_add_circuit(dest, op1, op2);
+}
 
 void __obliv_c__setBitsSub (void* vdest, void* borrowOut
                            ,const void* vop1,const void* vop2
@@ -306,20 +298,13 @@ void __obliv_c__setPlainSub (void* vdest
                             ,size_t size)
   { __obliv_c__setBitsSub (vdest,NULL,vop1,vop2,NULL,size); }
 
-void __obliv_c__setBitsSubF (void* vdest,void* carryOut
-                            ,const void* vop1,const void* vop2
-                            ,const void* carryIn
-                            ,size_t size)
-{
-  OblivBit *dest=vdest;
-  const OblivBit *op1=vop1, *op2=vop2;
-  obliv_float_sub_circuit(dest, op1, op2);
-}
-
 void __obliv_c__setPlainSubF (void* vdest
                              ,const void* vop1 ,const void* vop2
                              ,size_t size)
-  { __obliv_c__setBitsSubF (vdest,NULL,vop1,vop2,NULL,size); }
+{ OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_sub_circuit(dest, op1, op2);
+}
 
 #define MAX_BITS (8*sizeof(widest_t))
 // dest = c?src:0;
@@ -358,17 +343,11 @@ void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n)
   __obliv_c__condNeg(&__obliv_c__trueCond,vdest,vsrc,n);
 }
 
-void __obliv_c__condNegF (const void* vcond, void* vdest
-                        ,const void* vsrc, size_t n)
+void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n)
 {
   OblivBit *dest=vdest;
   const OblivBit *op1=vsrc, *op2=vcond;
   obliv_float_neg_circuit(dest, op1, op2);
-}
-
-void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n)
-{
-  __obliv_c__condNegF(&__obliv_c__trueCond,vdest,vsrc,n);
 }
 
 void __obliv_c__setMul (void* vdest
