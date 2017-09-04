@@ -36,6 +36,7 @@ stamp-h: config.h.in config.status
 	./config.status
 
 CC=@CC@
+CPP=@CPP@
 @DEFAULT_COMPILER@=1
 
 # We have to use _build because of OCaml's bug #0004502
@@ -57,7 +58,7 @@ CILLIB_TARGETS=
 CILLY_EXE_FILES=
 
 CIL_PLUGINS_DIR = src/ext
-CIL_EXCLUDE_PLUGINS =
+CIL_EXCLUDE_PLUGINS = oblivc
 CIL_PLUGINS = $(addprefix $(OBJDIR)/,$(filter-out $(addprefix $(CIL_PLUGINS_DIR)/, $(CIL_EXCLUDE_PLUGINS)),$(wildcard $(CIL_PLUGINS_DIR)/*)))
 
 CIL_DEFAULT_PLUGINS = $(patsubst $(CIL_PLUGINS_DIR)/%/default,cil.%,$(wildcard $(CIL_PLUGINS_DIR)/*/default))
@@ -104,10 +105,10 @@ $(OCAMLBUILD_TARGETS): ocamlbuild
 	@:
 
 # ------ these lines were added for obliv-C runtime -----------
-ifeq ($(RELEASE),1)
-  CFLAGS=-O3
-else
+ifeq ($(DEBUG),1)
   CFLAGS=-g
+else
+  CFLAGS=-O3
 endif
 DEPENDDIR = $(OBJDIR)/depends
 OCSRCDIR = src/ext/oblivc
@@ -116,20 +117,24 @@ OOCPARTS += copy
 
 oblivruntime: $(OBJDIR)/libobliv.a
 	
-$(OBJDIR)/libobliv.a: $(OCPARTS:%=$(OBJDIR)/%.o)
+$(OBJDIR)/libobliv.a: $(OCPARTS:%=$(OBJDIR)/%.o) $(OOCPARTS:%=$(OBJDIR)/%.oo)
 	ar cr $@ $^
 
 $(DEPENDDIR):
 	mkdir -p $(DEPENDDIR)
 
 $(OCPARTS:%=$(DEPENDDIR)/%.d): $(DEPENDDIR)/%.d: $(OCSRCDIR)/%.c $(DEPENDDIR) 
-	$(CC) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.o > $@
+	$(CPP) -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.o > $@
 	echo '	$$(CC) -c $$< -o $$@ -I $$(OCSRCDIR) $$(CFLAGS)' >> $@
+
+$(OOCPARTS:%=$(DEPENDDIR)/%.od): $(DEPENDDIR)/%.od: $(OCSRCDIR)/%.oc $(DEPENDDIR) 
+	$(CPP) -x c -MM $< -I$(OCSRCDIR) -MT $(OBJDIR)/$*.oo > $@
+	echo '	$$(BINDIR)/oblivcc -c $$< -o $$@ -I $$(OCSRCDIR) $$(CFLAGS)' >> $@
 
 # TODO update ocamlutil/Makefile.ocaml no longer used
 # CLEANING defind in ocamlutil/Makefile.ocaml based on $(MAKECMDGOALS)
 ifndef CLEANING
-  -include $(OCPARTS:%=$(DEPENDDIR)/%.d)
+  -include $(OCPARTS:%=$(DEPENDDIR)/%.d) $(OOCPARTS:%=$(DEPENDDIR)/%.od)
 endif
 # ------ end of obliv-C runtime -------------------------------
 
