@@ -1,3 +1,4 @@
+#include <obliv_bits.h>
 #include <obliv_float_ops.h>
 #include <obliv_types.h>
 
