@@ -1,3 +1,5 @@
+#include <obliv_bits.h>
+#include <obliv_float_ops.h>
 #include <obliv_types.h>
 
 void obliv_float_eq_circuit(OblivBit* dest, const OblivBit* op1, const OblivBit* op2)
