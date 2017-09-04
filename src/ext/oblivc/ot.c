@@ -236,14 +236,19 @@ static void npotSend_roundRecvKey(NpotSender* s,NpotSenderState* q)
   { q->PK0 = dhRecv(s->pd,s->destParty); }
 
 // x,y,z are scratch
-static void gcry_mpi_point_copy(gcry_mpi_point_t w, gcry_mpi_point_t v,
+// TODO(samee): Use gcry_mpi_point_copy when the libgcrypt 1.8 graduates
+// out of Debian experimental branch.
+static void oblivc_mpi_point_copy(gcry_mpi_point_t w, gcry_mpi_point_t v,
       gcry_mpi_t x,gcry_mpi_t y,gcry_mpi_t z)
 {
   gcry_mpi_point_get(x,y,z,v);
   gcry_mpi_point_set(w,x,y,z);
 }
 // x,y,z are scratch
-static void gcry_mpi_point_neg(gcry_mpi_point_t w,gcry_mpi_point_t v,
+// TODO(samee): We should start using gcry_mpi_ec_sub() directly.
+//   But see https://github.com/samee/obliv-c/pull/39
+//   We first need to add support for this in libgcrypt.
+static void oblivc_mpi_point_neg(gcry_mpi_point_t w,gcry_mpi_point_t v,
     gcry_mpi_t x,gcry_mpi_t y,gcry_mpi_t z)
 {
   gcry_mpi_point_get(x,y,z,v);
@@ -262,7 +267,7 @@ static void npotSend_roundSendData(NpotSender* s,NpotSenderState* q,
   gcry_mpi_ec_mul(PK0,s->r,PK0,s->ctx);
   oneTimePad(buf,arr[0],len,PK0,s->R,0,s->ctx,s->scratchx,s->scratchy);
   osend(s->pd,s->destParty,buf,len);
-  gcry_mpi_point_neg(PK0,PK0,s->scratchx,s->scratchy,s->scratchz);
+  oblivc_mpi_point_neg(PK0,PK0,s->scratchx,s->scratchy,s->scratchz);
 
   for(i=1;i<n;++i)
   { gcry_mpi_ec_add(PKi,PK0,s->Cr[i-1],s->ctx);
@@ -354,11 +359,11 @@ static void npotRecv_roundSendKey(NpotRecver* r,NpotRecverState* q,int seli,
   gk = gcry_mpi_point_new(0);
   PK0 = gcry_mpi_point_new(0);
   gcry_mpi_ec_mul(gk,q->k,DHg,r->ctx);
-  gcry_mpi_point_copy(PK0,gk,r->scratchx,r->scratchy,r->scratchz);
+  oblivc_mpi_point_copy(PK0,gk,r->scratchx,r->scratchy,r->scratchz);
 
   if(seli==0) { i=0; p=&gk; }
   else { i=seli-1; p=&PK0; }
-  gcry_mpi_point_neg(*p,gk,r->scratchx,r->scratchy,r->scratchz);
+  oblivc_mpi_point_neg(*p,gk,r->scratchx,r->scratchy,r->scratchz);
   gcry_mpi_ec_add(*p,*p,r->C[i],r->ctx);
   dhSend(PK0,r->pd,r->srcParty,r->ctx,r->scratchx,r->scratchy);
 
