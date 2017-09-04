@@ -45,6 +45,7 @@
 /index.html
 /stamp-h
 /META
+/.vscode
 
 # /debian/
 /debian/build-stamp

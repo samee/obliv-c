@@ -163,34 +163,6 @@ class GarbledCircuit:
             + str(self.outputs) + "]"
 
 
-class util_cppReadOp:
-    def __init__(self, openFile):
-        self.f = openFile
-        self.chars = []
-        self.cursor = 0
-        self.prepFile()
-
-    def prepFile(self):
-        fileLines = [x.rstrip() for x in self.f.readlines()]
-        for line in fileLines:
-            self.chars.extend([int(x.strip())
-                               for x in line.split(' ') if x != ''])
-
-    def readToBreak(self):
-        if self.cursor < len(self.chars):
-            char = self.chars[self.cursor]
-            self.cursor += 1
-            return char
-        else:
-            return -1
-
-    def read(self):
-        return self.readToBreak()
-
-    def debugRead(self):
-        print(self.chars)
-
-
 class ReadSCD:
     def __init__(self, filename, garbledCircuit):
         self.filename = filename
