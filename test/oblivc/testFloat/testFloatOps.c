@@ -5,7 +5,7 @@
 #include <math.h>
 #include <assert.h>
 #include "../common/util.h"
-#include "dbg.h"
+#include "../common/dbg.h"
 
 #include "testFloatOps.h"
 
