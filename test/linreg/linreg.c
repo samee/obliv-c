@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
 
         // Print results and gate count
         log_info("Total time: %lf seconds\n", runtime);
-        log_info("Yao Gate Count: %u\n", yaoGateCount());
+        // log_info("Yao Gate Count: %u\n", yaoGateCount());
         printf("\n");
         log_info("Slope   \tm = %15.6e\n", io.m); // print slope
         log_info("y-intercept\tb = %15.6e\n", io.b); // print y-intercept
