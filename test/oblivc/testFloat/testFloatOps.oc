@@ -40,13 +40,15 @@ void floatOps(void* args)
     // Addition
     obliv_z = obliv_x + obliv_y;
     revealOblivFloat(&z, obliv_z, 0);
+    printf("Addition test: expect 3.579000\n");
     printf("Addition: %f\n", z);
     printAsBinary(z);
     printf("\n");
 
-    // Addition
+    // Subtraction
     obliv_z = obliv_x - obliv_y;
     revealOblivFloat(&z, obliv_z, 0);
+    printf("Subtraction test: expect 1.111000\n");
     printf("Subtraction: %f\n", z);
     printAsBinary(z);
     printf("\n");
@@ -54,6 +56,7 @@ void floatOps(void* args)
     // Multiplication
     obliv_z = obliv_x * obliv_y;    
     revealOblivFloat(&z, obliv_z, 0);
+    printf("Multiplication test: expect 2.893730\n");
     printf("Multiplication: %f\n", z);
     printAsBinary(z);
     printf("\n");
@@ -61,6 +64,7 @@ void floatOps(void* args)
     // Division
     obliv_z = obliv_x / obliv_y;
     revealOblivFloat(&z, obliv_z, 0);
+    printf("Division test: expect 0.526226\n");
     printf("Division: %f\n", z);
     printAsBinary(z);
     printf("\n");
@@ -68,6 +72,7 @@ void floatOps(void* args)
     // Negation
     obliv_z = -obliv_x;
     revealOblivFloat(&z, obliv_z, 0);
+    printf("Negation test: expect -1.234000\n");
     printf("Negation: %f\n", z);
     printAsBinary(z);
     printf("\n");
@@ -76,6 +81,7 @@ void floatOps(void* args)
     bool r;
     obliv bool o_r = obliv_x != obliv_y;
     revealOblivBool(&r, o_r, 0);
+    printf("Not equal test: expect Not Equal\n");
     if (r) {
         printf("Not Equal\n");
     } else {
@@ -88,10 +94,11 @@ void floatOps(void* args)
     bool r;
     obliv bool o_r = obliv_x == obliv_y;
     revealOblivBool(&r, o_r, 0);
+    printf("Equal test: expect Not Equal\n");
     if (r) {
-        printf("Not Equal\n");
-    } else {
         printf("Equal\n");
+    } else {
+        printf("Not Equal\n");
     }
     printAsBinary(r);
     printf("\n");
@@ -100,6 +107,7 @@ void floatOps(void* args)
     bool r;
     obliv bool o_r = obliv_x < obliv_y;
     revealOblivBool(&r, o_r, 0);
+    printf("Less than test: expect Less than\n");
     if (r) {
         printf("Less than\n");
     } else {
@@ -112,6 +120,7 @@ void floatOps(void* args)
     bool r;
     obliv bool o_r = obliv_x > obliv_y;
     revealOblivBool(&r, o_r, 0);
+    printf("Greater than test: expect Not greater than\n");
     if (r) {
         printf("Greater than\n");
     } else {
@@ -124,6 +133,7 @@ void floatOps(void* args)
     bool r;
     obliv bool o_r = obliv_x <= obliv_y;
     revealOblivBool(&r, o_r, 0);
+    printf("Less than or equal to test: expect Less than or equal to\n");
     if (r) {
         printf("Less than or equal to\n");
     } else {
@@ -136,6 +146,7 @@ void floatOps(void* args)
     bool r;
     obliv bool o_r = obliv_x >= obliv_y;
     revealOblivBool(&r, o_r, 0);
+    printf("Greater than or equal to test: expect Not greater than or equal to\n");
     if (r) {
         printf("Greater than or equal to\n");
     } else {
@@ -148,6 +159,7 @@ void floatOps(void* args)
     float x_test_r;
     obliv float x_test = 55;
     revealOblivFloat(&x_test_r, x_test, 0);
+    printf("setFloatKnown test: expect 55.000000\n");
     printf("X_test_r: %f\n", x_test_r);
     printAsBinary(x_test_r);
     printf("\n");

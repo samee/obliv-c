@@ -4,7 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
-#include "../oblivc/common/util.h"
+#include "../common/util.h"
 #include "dbg.h"
 
 #include "testFloatOps.h"
@@ -48,7 +48,7 @@ void load_data(protocolIO *io, float* x, float* y, int party)
 
 int main(int argc, char *argv[]) 
 {
-  printf("Floating Point Addition\n");
+  printf("Floating Point Operations\n");
   printf("=================\n\n");
 
   // Check args
