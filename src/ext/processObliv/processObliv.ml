@@ -497,6 +497,7 @@ let setComparisonUS fnames dest s1 s2 loc =
   let optype = typeOfLval s1 in
   let fname = match unrollType optype with
   | TInt(k,_) -> if isSigned k then snd fnames else fst fnames
+  | TFloat(k,_) -> fst fnames
   | _ -> E.s (E.error "Cannot operate on obliv values of type %a" d_type optype)
   in
   setComparison fname dest s1 s2 loc
@@ -712,6 +713,10 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         if isSigned sk then
           setIntExtend "__obliv_c__setSignExtend" dv dk sv sk loc
         else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
+    | _ -> instr
+    end
+| Set(dv,CastE(dt,Lval sv),loc) when isOblivFloat dt ->
+    begin match unrollType dt,unrollType (typeOfLval sv) with
     | _ -> instr
     end
 | Set(v,CastE(t,x),loc) when isOblivSimple t ->
