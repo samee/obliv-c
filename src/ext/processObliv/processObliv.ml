@@ -632,8 +632,10 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
     | TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
         | Neg -> setUnop "__obliv_c__setNegF" v e loc
-        | BNot -> E.s (E.error "Bitwise operation on float invalid!\n")
-        | LNot -> E.s (E.error "Logical operation on float not supported!\n")
+        | BNot -> E.s (E.error
+                    "invalid operand to binary ! (have 'obliv float')")
+        | LNot -> E.s (E.error
+                    "invalid operand to logical ! (have 'obliv float')")
         end
     | _ -> instr
     end
@@ -672,23 +674,28 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
             end
         end
     | TFloat(kind, a) when hasOblivAttr a ->
+        let opError s =
+          E.s (E.error "invalid 'obliv float' operand to binary %s" s) in
         begin match op with
         | PlusA  -> setArith "__obliv_c__setPlainAddF" v e1 e2 loc
         | MinusA -> setArith "__obliv_c__setPlainSubF" v e1 e2 loc
         | Mult   -> setArith "__obliv_c__setMulF" v e1 e2 loc
         | Div    -> setArith "__obliv_c__setDivF" v e1 e2 loc
-        | Shiftlt-> E.s (E.error "Shift operation on float invalid!\n")
+        | Shiftlt-> E.s (E.error
+                          "invalid operand to binary << (have 'obliv float')")
+        | Shiftrt-> E.s (E.error
+                          "invalid operand to binary >> (have 'obliv float')")
         | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
         | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
         | Lt -> setComparison "__obliv_c__setLessThanF" v e1 e2 loc
         | Gt -> setComparison "__obliv_c__setLessThanF" v e2 e1 loc
         | Le -> setComparison "__obliv_c__setLessThanEqF" v e1 e2 loc
         | Ge -> setComparison "__obliv_c__setLessThanEqF" v e2 e1 loc
-        | BAnd -> E.s (E.error "Bitwise operation on float invalid!\n")
-        | BXor -> E.s (E.error "Bitwise operation on float invalid!\n")
-        | BOr  -> E.s (E.error "Bitwise operation on float invalid!\n")
-        | LAnd -> E.s (E.error "Logical operation on float not supported!\n")
-        | LOr  -> E.s (E.error "Logical operation on float not supported!\n")
+        | BAnd -> opError "&"
+        | BXor -> opError "^"
+        | BOr  -> opError "|"
+        | LAnd -> opError "&&"
+        | LOr  -> opError "||"
         | _ -> instr
         end
     | _ -> instr
