@@ -1,6 +1,6 @@
 # Samuel Havron
 # https://www.github.com/samuelhavron
-# MIT License
+# BSD License
 
 from sys import argv
 import random
