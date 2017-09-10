@@ -50,9 +50,9 @@ let oblivIntTarget = ref dummyType
 let oblivShortTarget = ref dummyType
 let oblivLongTarget = ref dummyType
 let oblivLLongTarget = ref dummyType
-let oblivFloatTarget = ref dummyType (*CHANGE*)
-let oblivDoubleTarget = ref dummyType (*CHANGE*)
-let oblivLongDoubleTarget = ref dummyType (*CHANGE*)
+let oblivFloatTarget = ref dummyType
+let oblivDoubleTarget = ref dummyType
+let oblivLongDoubleTarget = ref dummyType
 
 (* signed-ness affects code generation (e.g. signed vs unsigned comparison)
  * but not the generated data type *)
@@ -65,7 +65,6 @@ let intTargetType k = match k with
 | ILongLong | IULongLong -> !oblivLLongTarget
 ;;
 
-(*CHANGE*)
 let floatTargetType k = match k with
   | FFloat -> !oblivFloatTarget
   | FDouble -> !oblivDoubleTarget
