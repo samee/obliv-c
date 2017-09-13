@@ -2,6 +2,13 @@
 #define OBLIV_BITS_H
 #define __oblivious_c
 
+/* 
+   Note to maintainers: this header should *never* be included in any other
+   header; it will automatically be included in obliv-c source by the compiler,
+   and it contains defines that should never appear in plain C source (whereas
+   including most other obliv-c headers in regular C source is OK)
+   */
+
 //void* memset(void* s, int c, size_t n); // Hack, had to declare memset
 #include<string.h> // memset to zero
 #include<stdbool.h>

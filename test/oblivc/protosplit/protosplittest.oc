@@ -2,35 +2,43 @@
 #include <obliv_common.h>
 #include "protosplittest.h"
 
-void reducelist(obliv uint32_t * output, uint32_t * inputs, int len, ProtocolDesc * pd) {
-	if (pd != NULL) ocSetCurrentProto(pd);
+void reducelist(obliv uint32_t * output, uint32_t * input, size_t len, size_t index, ProtocolDesc * pds) {
+	ocSetCurrentProto(&pds[index]);
 
 	for (size_t ii = 0; ii < len; ii ++) {
-		*output += feedOblivInt(inputs[ii], ii%2 + 1);
+		obliv uint32_t in = feedOblivInt(input[index*len+ii], ii%2 + 1);
+		output[index] += in;
 	}
 
 	// we want to flush if our protocol is done and other threads are waiting on us
 	// in this case, it's not strictly necessary, but it's a good habit.
-	if (pd != NULL) oflush(pd);
+	oflush(&pds[index]);
 }
 
 void goprotosplit(void* vargs) {
-	obliv uint32_t output1, output2, output3;
+	struct args * a = vargs;
+	fprintf(stdout, "Threads: %d, Elements (each): %u, Total: %u\n", a->threads, a->elct, a->threads * a->elct);
 
-	uint32_t * inputs = malloc(ELCT * 3 * sizeof(uint32_t));
-	for (size_t ii = 0; ii < ELCT*3; ii++) inputs[ii] = ii+1;
+	obliv uint32_t * output = calloc(a->threads, sizeof(obliv uint32_t));
 
-	ProtocolDesc pd1;
-	ocSplitProto(&pd1, ocCurrentProto());
-	ProtocolDesc pd2;
-	ocSplitProto(&pd2, &pd1);
-	parallelize(reducelist, &output1, &output2, &output3, inputs, ELCT, &pd1, &pd2);
-	ocCleanupProto(&pd2);
-	ocCleanupProto(&pd1);
+	uint32_t * input = malloc(a->threads * a->elct * sizeof(uint32_t));
+	for (size_t ii = 0; ii < a->threads * a->elct; ii++) input[ii] = ii+1;
 
-	output1 += output2 + output3;
+	ProtocolDesc * pdorig = ocCurrentProto();	
+	ProtocolDesc * pds = malloc(a->threads * sizeof(ProtocolDesc));
+	for (size_t ii = 0; ii < a->threads; ii++) ocSplitProto(&pds[ii], ocCurrentProto());
+	parallelize(reducelist, output, input, a->elct, a->threads, pds);
+	for (size_t ii = 0; ii < a->threads; ii++) ocCleanupProto(&pds[ii]);
+	ocSetCurrentProto(pdorig);
+
+	for (size_t ii = 1; ii < a->threads; ii++)  {
+		output[0] += output[ii];
+	}
+	
 	uint32_t result;
-	revealOblivInt(&result, output1, 0);
-	printf("Result: %u, Expected: %u\n", result, (ELCT*3+1)*(ELCT*3)/2);
-	free(inputs);
+	revealOblivInt(&result, output[0], 0);
+	fprintf(stdout, "Result: %u, Expected: %u\n", result, (a->elct*a->threads+1)*(a->elct*a->threads)/2);
+	free(input);
+	free(output);
+	free(pds);
 }

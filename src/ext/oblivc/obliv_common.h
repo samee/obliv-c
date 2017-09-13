@@ -74,6 +74,7 @@ void npotRecv1Of2(struct NpotRecver* r,char* dest,const bool* sel,int n,int len,
     int batchsize);
 
 struct HonestOTExtRecver* honestOTExtRecverNew(ProtocolDesc* pd,int srcparty);
+struct HonestOTExtRecver* honestOTExtRecverSplit(struct HonestOTExtRecver* t, ProtocolDesc* pd);
 void honestOTExtRecverRelease(struct HonestOTExtRecver* recver);
 void honestOTExtRecv1Of2(struct HonestOTExtRecver* r,char* dest,const bool* sel,
     int n,int len);
@@ -86,6 +87,7 @@ void honestOTExtRecv1Of2Chunk(void* vargs,char* dest,int nchunk,
     int len,bool isCorr);
 
 struct HonestOTExtSender* honestOTExtSenderNew(ProtocolDesc* pd,int destparty);
+struct HonestOTExtSender* honestOTExtSenderSplit(struct HonestOTExtSender* t, ProtocolDesc* pd);
 void honestOTExtSenderRelease(struct HonestOTExtSender* sender);
 void honestOTExtSend1Of2(struct HonestOTExtSender* s,
     const char* opt0,const char* opt1,int n,int len);
