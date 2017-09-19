@@ -160,6 +160,9 @@ void __obliv_c__setLessOrEqualSigned (void* dest
 void __obliv_c__setEqualTo (void* dest
                            ,const void* op1,const void* op2
                            ,size_t size);
+void __obliv_c__setEqualToF (void* vdest
+                            ,const void* vop1,const void* vop2
+                            ,size_t size);
 void __obliv_c__setNotEqualF (void* vdest
                              ,const void* vop1,const void* vop2
                              ,size_t size);
