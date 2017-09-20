@@ -1,5 +1,7 @@
 #ifndef OBLIV_BITS_H
 #define OBLIV_BITS_H
+#define __oblivious_c
+
 //void* memset(void* s, int c, size_t n); // Hack, had to declare memset
 #include<string.h> // memset to zero
 #include<stdbool.h>
@@ -7,8 +9,7 @@
 
 // import common types
 #include<obliv_types_internal.h>
-
-void ocSetCurrentProto(ProtocolDesc* pd);
+#include<obliv_common.h>
 
 #define __bitsize(type) (8*sizeof(type))
 
@@ -20,6 +21,7 @@ typedef struct { OblivBit bits[__bitsize(int)];   } __obliv_c__int;
 typedef struct { OblivBit bits[__bitsize(short)]; } __obliv_c__short;
 typedef struct { OblivBit bits[__bitsize(long)];  } __obliv_c__long;
 typedef struct { OblivBit bits[__bitsize(long long)]; } __obliv_c__lLong;
+typedef struct { OblivBit bits[__bitsize(float)]; } __obliv_c__float;
 
 // Just a cast
 static inline OblivBit* __obliv_c__bits(void* x) { return x; }
@@ -41,12 +43,8 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b);
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a);
 void __obliv_c__flipBit(OblivBit* dest); // Avoids a struct copy
 
-// Careful with this function: obliv things must be done in-sync by all parties
-// Therefore actions in if(ocCurrentParty()==me) {...} must not touch obliv data
-//   This is not checked by the compiler in any way; you have been warned
-int ocCurrentParty();
-int ocCurrentPartyDefault(ProtocolDesc* pd);
-
+void __obliv_c__setFloatKnown
+    (void * dest, size_t size, float value);
 // Bitvector functions (these functions also work if dest and source point
 //   to the same object).
 // unconditional versions:
@@ -87,6 +85,9 @@ void __obliv_c__setRShift (void* vdest, const void* vsrc, size_t size,
 void __obliv_c__setPlainAdd (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size);
+void __obliv_c__setPlainAddF (void* vdest
+                            ,const void* vop1 ,const void* vop2
+                            ,size_t size);
 void __obliv_c__setPlainSub (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size);
@@ -95,6 +96,7 @@ void __obliv_c__setBitsAdd (void* dest,void* carryOut
                            ,const void* carryIn
                            ,size_t size);
 void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n);
+void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n);
 void __obliv_c__condNeg (const void* vcond, void* vdest
                         ,const void* vsrc, size_t n);
 // Fun fact: product of n-bit numbers, when truncated to n-bits, is the 
@@ -102,6 +104,12 @@ void __obliv_c__condNeg (const void* vcond, void* vdest
 void __obliv_c__setMul (void* vdest
                        ,const void* vop1 ,const void* vop2
                        ,size_t size);
+void __obliv_c__setMulF (void* vdest
+                        ,const void* vop1 ,const void* vop2
+                        ,size_t size);
+void __obliv_c__setDivF (void* vdest
+                        ,const void* vop1 ,const void* vop2
+                        ,size_t size);
 void __obliv_c__setDivModUnsigned (void* vquot, void* vrem
                                   ,const void* vop1, const void* vop2
                                   ,size_t size);
@@ -124,6 +132,9 @@ void __obliv_c__setModSigned (void* vdest
 void __obliv_c__setBitsSub (void* dest,void* borrowOut
                            ,const void* op1,const void* op2
                            ,const void* borrowIn,size_t size);
+void __obliv_c__setPlainSubF (void* vdest
+                             ,const void* vop1 ,const void* vop2
+                             ,size_t size);
 void __obliv_c__setSignExtend (void* dest, size_t dsize
                               ,const void* src, size_t ssize);
 void __obliv_c__setZeroExtend (void* dest, size_t dsize
@@ -149,6 +160,18 @@ void __obliv_c__setLessOrEqualSigned (void* dest
 void __obliv_c__setEqualTo (void* dest
                            ,const void* op1,const void* op2
                            ,size_t size);
+void __obliv_c__setEqualToF (void* vdest
+                            ,const void* vop1,const void* vop2
+                            ,size_t size);
+void __obliv_c__setNotEqualF (void* vdest
+                             ,const void* vop1,const void* vop2
+                             ,size_t size);
+void __obliv_c__setLessThanF (void* vdest
+                             ,const void* vop1,const void* vop2
+                             ,size_t size);
+void __obliv_c__setLessThanEqF (void* vdest
+                               ,const void* vop1,const void* vop2
+                               ,size_t size);
 void __obliv_c__setNotEqual (void* dest
                             ,const void* op1,const void* op2
                             ,size_t size);
@@ -163,6 +186,16 @@ void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size
 {
   OblivBit ov[__bitsize(widest_t)];
   __obliv_c__setSignedKnown(ov,size,val);
+  __obliv_c__ifThenElse(dest,ov,dest,size,cond);
+}
+
+// Conditionals (TODO other operators) that may be faster at times
+static inline 
+void __obliv_c__condAssignKnownF(const void* cond, void* dest, size_t size
+                                ,widest_t val)
+{
+  OblivBit ov[__bitsize(widest_t)];
+  __obliv_c__setFloatKnown(ov,size,val);
   __obliv_c__ifThenElse(dest,ov,dest,size,cond);
 }
 

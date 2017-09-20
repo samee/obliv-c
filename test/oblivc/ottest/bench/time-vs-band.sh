@@ -43,16 +43,16 @@ echo on
 cd "$PROJECT_PATH/$BENCHDIR"
 # Compilie benchmark program
 $OBLIVCC -O3 $PROJECT_PATH/$BENCHSRC -o $BENCHBIN
-ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN -DREMOTEHOST='\"$LOCAL_HOST\"'"
+ssh $REMOTE_HOST "cd $REMOTE_PATH/$BENCHDIR && $REMOTE_PATH/bin/oblivcc -O3 $REMOTE_PATH/$BENCHSRC -o $BENCHBIN"
 port=$LOCAL_PORT
 for ottype in H M P Q; do
   otcount=5000000
   for ((speed=15000; speed<=50000; speed=$speed+5000)); do
     for ((run=0; $run<3; run=$run+1)); do
-      trickle -s -d $speed -u $speed -w 10000 ./$BENCHBIN $port 1 $ottype $otcount &
+      trickle -s -d $speed -u $speed -w 10000 ./$BENCHBIN $port -- $ottype $otcount &
       sleep 0.3
       echo -n "$port $ottype $otcount $speed" >> $0.log
-      ssh $REMOTE_HOST time $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port 2 $ottype $otcount &>> $0.log
+      ssh $REMOTE_HOST time $REMOTE_PATH/$BENCHDIR/$BENCHBIN $port $LOCAL_HOST $ottype $otcount &>> $0.log
       port=$((port+1))
     done
   done

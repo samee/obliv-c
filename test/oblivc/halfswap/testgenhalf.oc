@@ -1,0 +1,30 @@
+#include"testgenhalf.h"
+#include<assert.h>
+#include<obliv.oh>
+#include<obliv_common.h>
+#include<obliv_yao.h>
+#include<stdlib.h>
+
+void testGenHalf(void* vargs)
+{
+  TestGenHalfIO* args=vargs;
+  int n = args->n;
+  obliv int *opt0 = calloc(args->n,sizeof(obliv int));
+  obliv int *opt1 = calloc(args->n,sizeof(obliv int));
+  int i;
+  int n1 = ocBroadcastInt(args->n,1);
+  int n2 = ocBroadcastInt(args->n,2);
+  assert(n1==n2); 
+  n=n1;
+  feedOblivIntArray(opt0,args->data,n,2);
+  feedOblivIntArray(opt1,args->data+n,n,2);
+  for(i=0;i<n;++i)
+    yaoGHalfSwapGate(ocCurrentProto(),
+        (void*)(opt0+i), (void*)(opt1+i), ocBitSize(obliv int),args->data[i]);
+  for(i=0;i<n;++i)
+  { revealOblivInt(args->data+i,opt0[i],0);
+    revealOblivInt(args->data+n+i,opt1[i],0);
+  }
+  free(opt0);
+  free(opt1);
+}

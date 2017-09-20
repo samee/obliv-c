@@ -4,10 +4,6 @@
 #include<obliv.h>
 #include<obliv_common.h>
 
-#ifndef REMOTEHOST
-#define REMOTEHOST "localhost"
-#endif
-
 void unpackBitString(bool dest[],char src[],size_t boolCount)
 {
   unsigned i,j;
@@ -22,16 +18,17 @@ int main(int argc, char* argv[])
   int n;
   const int len = 10;
   if(argc<5 || sscanf(argv[4],"%d",&n)!=1) 
-  { fprintf(stderr,"Usage %s <port> <party> <H|M|P|Q> <n>\n",argv[0]);
+  { fprintf(stderr,"Usage %s <port> <--|server> <H|M|P|Q> <n>\n",argv[0]);
     return 1;
   }
 	ProtocolDesc pd;
   dhRandomInit();
-  int me = argv[2][0]=='1'?1:2;
+  const char* remote_host = (strcmp(argv[2],"--")==0?NULL:argv[2]);
+  int me = remote_host?2:1;
   int err;
 	//protocolUseStdio(&pd);
   if(me==1) err = protocolAcceptTcp2P(&pd,argv[1]);
-  else err = protocolConnectTcp2P(&pd,REMOTEHOST,argv[1]);
+  else err = protocolConnectTcp2P(&pd,remote_host,argv[1]);
   if(err!=0) { fprintf(stderr,"TCP connection error\n"); return 2; }
 	setCurrentParty(&pd,me);
   pd.error=0;

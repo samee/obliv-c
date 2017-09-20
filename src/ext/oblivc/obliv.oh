@@ -8,12 +8,14 @@ bool ocInNpProto(void);
 void ocNpSetBroadcast1(bool v);
 bool ocNpGetBroadcast1(void);
 
+#ifdef __oblivious_c
 void setupOblivBool(OblivInputs* spec, obliv bool* dest, bool v);
 void setupOblivChar(OblivInputs* spec, obliv char* dest, char v);
 void setupOblivInt(OblivInputs* spec, obliv int* dest, int v);
 void setupOblivShort(OblivInputs* spec, obliv short* dest, short v);
 void setupOblivLong(OblivInputs* spec, obliv long* dest, long v);
 void setupOblivLLong(OblivInputs* spec, obliv long long * dest, long long v);
+void setupOblivFloat(OblivInputs* spec, obliv float *dest, float v);
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party);
 
@@ -24,6 +26,7 @@ obliv short feedOblivShort(short v,int party);
 obliv int feedOblivInt(int v,int party);
 obliv long feedOblivLong(long v,int party);
 obliv long long feedOblivLLong(long long v,int party);
+obliv float feedOblivFloat(float v, int party);
 
 // Feed an entire array. Uses the setup functions above
 void  feedOblivBoolArray(obliv bool  dest[],const bool  src[],size_t n,
@@ -48,6 +51,8 @@ bool revealOblivInt(int* dest, obliv int src,int party);
 bool revealOblivShort(short* dest, obliv short src,int party);
 bool revealOblivLong(long* dest, obliv long src,int party);
 bool revealOblivLLong(long long* dest, obliv long long src,int party);
+bool revealOblivFloat(float *dest, obliv float src, int party);
+#endif
 
 bool ocBroadcastBool(bool v,int source);
 char ocBroadcastChar(char v,int source);
@@ -56,5 +61,5 @@ short ocBroadcastShort(short v,int source);
 long ocBroadcastLong(long v,int source);
 long long ocBroadcastLLong(long long v,int source);
 
-unsigned yaoGateCount(void);
+uint64_t yaoGateCount(void);
 #endif

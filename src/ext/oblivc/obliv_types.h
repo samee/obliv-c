@@ -33,7 +33,7 @@ typedef struct OblivBit OblivBit;
 
 typedef char yao_key_t[YAO_KEY_BYTES];
 
-#define NNOB_KEY_BYTES 10 
+#define NNOB_KEY_BYTES 10
 typedef char nnob_key_t[NNOB_KEY_BYTES];
 typedef struct NnobKey {
 	nnob_key_t key;
@@ -47,7 +47,7 @@ struct ProtocolDesc {
   int partyCount, thisParty, error;
   struct ProtocolTransport* trans;
   union // a struct for each protocol-specific info
-  { 
+  {
     struct { unsigned mulCount,xorCount; } debug;
   };
 
@@ -64,11 +64,16 @@ struct ProtocolDesc {
 
   void* extra;  // protocol-specific information
                 // First field should be char protoType
+
+  // helper functions to split extra protocol info for new threads, and clean up
+  // split protocols when they're done
+  void (*splitextra)(ProtocolDesc*,ProtocolDesc*);
+  void (*cleanextra)(ProtocolDesc*);
 };
 
 #define OC_DYN_EXTRA_FUN(fname,Type1,Type2,type2Id)    \
   Type2* fname(Type1* s1)                              \
-  { if(*(char*)s1->extra==(type2Id)) return s1->extra; \
+  { if(*(char*)s1->extra==(type2Id)) return (Type2*) s1->extra; \
     else return NULL;                                  \
   }
 
@@ -105,8 +110,9 @@ typedef OTrecver COTrecver; // Strong typedef would have been nice
 typedef struct YaoProtocolDesc {
   char protoType;
   yao_key_t R,I; // LSB of R needs to be 1
-  uint64_t gcount;
-  unsigned icount, ocount;
+  uint64_t gcount, gcount_offset;
+  uint64_t icount, ocount;
+  bool ownOT;
   void (*nonFreeGate)(struct ProtocolDesc*,OblivBit*,char,
       const OblivBit*,const OblivBit*);
   union { OTsender sender; OTrecver recver; };
@@ -126,11 +132,15 @@ struct ProtocolTransport {
   ProtocolTransport* (*split)(ProtocolTransport*);
   int (*send)(ProtocolTransport*,int,const void*,size_t);
   int (*recv)(ProtocolTransport*,int,      void*,size_t);
+  int (*flush)(ProtocolTransport*);
   void (*cleanup)(ProtocolTransport*);
 };
 
 struct OblivInputs {
-  unsigned long long src;
+  union {
+    unsigned long long src;
+    float src_f;
+  };
   struct OblivBit* dest;
   size_t size;
 };

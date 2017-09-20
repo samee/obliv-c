@@ -33,3 +33,6 @@ gcry_mpi_t dhRandomExp(BCipherRandomGen* gen);
 unsigned long long bcRandomInt(BCipherRandomGen* gen,unsigned long long max);
 void bcRandomShuffle(BCipherRandomGen* gen,unsigned arr[],size_t n);
 void bcRandomPermutation(BCipherRandomGen* gen,unsigned arr[],size_t n);
+
+// Weird function being used externally
+void setctrFromIntBCipherRandomGen(BCipherRandomGen* gen,uint64_t ctr);

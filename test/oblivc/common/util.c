@@ -4,16 +4,6 @@
 #include<time.h>
 #include"util.h"
 
-#ifndef REMOTE_HOST
-#define REMOTE_HOST localhost
-#endif
-
-#define QUOTE(x) #x
-#define TO_STRING(x) QUOTE(x)
-static const char remote_host[] = TO_STRING(REMOTE_HOST);
-#undef TO_STRING
-#undef QUOTE
-
 double wallClock()
 {
   struct timespec t;
@@ -21,9 +11,10 @@ double wallClock()
   return t.tv_sec+1e-9*t.tv_nsec;
 }
 
-void ocTestUtilTcpOrDie(ProtocolDesc* pd,bool isServer,const char* port)
+void ocTestUtilTcpOrDie(ProtocolDesc* pd,const char* remote_host,
+                        const char* port)
 {
-  if(isServer)
+  if(!remote_host)
   { if(protocolAcceptTcp2P(pd,port)!=0)
     { fprintf(stderr,"TCP accept failed\n");
       exit(1);

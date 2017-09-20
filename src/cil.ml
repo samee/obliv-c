@@ -2405,6 +2405,10 @@ and isOblivInt t = match unrollType t with
 | TInt(_,a) -> hasOblivAttr a
 | _ -> false
 
+and isOblivFloat t = match unrollType t with
+| TFloat(_,a) -> hasOblivAttr a
+| _ -> false
+
 and isOblivSimple t = match unrollType t with
 | TInt(_,a) | TFloat(_,a) -> hasOblivAttr a
 | _ -> false
@@ -2443,7 +2447,7 @@ and bitsSizeOf t =
     E.s (E.error "You did not call Cil.initCIL before using the CIL library");
   match unrollType t with 
   | TInt(IBool,a) when hasOblivAttr a -> !oblivBitsSize
-  | t when isOblivSimple t -> let base = bitsSizeOf (unoblivType t) in
+  | t when (isOblivSimple t || isOblivFloat t) -> let base = bitsSizeOf (unoblivType t) in
                               base * !oblivBitsSize
   | TInt (ik,_) -> 8 * (bytesSizeOfInt ik)
   | TFloat(FDouble, _) -> 8 * !M.theMachine.M.sizeof_double
@@ -6746,7 +6750,7 @@ let rec xform_switch_stmt s break_dest cont_dest = begin
        * label_break: ; // break_stmt
        *
        * The default case, if present, must be used only if *all*
-       * non-default cases fail [ISO/IEC 9899:1999, §6.8.4.2, ¶5]. As
+       * non-default cases fail [ISO/IEC 9899:1999, Â§6.8.4.2, Â¶5]. As
        * a result, we test all cases first, and hit 'default' only if
        * no case matches. However, we do not reorder the switch's
        * body, so fall-through still works as expected.

@@ -1,0 +1,33 @@
+#include"testevalhalf.h"
+#include<assert.h>
+#include<obliv.oh>
+#include<obliv_common.h>
+#include<obliv_yao.h>
+#include<stdlib.h>
+#include<stdio.h>
+
+void testEvalHalf(void* vargs)
+{
+  TestEvalHalfIO* args=vargs;
+  int n = args->n;
+  obliv int *opt0 = calloc(args->n,sizeof(obliv int));
+  obliv int *opt1 = calloc(args->n,sizeof(obliv int));
+  int i;
+  int n1 = ocBroadcastInt(args->n,1);
+  int n2 = ocBroadcastInt(args->n,2);
+  if(n1!=n2) { fprintf(stderr,"Error: size mismatch\n"); exit(2); }
+  n=n1;
+  feedOblivIntArray(opt0,args->data,n,1);
+  feedOblivIntArray(opt1,args->data+n,n,1);
+  ProtocolDesc* pd = ocCurrentProto();
+  YaoEHalfSwapper sw = yaoEHalfSwapSetup(pd,args->sel,n);
+  for(i=0;i<n;++i)
+    yaoEHalfSwapGate(pd,
+        (void*)(opt0+i), (void*)(opt1+i), ocBitSize(obliv int), &sw);
+  for(i=0;i<n;++i)
+  { revealOblivInt(args->data+i,opt0[i],0);
+    revealOblivInt(args->data+n+i,opt1[i],0);
+  }
+  free(opt0);
+  free(opt1);
+}

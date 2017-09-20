@@ -21,9 +21,9 @@ int main(int argc,char *argv[])
   protocolIO io;
   if(argc<4)
   { if(argc<2) fprintf(stderr,"Port number missing\n");
-    else if(argc<3) fprintf(stderr,"Party missing\n");
+    else if(argc<3) fprintf(stderr,"Server location missing\n");
     else fprintf(stderr,"string missing\n");
-    fprintf(stderr,"Usage: %s <port> <1|2> <string>\n",argv[0]);
+    fprintf(stderr,"Usage: %s <port> <--|remote_host> <string>\n",argv[0]);
     return 1;
   }
 
@@ -35,9 +35,10 @@ int main(int argc,char *argv[])
   }
 
   //protocolUseStdio(&pd);
-  ocTestUtilTcpOrDie(&pd,argv[2][0]=='1',argv[1]);
+  const char* remote_host = (strcmp(argv[2],"--")?argv[2]:NULL);
+  ocTestUtilTcpOrDie(&pd,remote_host,argv[1]);
 
-  currentParty = (argv[2][0]=='1'?1:2);
+  currentParty = (remote_host?2:1);
   setCurrentParty(&pd,currentParty);
   lap = wallClock();
   execYaoProtocol(&pd,editDistance,&io);
