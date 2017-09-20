@@ -497,7 +497,6 @@ let setComparisonUS fnames dest s1 s2 loc =
   let optype = typeOfLval s1 in
   let fname = match unrollType optype with
   | TInt(k,_) -> if isSigned k then snd fnames else fst fnames
-  | TFloat(k,_) -> fst fnames
   | _ -> E.s (E.error "Cannot operate on obliv values of type %a" d_type optype)
   in
   setComparison fname dest s1 s2 loc
@@ -624,53 +623,81 @@ let trueCond = var (makeGlobalVar "__obliv_c__trueCond" oblivBoolType)
 let rec codegenUncondInstr (instr:instr) : instr = match instr with
 | Set(v,UnOp(op,Lval e,t),loc) -> 
     begin match unrollType t with
-    | TInt(kind,a) when hasOblivAttr a -> 
-        begin match op with
-        | Neg  -> setUnop "__obliv_c__setNeg" v e loc
-        | BNot -> setUnop "__obliv_c__setBitwiseNot" v e loc
-        | LNot -> setUnop "__obliv_c__setLogicalNot" v e loc
+    | TInt(kind,a) when hasOblivAttr a ->
+        begin match unrollType (typeOf (Lval e)) with
+        | TFloat(kind,a) when hasOblivAttr a ->
+          begin match op with
+          | BNot -> E.s (E.error "invalid operand to binary ~ (have 'obliv float')")
+          | LNot -> E.s (E.error "invalid operand to logical ! (have 'obliv float')")
+          end
+        | _ ->
+          begin match op with
+          | Neg  -> setUnop "__obliv_c__setNeg" v e loc
+          | BNot -> setUnop "__obliv_c__setBitwiseNot" v e loc
+          | LNot -> setUnop "__obliv_c__setLogicalNot" v e loc
+          end
         end
     | TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
         | Neg -> setUnop "__obliv_c__setNegF" v e loc
-        | BNot -> E.s (E.error "invalid operand to binary ! (have 'obliv float')")
-        | LNot -> E.s (E.error "invalid operand to logical ! (have 'obliv float')")
         end
     | _ -> instr
     end
 | Set(v,BinOp(op,Lval e1,Lval e2,t),loc) ->
     begin match unrollType t with
     | TInt(kind,a) when hasOblivAttr a ->
-        begin match op with
-        | PlusA  -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
-        | MinusA -> setArith "__obliv_c__setPlainSub" v e1 e2 loc
-        | Mult   -> setArith "__obliv_c__setMul" v e1 e2 loc
-        | Shiftlt-> setShift "__obliv_c__setLShift" v e1 e2 loc
-        | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
-        | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
-        | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
-        | Gt -> setComparisonUS cmpLtFuncs v e2 e1 loc
-        | Le -> setComparisonUS cmpLeFuncs v e1 e2 loc
-        | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
-        | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAnd" v e1 e2 loc
-        | BXor -> setBitwiseOp "__obliv_c__setBitwiseXor" v e1 e2 loc
-        | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOr" v e1 e2 loc
-        | LAnd -> setLogicalOp "__obliv_c__setBitAnd" v e1 e2 loc
-        | LOr  -> setLogicalOp "__obliv_c__setBitOr"  v e1 e2 loc
-        | _ when isSigned kind ->
+        begin match unrollType (typeOf (Lval e1)) with
+        | TFloat(kind,a) when hasOblivAttr a ->
+          begin match unrollType (typeOf (Lval e2)) with
+          | TFloat(kind,a) when hasOblivAttr a ->
             begin match op with
-            | Shiftrt -> setShift "__obliv_c__setRShiftSigned" v e1 e2 loc
-            | Div -> setArith "__obliv_c__setDivSigned" v e1 e2 loc
-            | Mod -> setArith "__obliv_c__setModSigned" v e1 e2 loc
+            | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
+            | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
+            | Lt -> setComparison "__obliv_c__setLessThanF" v e1 e2 loc
+            | Gt -> setComparison "__obliv_c__setLessThanF" v e2 e1 loc
+            | Le -> setComparison "__obliv_c__setLessThanEqF" v e1 e2 loc
+            | Ge -> setComparison "__obliv_c__setLessThanEqF" v e2 e1 loc
+            | BAnd -> E.s (E.error "invalid operand to binary & (have 'obliv float')")
+            | BXor -> E.s (E.error "invalid operand to binary ^ (have 'obliv float')")
+            | BOr  -> E.s (E.error "invalid operand to binary | (have 'obliv float')")
+            | LAnd -> E.s (E.error "invalid operand to logical && (have 'obliv float')")
+            | LOr  -> E.s (E.error "invalid operand to logical || (have 'obliv float')")
             | _ -> instr
             end
+          | _ -> E.s (E.error "unimplemented: both operands must be of type obliv float")
+          end
         | _ -> 
+          begin match op with
+          | PlusA  -> setArith "__obliv_c__setPlainAdd" v e1 e2 loc
+          | MinusA -> setArith "__obliv_c__setPlainSub" v e1 e2 loc
+          | Mult   -> setArith "__obliv_c__setMul" v e1 e2 loc
+          | Shiftlt-> setShift "__obliv_c__setLShift" v e1 e2 loc
+          | Ne -> setComparison "__obliv_c__setNotEqual" v e1 e2 loc
+          | Eq -> setComparison "__obliv_c__setEqualTo"  v e1 e2 loc
+          | Lt -> setComparisonUS cmpLtFuncs v e1 e2 loc
+          | Gt -> setComparisonUS cmpLtFuncs v e2 e1 loc
+          | Le -> setComparisonUS cmpLeFuncs v e1 e2 loc
+          | Ge -> setComparisonUS cmpLeFuncs v e2 e1 loc
+          | BAnd -> setBitwiseOp "__obliv_c__setBitwiseAnd" v e1 e2 loc
+          | BXor -> setBitwiseOp "__obliv_c__setBitwiseXor" v e1 e2 loc
+          | BOr  -> setBitwiseOp "__obliv_c__setBitwiseOr" v e1 e2 loc
+          | LAnd -> setLogicalOp "__obliv_c__setBitAnd" v e1 e2 loc
+          | LOr  -> setLogicalOp "__obliv_c__setBitOr"  v e1 e2 loc
+          | _ when isSigned kind ->
+              begin match op with
+              | Shiftrt -> setShift "__obliv_c__setRShiftSigned" v e1 e2 loc
+              | Div -> setArith "__obliv_c__setDivSigned" v e1 e2 loc
+              | Mod -> setArith "__obliv_c__setModSigned" v e1 e2 loc
+              | _ -> instr
+              end
+          | _ -> 
             begin match op with
             | Shiftrt -> setShift "__obliv_c__setRShiftUnsigned" v e1 e2 loc
             | Div -> setArith "__obliv_c__setDivUnsigned" v e1 e2 loc
             | Mod -> setArith "__obliv_c__setModUnsigned" v e1 e2 loc
             | _ -> instr
             end
+          end
         end
     | TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
@@ -679,17 +706,6 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         | Mult   -> setArith "__obliv_c__setMulF" v e1 e2 loc
         | Div    -> setArith "__obliv_c__setDivF" v e1 e2 loc
         | Shiftlt-> E.s (E.error "invalid operand to binary << (have 'obliv float')")
-        | Ne -> setComparison "__obliv_c__setNotEqualF" v e1 e2 loc
-        | Eq -> setComparison "__obliv_c__setEqualToF"  v e1 e2 loc
-        | Lt -> setComparison "__obliv_c__setLessThanF" v e1 e2 loc
-        | Gt -> setComparison "__obliv_c__setLessThanF" v e2 e1 loc
-        | Le -> setComparison "__obliv_c__setLessThanEqF" v e1 e2 loc
-        | Ge -> setComparison "__obliv_c__setLessThanEqF" v e2 e1 loc
-        | BAnd -> E.s (E.error "invalid operand to binary & (have 'obliv float')")
-        | BXor -> E.s (E.error "invalid operand to binary ^ (have 'obliv float')")
-        | BOr  -> E.s (E.error "invalid operand to binary | (have 'obliv float')")
-        | LAnd -> E.s (E.error "invalid operand to logical && (have 'obliv float')")
-        | LOr  -> E.s (E.error "invalid operand to logical || (have 'obliv float')")
         | _ -> instr
         end
     | _ -> instr
