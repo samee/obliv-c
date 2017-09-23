@@ -5,6 +5,7 @@
 #include<stdbool.h>
 #include<stdint.h>
 #include<stdlib.h>
+#include<stdatomic.h>
 #include<math.h>
 
 #include<time.h>
@@ -177,7 +178,7 @@ typedef struct NpotSender
   gcry_ctx_t ctx; // This doesn't seem to be thread-safe
 } NpotSender;
 
-/* 
+/*
   Returns a new object for performing Naor-Pinkas Oblivious Transfers.
   Can later be used with npotSend*() family of functions. The basic object
   is really set up to perform 1-out-of-N transfers, although the npotSend*() 
@@ -678,25 +679,28 @@ senderExtensionBoxNew (ProtocolDesc* pd, int destParty, int keyBytes)
   return s;
 }
 SenderExtensionBox*
-senderExtensionBoxSplit (ProtocolDesc * pd, SenderExtensionBox* t)
+senderExtensionBoxSplit (ProtocolDesc * pd, SenderExtensionBox* s_src)
 {
-  const int k = t->keyBytes*8;
+  const int k = s_src->keyBytes*8;
   SenderExtensionBox* s = malloc(sizeof *s);
-  s->destParty = t->destParty;
+  s->destParty = s_src->destParty;
   s->pd = pd;
   s->keyBytes = k/8;
   s->spack = malloc(sizeof(char[k/8]));
-  memcpy(s->spack,t->spack,k/8);
+  memcpy(s->spack,s_src->spack,k/8);
   s->S = malloc(sizeof(bool[k]));
-  memcpy(s->S,t->S,sizeof(bool[k]));
+  memcpy(s->S,s_src->S,sizeof(bool[k]));
   s->keyblock = malloc(sizeof(BCipherRandomGen*[k]));
 
   // Initialize s->keyblock
-  char seed[OT_SEEDLEN];
+  char seed1[OT_SEEDLEN];
+  char seed2[OT_SEEDLEN];
   int i;
   for(i=0;i<k;++i)
-  { randomizeBuffer(t->keyblock[i], seed, OT_SEEDLEN);
-    s->keyblock[i] = newBCipherRandomGenByKey(seed);
+  { randomizeBuffer(s_src->keyblock[i], seed1, OT_SEEDLEN);
+    randomizeBuffer(s_src->keyblock[i], seed2, OT_SEEDLEN);
+    s->keyblock[i] = newBCipherRandomGenByKey(seed1);
+    resetBCipherRandomGen(s_src->keyblock[i], seed2);
   }
 
   return s;
@@ -744,22 +748,27 @@ recverExtensionBoxNew (ProtocolDesc* pd, int srcParty, int keyBytes)
 }
 
 RecverExtensionBox*
-recverExtensionBoxSplit (ProtocolDesc * pd, RecverExtensionBox* t)
+recverExtensionBoxSplit (ProtocolDesc * pd, RecverExtensionBox* r_src)
 {
-  const int k = t->keyBytes*8;
+  const int k = r_src->keyBytes*8;
   RecverExtensionBox* r = malloc(sizeof *r);
-  r->srcParty = t->srcParty;
+  r->srcParty = r_src->srcParty;
   r->pd = pd;
-  r->keyBytes=t->keyBytes;
-  char seed[OT_SEEDLEN];
+  r->keyBytes=r_src->keyBytes;
+  char seed1[OT_SEEDLEN];
+  char seed2[OT_SEEDLEN];
   int i;
   r->keyblock0 = malloc(sizeof(BCipherRandomGen*[k]));
   r->keyblock1 = malloc(sizeof(BCipherRandomGen*[k]));
   for(i=0;i<k;++i)
-  { randomizeBuffer(t->keyblock0[i], seed, OT_SEEDLEN);
-    r->keyblock0[i] = newBCipherRandomGenByKey(seed);
-    randomizeBuffer(t->keyblock1[i], seed, OT_SEEDLEN);
-    r->keyblock1[i] = newBCipherRandomGenByKey(seed);
+  { randomizeBuffer(r_src->keyblock0[i], seed1, OT_SEEDLEN);
+    randomizeBuffer(r_src->keyblock0[i], seed2, OT_SEEDLEN);
+    r->keyblock0[i] = newBCipherRandomGenByKey(seed1);
+    resetBCipherRandomGen(r_src->keyblock0[i], seed2);
+    randomizeBuffer(r_src->keyblock1[i], seed1, OT_SEEDLEN);
+    randomizeBuffer(r_src->keyblock1[i], seed2, OT_SEEDLEN);
+    r->keyblock1[i] = newBCipherRandomGenByKey(seed1);
+    resetBCipherRandomGen(r_src->keyblock1[i], seed2);
   }
   return r;
 }
@@ -1082,23 +1091,22 @@ bcipherCryptNoResize(BCipherRandomGen* gen,const char* key,int nonce,
 }
 
 
-/* 
-   Data structures and functions for dealing with multithreaded nonce-allocation
+/* Data structures and functions for dealing with multithreaded nonce-allocation
    We use gcc's built-in atomics rather than synchronization primitives. On modern CPUs
    these translate directly into instructions, so they're pretty quick. The reason for
    all this complication: setting up OT extensions afresh is really expensive, so we
    want to be able to reuse a single instance across multiple threads
    */
 
-typedef struct HonestOTExtNonceTracker
-{ size_t * nonce_master;
-  size_t * ref_count;
-} HonestOTExtNonceTracker;
+typedef struct HonestOTExtSenderShared
+{ atomic_size_t * nonce_master;
+  atomic_size_t * ref_count;
+} HonestOTExtSenderShared;
 
 typedef struct HonestOTExtSender
 { SenderExtensionBox* box;
   BCipherRandomGen* padder;
-  HonestOTExtNonceTracker* nonce_trk;
+  HonestOTExtSenderShared* sender_shared;
 } HonestOTExtSender;
 
 typedef struct HonestOTExtRecver
@@ -1106,7 +1114,7 @@ typedef struct HonestOTExtRecver
   BCipherRandomGen* padder;
 } HonestOTExtRecver;
 
-void honestOTExtNonceTrackerInit(HonestOTExtNonceTracker * t, HonestOTExtNonceTracker * t_prev)
+void honestOTExtSenderSharedInit(HonestOTExtSenderShared * t, HonestOTExtSenderShared * t_prev)
 { if (t_prev == NULL)
   {
     t->nonce_master = malloc(sizeof(*t->nonce_master));
@@ -1117,28 +1125,28 @@ void honestOTExtNonceTrackerInit(HonestOTExtNonceTracker * t, HonestOTExtNonceTr
   {
     t->nonce_master = t_prev->nonce_master;
     t->ref_count = t_prev->ref_count;
-    __atomic_add_fetch(t->ref_count, 1, __ATOMIC_RELAXED);
+    atomic_fetch_add_explicit(t->ref_count, 1, memory_order_relaxed);
   }
 }
 
-HonestOTExtNonceTracker * honestOTExtNonceTrackerNew(HonestOTExtNonceTracker * t_prev)
-{ HonestOTExtNonceTracker * t = malloc(sizeof(HonestOTExtNonceTracker));
-  honestOTExtNonceTrackerInit(t, t_prev);
+HonestOTExtSenderShared * honestOTExtSenderSharedNew(HonestOTExtSenderShared * t_prev)
+{ HonestOTExtSenderShared * t = malloc(sizeof(HonestOTExtSenderShared));
+  honestOTExtSenderSharedInit(t, t_prev);
   return t;
 }
 
-static inline size_t honestOTExtNonceTrackerNext(HonestOTExtNonceTracker * t, size_t small_delta)
-{ return __atomic_fetch_add(t->nonce_master, small_delta, __ATOMIC_RELAXED); }
+static inline size_t honestOTExtSenderSharedNextNonce(HonestOTExtSenderShared * t, size_t small_delta)
+{ return atomic_fetch_add_explicit(t->nonce_master, small_delta, memory_order_relaxed); }
 
-void honestOTExtNonceTrackerCleanup(HonestOTExtNonceTracker * t)
-{ if (__atomic_sub_fetch(t->ref_count, 1, __ATOMIC_RELAXED) == 0) {
+void honestOTExtSenderSharedCleanup(HonestOTExtSenderShared * t)
+{ if (atomic_fetch_sub_explicit(t->ref_count, 1, memory_order_relaxed) == 1) {
     free(t->ref_count);
     free(t->nonce_master); 
   }
 }
 
-void honestOTExtNonceTrackerRelease(HonestOTExtNonceTracker * t)
-{ honestOTExtNonceTrackerCleanup(t);
+void honestOTExtSenderSharedRelease(HonestOTExtSenderShared * t)
+{ honestOTExtSenderSharedCleanup(t);
   free(t);
 }
 
@@ -1159,7 +1167,7 @@ void honestOTExtNonceTrackerRelease(HonestOTExtNonceTracker * t)
 typedef struct
 { BCipherRandomGen *cipher;
   const char *box;
-  HonestOTExtNonceTracker *nonce_trk;
+  HonestOTExtSenderShared *sender_shared;
   size_t nonce, nonceDelta;
   int n, rowBytes, *rows, k, len, destParty, c;
   char *opt0, *opt1;
@@ -1285,7 +1293,7 @@ recverExtensionBoxRecvMsg(RecvMsgArgs* a)
   free(ctext);
 }
 
-static inline size_t honestOTExtNonceTrackerNext(HonestOTExtNonceTracker * t, size_t small_delta);
+static inline size_t honestOTExtSenderSharedNextNonce(HonestOTExtSenderShared * t, size_t small_delta);
 
 static void* senderExtensionBoxSendMsgs_thread(void* va)
 { SendMsgArgs* a=va;
@@ -1313,7 +1321,7 @@ senderExtensionBoxSendMsgs(SendMsgArgs* a)
     { si[i]=*a;
       si[i].c=ndone;
       si[i].n=(a->n-ndone+tc-i-1)/(tc-i);
-      si[i].nonce=honestOTExtNonceTrackerNext(a->nonce_trk, si[i].n*a->nonceDelta);
+      si[i].nonce=honestOTExtSenderSharedNextNonce(a->sender_shared, si[i].n*a->nonceDelta);
       si[i].opt0=a->opt0+a->len*ndone;
       si[i].opt1=a->opt1+a->len*ndone;
       si[i].trans=a->trans->split(a->trans);
@@ -1384,7 +1392,7 @@ honestOTExtSenderInit(HonestOTExtSender* s,ProtocolDesc* pd,
                       int destParty,int keyBytes)
 { s->box = senderExtensionBoxNew(pd,destParty,keyBytes);
   s->padder = newBCipherRandomGen();
-  s->nonce_trk = honestOTExtNonceTrackerNew(NULL);
+  s->sender_shared = honestOTExtSenderSharedNew(NULL);
 }
 HonestOTExtSender*
 honestOTExtSenderNew(ProtocolDesc* pd,int destParty)
@@ -1393,11 +1401,11 @@ honestOTExtSenderNew(ProtocolDesc* pd,int destParty)
   return s;
 }
 HonestOTExtSender*
-honestOTExtSenderSplit(HonestOTExtSender* t, ProtocolDesc* pd)
+honestOTExtSenderSplit(ProtocolDesc* pd,HonestOTExtSender* s_src)
 { HonestOTExtSender* s = malloc(sizeof *s);
-  s->box = senderExtensionBoxSplit(pd, t->box);
-  s->padder = copyBCipherRandomGenNoKey(t->padder);
-  s->nonce_trk = honestOTExtNonceTrackerNew(t->nonce_trk);
+  s->box = senderExtensionBoxSplit(pd, s_src->box);
+  s->padder = copyBCipherRandomGenNoKey(s_src->padder);
+  s->sender_shared = honestOTExtSenderSharedNew(s_src->sender_shared);
   return s;
 }
 void
@@ -1413,17 +1421,17 @@ honestOTExtRecverNew(ProtocolDesc* pd,int srcParty)
   return r;
 }
 HonestOTExtRecver*
-honestOTExtRecverSplit(HonestOTExtRecver* t, ProtocolDesc* pd)
+honestOTExtRecverSplit(ProtocolDesc* pd,HonestOTExtRecver* r_src)
 { HonestOTExtRecver* r = malloc(sizeof *r);
-  r->box = recverExtensionBoxSplit(pd, t->box);
-  r->padder = copyBCipherRandomGenNoKey(t->padder);
+  r->box = recverExtensionBoxSplit(pd, r_src->box);
+  r->padder = copyBCipherRandomGenNoKey(r_src->padder);
   return r;
 }
 void
 honestOTExtSenderCleanup(HonestOTExtSender* s)
 { senderExtensionBoxRelease(s->box);
   releaseBCipherRandomGen(s->padder);
-  honestOTExtNonceTrackerRelease(s->nonce_trk);
+  honestOTExtSenderSharedRelease(s->sender_shared);
 }
 void
 honestOTExtSenderRelease(HonestOTExtSender* s)
@@ -1452,7 +1460,7 @@ void* honestOTExtSend1Of2Start(HonestOTExtSender* s,int n)
   senderExtensionBox(s->box,box,rowBytes);
   *args = (SendMsgArgs) {
     .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=all,
-    .k=k, .nonce_trk=s->nonce_trk, .nonceDelta = 0, .c=0,
+    .k=k, .sender_shared=s->sender_shared, .nonceDelta = 0, .c=0,
     .opt0=NULL, .opt1=NULL, .len=0,
     .destParty=s->box->destParty, .spack=s->box->spack,
     .trans=s->box->pd->trans, .corrFun=NULL, .corrArg=NULL,
@@ -1475,7 +1483,7 @@ void honestOTExtSend1Of2Chunk(void* vargs,char* opt0,char* opt1,int nchunk,
   suba.opt0=opt0;
   suba.opt1=opt1;
   suba.len=len;
-  suba.nonce_trk=((HonestOTExtSender*)args->sender)->nonce_trk;
+  suba.sender_shared=((HonestOTExtSender*)args->sender)->sender_shared;
   suba.nonceDelta = (len+suba.cipher->blen-1)/suba.cipher->blen;
   suba.corrFun=f;
   suba.corrArg=corrArg;
@@ -1680,7 +1688,7 @@ otExtSend1Of2(OTExtSender* ss,const char* opt0,const char* opt1,
   else
   { SendMsgArgs args = {
       .cipher=s->padder, .box=box, .n=n, .rowBytes=rowBytes, .rows=rows,
-      .k=rc, .nonce_trk=s->nonce_trk, .nonceDelta=(len+blen-1)/blen,
+      .k=rc, .sender_shared=s->sender_shared, .nonceDelta=(len+blen-1)/blen,
       .opt0=(char*)opt0, .opt1=(char*)opt1, .len=len,
       .destParty=s->box->destParty, .spack=s->box->spack,
       .trans=s->box->pd->trans, .corrFun=NULL, .corrArg=NULL

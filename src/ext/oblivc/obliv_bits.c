@@ -1042,10 +1042,10 @@ void splitYaoProtocolExtra(ProtocolDesc* pdout, ProtocolDesc * pdin) {
     gcry_randomize(ypdout->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
     gcry_randomize(&ypdout->gcount_offset,sizeof(ypdout->gcount_offset),GCRY_STRONG_RANDOM);
     osend(pdout,2,&ypdout->gcount_offset,sizeof(ypdout->gcount_offset));
-    ypdout->sender = honestOTExtSenderAbstract(honestOTExtSenderSplit(ypdin->sender.sender,pdout));
+    ypdout->sender = honestOTExtSenderAbstract(honestOTExtSenderSplit(pdout,ypdin->sender.sender));
   } else {
     orecv(pdout,1,&ypdout->gcount_offset,sizeof(ypdout->gcount_offset));
-    ypdout->recver = honestOTExtRecverAbstract(honestOTExtRecverSplit(ypdin->recver.recver,pdout));
+    ypdout->recver = honestOTExtRecverAbstract(honestOTExtRecverSplit(pdout,ypdin->recver.recver));
   }
   ypdout->gcount = ypdout->gcount_offset;
   oflush(pdin); oflush(pdout);
