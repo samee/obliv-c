@@ -641,6 +641,9 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
     | TFloat(kind, a) when hasOblivAttr a ->
         begin match op with
         | Neg -> setUnop "__obliv_c__setNegF" v e loc
+        | _ -> E.s (E.error "Unexpected error. %s"
+                            ("!(float exp) or ~(float exp) should not " ^
+                            "produce float expression"))
         end
     | _ -> instr
     end
@@ -703,12 +706,18 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         end
     | _ -> instr
     end
-| Set(v,CastE(dt,x),loc) when isOblivSimple dt && not (isOblivSimple (typeOf x)) ->
+(* Promotion from non-obliv data to obliv *)
+| Set(v,CastE(dt,x),loc) when isOblivSimple dt
+                           && not (isOblivSimple (typeOf x)) ->
     begin match unrollType dt with 
     | TInt(k,_) -> setKnownInt v k x loc
     | TFloat(k, _) -> setKnownFloat v k x loc
     | _ -> instr
     end
+| Set(_,CastE(dt, x), loc) when isOblivSimple dt
+                             && isOblivSimple (typeOf x)
+                             && isOblivInt dt <> isOblivInt (typeOf x) ->
+    E.s (E.error "Unimplemented: conversion between obliv int and obliv float")
 | Set(dv,CastE(dt,Lval sv),loc) when isOblivInt dt ->
     begin match unrollType dt,unrollType (typeOfLval sv) with
     | TInt(dk,da), TInt(sk,sa) when hasOblivAttr sa ->
@@ -717,10 +726,7 @@ let rec codegenUncondInstr (instr:instr) : instr = match instr with
         else setIntExtend "__obliv_c__setZeroExtend" dv dk sv sk loc
     | _ -> instr
     end
-| Set(dv,CastE(dt,Lval sv),loc) when isOblivFloat dt ->
-    begin match unrollType dt,unrollType (typeOfLval sv) with
-    | _ -> instr
-    end
+| Set(dv,CastE(dt,Lval sv),loc) when isOblivFloat dt -> instr
 | Set(v,CastE(t,x),loc) when isOblivSimple t ->
     codegenUncondInstr (Set(v,CastE(unrollType t,x),loc))
 | Call(lvo,exp,args,loc) when isOblivFunc (typeOf exp) ->
