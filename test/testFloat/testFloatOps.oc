@@ -81,8 +81,6 @@ void floatOps(void* args)
     } else {
         printf("Equal\n");
     }
-    printAsBinary(r);
-    printf("\n");
 
     // Equal
     bool r;
@@ -93,8 +91,6 @@ void floatOps(void* args)
     } else {
         printf("Equal\n");
     }
-    printAsBinary(r);
-    printf("\n");
 
     // Less Than
     bool r;
@@ -105,8 +101,6 @@ void floatOps(void* args)
     } else {
         printf("Not less than\n");
     }
-    printAsBinary(r);
-    printf("\n");
 
     // Greater Than
     bool r;
@@ -117,8 +111,6 @@ void floatOps(void* args)
     } else {
         printf("Not greater than\n");
     }
-    printAsBinary(r);
-    printf("\n");
 
     // Less Than or Equal to
     bool r;
@@ -129,8 +121,6 @@ void floatOps(void* args)
     } else {
         printf("Not less than or equal to\n");
     }
-    printAsBinary(r);
-    printf("\n");
 
     // Greater Than or Equal to
     bool r;
@@ -141,8 +131,6 @@ void floatOps(void* args)
     } else {
         printf("Not greater than or equal to\n");
     }
-    printAsBinary(r);
-    printf("\n");
 
     // Test setFloatKnown
     float x_test_r;
