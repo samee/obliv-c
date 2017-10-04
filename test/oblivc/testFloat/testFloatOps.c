@@ -4,7 +4,7 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
-#include "../oblivc/common/util.h"
+#include "../common/util.h"
 #include "dbg.h"
 
 #include "testFloatOps.h"

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <obliv.oh>
 
-#include "linReg.h"
+#include "linreg.h"
 #include "dbg.h"
 
 void toObliv(protocolIO *io, obliv float *oa, float *a, int party) 
