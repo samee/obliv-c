@@ -2131,15 +2131,7 @@ bool revealOblivFloat(float *dest, __obliv_c__float src, int party)
 {
     widest_t wd = 0;
     if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(float),party)) {
-      // Use the "union trick" to convert wd to a proper float
-      // since wd is stored as a widest_t
-      union ItoF {
-        widest_t i;
-        float f;
-      };
-      union ItoF conv;
-      conv.i = wd;
-      *dest = conv.f;
+      *dest = *(float*)(&wd);
       return true; 
     }
     return false;
