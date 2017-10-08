@@ -2056,7 +2056,10 @@ void setupOblivLong(OblivInputs* spec, __obliv_c__long* dest, long v)
 void setupOblivLLong(OblivInputs* spec, __obliv_c__lLong* dest, long long v)
   { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 void setupOblivFloat(OblivInputs* spec, __obliv_c__float* dest, float v)
-  { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
+{ spec->dest=dest->bits;
+  spec->src_f=v;
+  spec->size=__bitsize(v);
+}
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
   { currentProto->feedOblivInputs(currentProto,spec,count,party); }
@@ -2066,7 +2069,6 @@ void feedOblivInputs(OblivInputs* spec, size_t count, int party)
     { __obliv_c__##ot rv; \
       OblivInputs spec; \
       setupObliv##tname(&spec,&rv,v); \
-      spec.src_f = v; \
       feedOblivInputs(&spec,1,party); \
       return rv; \
     }\
