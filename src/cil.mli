@@ -2549,6 +2549,7 @@ val unoblivType : typ -> typ
 
 val isOblivFunc : typ -> bool
 val isOblivInt : typ -> bool
+val isOblivFloat : typ -> bool
 val isOblivSimple : typ -> bool
 val isOblivSimpleOrArray : typ -> bool
 val isNonOblivSimple : typ -> bool

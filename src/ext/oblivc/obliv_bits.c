@@ -1,5 +1,6 @@
 // TODO I need to fix some int sizes
 #include <obliv_bits.h>
+#include <obliv_float_ops.h>
 #include <obliv_yao.h>
 #include <commitReveal.h>
 #include <nnob.h>
@@ -1494,7 +1495,7 @@ void __obliv_c__flipBit(OblivBit* dest)
   else currentProto->flipBit(currentProto,dest); 
 }
 
-void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit*  dest
+void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit* dest
                                      ,widest_t v,size_t size)
 { spec->dest=dest;
   spec->src=v;
@@ -1519,9 +1520,30 @@ void __obliv_c__setSignedKnown
   OblivBit* dest=vdest;
   while(size-->0)
   { __obliv_c__assignBitKnown(dest,value&1);
-    value>>=1; dest++;
+    value>>=1;
+    dest++;
   }
 }
+
+void __obliv_c__setFloatKnown(void* vdest, size_t size, float value) {
+  unsigned char* floatBytes = (unsigned char*) &value;
+  OblivBit* dest = vdest;
+  int i = 0;
+  int j = 0;
+  unsigned char currentByte = floatBytes[j];
+  while(size-- > 0)
+  { __obliv_c__assignBitKnown(dest, currentByte & 0x01);
+    currentByte >>= 1; 
+    dest++;
+    i++;
+    if (i == 8)
+    { i = 0;
+      j++;
+      currentByte = floatBytes[j];
+    }
+  }
+}
+
 void __obliv_c__setUnsignedKnown
   (void* vdest, size_t size, long long unsigned value)
 {
@@ -1634,6 +1656,14 @@ void __obliv_c__setPlainAdd (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size)
   { __obliv_c__setBitsAdd (vdest,NULL,vop1,vop2,NULL,size); }
+ 
+void __obliv_c__setPlainAddF (void* vdest
+                          ,const void* vop1 ,const void* vop2
+                          ,size_t size)
+{ OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_add_circuit(dest, op1, op2);
+}
 
 void __obliv_c__setBitsSub (void* vdest, void* borrowOut
                            ,const void* vop1,const void* vop2
@@ -1672,6 +1702,14 @@ void __obliv_c__setPlainSub (void* vdest
                             ,size_t size)
   { __obliv_c__setBitsSub (vdest,NULL,vop1,vop2,NULL,size); }
 
+void __obliv_c__setPlainSubF (void* vdest
+                             ,const void* vop1 ,const void* vop2
+                             ,size_t size)
+{ OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_sub_circuit(dest, op1, op2);
+}
+
 #define MAX_BITS (8*sizeof(widest_t))
 // dest = c?src:0;
 static void setZeroOrVal (OblivBit* dest
@@ -1709,6 +1747,19 @@ void __obliv_c__setNeg (void* vdest, const void* vsrc, size_t n)
   __obliv_c__condNeg(&__obliv_c__trueCond,vdest,vsrc,n);
 }
 
+void __obliv_c__condNegF (const void* vcond, void* vdest
+                        ,const void* vsrc, size_t n)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vsrc, *op2=vcond;
+  obliv_float_neg_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setNegF (void* vdest, const void* vsrc, size_t n)
+{
+  __obliv_c__condNegF(&__obliv_c__trueCond,vdest,vsrc,n);
+}
+
 void __obliv_c__setMul (void* vdest
                        ,const void* vop1 ,const void* vop2
                        ,size_t size)
@@ -1723,6 +1774,24 @@ void __obliv_c__setMul (void* vdest
     __obliv_c__setPlainAdd(sum+i,sum+i,temp,size-i);
   }
   __obliv_c__copyBits(vdest,sum,size);
+}
+
+void __obliv_c__setMulF (void* vdest
+                        ,const void* vop1,const void* vop2
+                        ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_mult_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setDivF (void* vdest
+                        ,const void* vop1,const void* vop2
+                        ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_div_circuit(dest, op1, op2);
 }
 
 // All parameters have equal number of bits
@@ -1895,6 +1964,16 @@ void __obliv_c__setEqualTo (void* vdest
   __obliv_c__flipBit(dest);
 }
 
+void __obliv_c__setEqualToF (void* vdest
+                            ,const void* vop1,const void* vop2
+                            ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_eq_circuit(dest, op1, op2);
+}
+
+
 void __obliv_c__setNotEqual (void* vdest
                             ,const void* vop1,const void* vop2
                             ,size_t size)
@@ -1908,6 +1987,35 @@ void __obliv_c__setNotEqual (void* vdest
     __obliv_c__setBitOr(dest,dest,&t);
   }
 }
+
+void __obliv_c__setNotEqualF (void* vdest
+                             ,const void* vop1,const void* vop2
+                             ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_eq_circuit(dest, op1, op2);
+  __obliv_c__flipBit(dest);
+}
+
+void __obliv_c__setLessThanF (void* vdest
+                             ,const void* vop1,const void* vop2
+                             ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_lt_circuit(dest, op1, op2);
+}
+
+void __obliv_c__setLessThanEqF (void* vdest
+                               ,const void* vop1,const void* vop2
+                               ,size_t size)
+{
+  OblivBit *dest=vdest;
+  const OblivBit *op1=vop1, *op2=vop2;
+  obliv_float_le_circuit(dest, op1, op2);
+}
+
 void __obliv_c__setLogicalNot (void* vdest,const void* vop,size_t size)
 { OblivBit t;
   OblivBit *dest=vdest;
@@ -1947,6 +2055,11 @@ void setupOblivLong(OblivInputs* spec, __obliv_c__long* dest, long v)
   { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
 void setupOblivLLong(OblivInputs* spec, __obliv_c__lLong* dest, long long v)
   { __obliv_c__setupOblivBits(spec,dest->bits,v,__bitsize(v)); }
+void setupOblivFloat(OblivInputs* spec, __obliv_c__float* dest, float v)
+{ spec->dest=dest->bits;
+  spec->src_f=v;
+  spec->size=__bitsize(v);
+}
 
 void feedOblivInputs(OblivInputs* spec, size_t count, int party)
   { currentProto->feedOblivInputs(currentProto,spec,count,party); }
@@ -1975,6 +2088,7 @@ feedOblivFun(short,short,Short)
 feedOblivFun(int,int,Int)
 feedOblivFun(long,long,Long)
 feedOblivFun(long long,lLong,LLong)
+feedOblivFun(float, float, Float)
 
 #undef feedOblivFun
 
@@ -2014,6 +2128,15 @@ bool revealOblivLLong(long long* dest, __obliv_c__lLong src,int party)
   if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(long long),party)) 
     { *dest=(long long)wd; return true; }
   return false;
+}
+bool revealOblivFloat(float *dest, __obliv_c__float src, int party)
+{
+    widest_t wd = 0;
+    if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(float),party)) {
+      *dest = *(float*)(&wd);
+      return true; 
+    }
+    return false;
 }
 
 // TODO fix data width

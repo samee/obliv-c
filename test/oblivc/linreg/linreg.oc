@@ -1,0 +1,101 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <obliv.oh>
+
+#include "linreg.h"
+#include "dbg.h"
+
+void toObliv(protocolIO *io, obliv float *oa, float *a, int party) 
+{
+    for(int i = 0; i < io->n; i++) {
+        oa[i] = feedOblivFloat(a[i], party);
+    }
+}
+
+obliv float osqr(obliv float x) 
+{
+    return x * x;
+}
+
+obliv float dotProd(obliv float *oa, obliv float *ob, int n) 
+{
+    obliv float dotProd = 0;
+    for (int i = 0; i < n; i++) {
+        dotProd += oa[i] * ob[i];
+    }
+    return dotProd;
+}
+
+obliv float sum(obliv float *a, int n) 
+{
+    obliv float sum = 0;
+    for (int i = 0; i < n; i++) {
+        sum += a[i];
+    }
+    return sum;
+}
+
+void linear_regression(protocolIO *io, obliv float *ox, obliv float *oy, 
+                       obliv float om, obliv float ob, obliv float or) 
+{
+    int n = io->n;
+    obliv float sumx = sum(ox, n); // sum of x
+    obliv float sumxx = dotProd(ox, ox, n); // sum of each x squared
+    obliv float sumy = sum(oy, n); // sum of y
+    obliv float sumyy = dotProd(oy, oy, n); // sum of each y squared
+    obliv float sumxy = dotProd(ox, oy, n); // sum of each x * y
+
+    // Compute least-squares best fit straight line
+    om = (n * sumxy - (sumx * sumy)) / (n * sumxx - osqr(sumx)); // slope
+    ob = ((sumy * sumxx) - (sumx * sumxy)) / (n * sumxx - osqr(sumx)); // y-intercept
+
+    obliv float ocov = (n * sumxy) - (sumx * sumy);
+    obliv float ostddevs = ((n * sumxx) - osqr(sumx)) * ((n * sumyy) - osqr(sumy));
+    obliv float orsqr = osqr(ocov) * ostddevs; // sqrt(revealed rsqr) = r
+
+    revealOblivFloat(&io->rsqr, orsqr, 0);
+    revealOblivFloat(&io->m, om, 0);
+    revealOblivFloat(&io->b, ob, 0);
+}
+
+void check_input_count(protocolIO *io) 
+{
+    int nx = ocBroadcastInt(io->n, 1);
+    int ny = ocBroadcastInt(io->n, 2);
+    if (nx != ny) {
+        log_err("Unequal amount of data points.\n\t"
+                "X data points (party 1): %d\n\t"
+                "Y data points (party 2): %d\n", nx, ny);
+        clean_errno();	  
+        exit(1);
+    }
+}
+
+void linReg(void* args) 
+{
+    protocolIO *io = (protocolIO*) args;
+
+    int *x = malloc(sizeof(int) * ALLOC);
+    int *y = malloc(sizeof(int) * ALLOC);
+    check_mem(x, y, ocCurrentParty());
+
+    // RESULTS
+    obliv float om = 0; 
+    obliv float ob = 0;
+    obliv float or = 0;
+    
+    load_data(io, &x, &y, ocCurrentParty());
+    check_input_count(io);
+
+    obliv float *ox = malloc(sizeof(obliv float) * io->n);
+    obliv float *oy = malloc(sizeof(obliv float) * io->n);
+    
+    toObliv(io, ox, x, 1);
+    toObliv(io, oy, y, 2);
+    free(x);
+    free(y);
+
+    linear_regression(io, ox, oy, om, ob, or);
+    free(ox);
+    free(oy);
+}

@@ -112,7 +112,7 @@ else
 endif
 DEPENDDIR = $(OBJDIR)/depends
 OCSRCDIR = src/ext/oblivc
-OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils bcrandom privacy-free psi nnob copy
+OCPARTS += obliv_bits ot dualex atomic_queue commitReveal obliv_network_utils bcrandom privacy-free psi nnob copy obliv_float_add obliv_float_sub obliv_float_div obliv_float_eq obliv_float_le obliv_float_lt obliv_float_mult obliv_float_neg
 OOCPARTS += copy
 
 oblivruntime: $(OBJDIR)/libobliv.a

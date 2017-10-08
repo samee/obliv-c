@@ -137,7 +137,10 @@ struct ProtocolTransport {
 };
 
 struct OblivInputs {
-  unsigned long long src;
+  union {
+    unsigned long long src;
+    float src_f;
+  };
   struct OblivBit* dest;
   size_t size;
 };

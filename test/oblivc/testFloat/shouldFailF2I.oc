@@ -1,0 +1,3 @@
+obliv float fun(obliv int x) {
+  return x;
+}
