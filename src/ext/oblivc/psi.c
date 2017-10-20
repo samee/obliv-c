@@ -7,6 +7,7 @@
 #include<obliv_common.h>
 #include<obliv_psi.h>
 #include<stdlib.h>
+#include<sort_r.h> // from https://github.com/noporpoise/sort_r
 
 #define HASH_ALGO GCRY_MD_SHA1
 #define HASH_BITS 160
@@ -173,7 +174,11 @@ OcPsiResult* execPsiProtocol_DH(ProtocolDesc* pd,
   xchgPoints(pd,curve,your,nu,mine,ni);
 
   PointCompareArgs *args = pcaNew(curve);
+#ifdef _WIN32
+  sort_r(your,nu,nu*sizeof(gcry_mpi_point_t),compare_points,args);
+#else
   qsort_r(your,nu,sizeof(*your),compare_points,args);
+#endif
   OcPsiResult* res = ocPsiResultNew(ni<nu?ni:nu);
   for(i=0;i<ni;++i) if(bsearchPoint(mine[i],your,nu,args))
     res->indices[res->n++] = order[i];

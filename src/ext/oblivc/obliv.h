@@ -27,6 +27,8 @@ void execDebugProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 void execNetworkStressProtocol(ProtocolDesc* pd, int bytecount,
                                protocol_run start, void* arg);
 void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
+void execYaoProtocol_Init(ProtocolDesc* pd, protocol_run start, void* arg);
+void execYaoProtocol_End(ProtocolDesc* pd, protocol_run start, void* arg);
 void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg);
 bool execDualexProtocol(ProtocolDesc* pd, protocol_run start, void* arg);
 bool execNpProtocol(ProtocolDesc* pd, protocol_run start, void* arg);

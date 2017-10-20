@@ -34,8 +34,14 @@ static inline int transSend(ProtocolTransport* t,int d,const void* p,size_t n)
   { return t->send(t,d,p,n); }
 static inline int transRecv(ProtocolTransport* t,int s,void* p,size_t n)
   { return t->recv(t,s,p,n); }
-static inline int transFlush(ProtocolTransport* t)
-  { if (t->flush) return t->flush(t); else return 0; }
+static inline int transFlush(ProtocolTransport* t) {
+#ifndef _WIN32
+  if (t->flush) 
+	  return t->flush(t); 
+  else
+#endif
+	  return 0; 
+}
 static inline int osend(ProtocolDesc* pd,int d,const void* p,size_t n)
   { return transSend(pd->trans,d,p,n); }
 static inline int orecv(ProtocolDesc* pd,int s,void* p,size_t n)

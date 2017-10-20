@@ -22,6 +22,10 @@ const char* yaoKeyOfBit(const OblivBit* b);
 extern void setupYaoProtocol(ProtocolDesc* pd,bool halfgates);
 extern void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
                             protocol_run start, void* arg);
+extern void mainYaoProtocol_Init(ProtocolDesc* pd, bool point_and_permute,
+                                protocol_run start, void* arg);
+extern void mainYaoProtocol_End(ProtocolDesc* pd, bool point_and_permute,
+                               protocol_run start, void* arg);
 extern void cleanupYaoProtocol(ProtocolDesc* pd);
 extern bool yaoGenrRevealOblivBits(ProtocolDesc* pd,
                 widest_t* dest,const OblivBit* o,size_t n,int party);
