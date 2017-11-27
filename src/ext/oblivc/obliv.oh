@@ -52,14 +52,35 @@ bool revealOblivShort(short* dest, obliv short src,int party);
 bool revealOblivLong(long* dest, obliv long src,int party);
 bool revealOblivLLong(long long* dest, obliv long long src,int party);
 bool revealOblivFloat(float *dest, obliv float src, int party);
+
+bool  revealOblivBoolArray(bool dest[],  obliv bool src[],  size_t n,
+						   int party);
+bool  revealOblivCharArray(char dest[],  obliv char src[],  size_t n,
+						   int party);
+bool   revealOblivIntArray(int dest[],   obliv int src[],   size_t n,
+						   int party);
+bool revealOblivShortArray(short dest[], obliv short src[], size_t n,
+						   int party);
+bool  revealOblivLongArray(long dest[],  obliv long src[],  size_t n,
+						   int party);
+bool revealOblivLLongArray(long long dest[], obliv long long src[], size_t n,
+						   int party);
 #endif
 
-bool ocBroadcastBool(bool v,int source);
-char ocBroadcastChar(char v,int source);
-int ocBroadcastInt(int v,int source);
-short ocBroadcastShort(short v,int source);
-long ocBroadcastLong(long v,int source);
-long long ocBroadcastLLong(long long v,int source);
+bool ocBroadcastBool(bool v,int party);
+char ocBroadcastChar(char v,int party);
+int ocBroadcastInt(int v,int party);
+short ocBroadcastShort(short v,int party);
+long ocBroadcastLong(long v,int party);
+long long ocBroadcastLLong(long long v,int party);
+
+void  ocBroadcastBoolArray(bool dest[],   bool src[], size_t n, int party);
+void  ocBroadcastCharArray(char dest[],   char src[], size_t n, int party);
+void   ocBroadcastIntArray(int dest[],     int src[], size_t n, int party);
+void ocBroadcastShortArray(short dest[], short src[], size_t n, int party);
+void  ocBroadcastLongArray(long dest[],   long src[], size_t n, int party);
+void ocBroadcastLLongArray(long long dest[], long long src[], size_t n,
+							int party);
 
 uint64_t yaoGateCount(void);
 #endif

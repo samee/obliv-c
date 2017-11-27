@@ -2093,67 +2093,74 @@ feedOblivFun(float, float, Float)
 #undef feedOblivFun
 
 // TODO pass const values by ref later
-bool revealOblivBool(bool* dest,__obliv_c__bool src,int party)
+bool revealOblivBool(bool * dest, __obliv_c__bool src, int party)
 { widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,1,party)) 
+  if(__obliv_c__revealOblivBits(&wd,src.bits,1,party))
     { *dest=(bool)wd; return true; }
   return false;
 }
-bool revealOblivChar(char* dest, __obliv_c__char src,int party)
-{ widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(char),party)) 
-    { *dest=(char)wd; return true; }
-  return false;
-}
-bool revealOblivInt(int* dest, __obliv_c__int src,int party)
-{ widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(int),party)) 
-    { *dest=(int)wd; return true; }
-  return false;
-}
-bool revealOblivShort(short* dest, __obliv_c__short src,int party)
-{ widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(short),party)) 
-    { *dest=(short)wd; return true; }
-  return false;
-}
-bool revealOblivLong(long* dest, __obliv_c__long src,int party)
-{ widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(long),party)) 
-    { *dest=(long)wd; return true; }
-  return false;
-}
-bool revealOblivLLong(long long* dest, __obliv_c__lLong src,int party)
-{ widest_t wd;
-  if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(long long),party)) 
-    { *dest=(long long)wd; return true; }
-  return false;
-}
-bool revealOblivFloat(float *dest, __obliv_c__float src, int party)
-{
-    widest_t wd = 0;
-    if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(float),party)) {
-      *dest = *(float*)(&wd);
-      return true; 
-    }
-    return false;
+bool revealOblivBoolArray(bool *dest, const __obliv_c__bool * src,
+                              size_t n, int party)
+{ bool rv = true;
+  for (size_t ii = 0; ii < n; ii++)
+    { rv &= revealOblivBool(&dest[ii], src[ii], party); }
+  return rv;
 }
 
+#define revealOblivFun(t, ot, tname) \
+      bool revealObliv##tname(t * dest, __obliv_c__##ot src, int party) \
+      { widest_t wd; \
+        if(__obliv_c__revealOblivBits(&wd,src.bits,__bitsize(t),party)) \
+          { *dest=*(t*)&wd; return true; } \
+        return false; \
+      } \
+      bool revealObliv##tname##Array(t *dest, const __obliv_c__##ot * src,\
+                                    size_t n, int party) \
+      { bool rv = true; \
+        if(party!=1) \
+          for (size_t ii = 0; ii < n; ii++) \
+            { rv &= revealObliv##tname(&dest[ii], src[ii], 2); } \
+        if(party!=2) \
+          for (size_t ii = 0; ii < n; ii++) \
+            { rv &= revealObliv##tname(&dest[ii], src[ii], 1); } \
+        return rv; \
+      }
+
+revealOblivFun(char,char,Char);
+revealOblivFun(short,short,Short);
+revealOblivFun(int,int,Int);
+revealOblivFun(long,long,Long);
+revealOblivFun(long long,lLong,LLong);
+revealOblivFun(float,float,Float);
+
+#undef revealOblivFun
+
 // TODO fix data width
-bool ocBroadcastBool(bool v,int source)
-{
-  char t = v;
-  broadcastBits(source,&t,1);
+bool ocBroadcastBool(bool v,int party)
+{ char t = v;
+  broadcastBits(party,&t,1);
   return t;
 }
+void ocBroadcastBoolArray(bool *dest, bool *src, size_t n, int party)
+{ for (size_t ii = 0; ii < n; ii ++)
+    { dest[ii] = ocBroadcastBool(src[ii], party); }
+}
+
 #define broadcastFun(t,tname)           \
-  t ocBroadcast##tname(t v, int source)   \
-  { broadcastBits(source,&v,sizeof(v)); \
-    return v;                           \
-  }
+      t ocBroadcast##tname(t v, int party)   \
+      { broadcastBits(party,&v,sizeof(t)); \
+        return v;                           \
+      } \
+      void ocBroadcast##tname##Array(t *dest, t *src, size_t n, int party) \
+      { if (ocCurrentParty() == party && dest != src) \
+          { memcpy(dest, src, n * sizeof(t)); } \
+        broadcastBits(party,dest,n * sizeof(t)); \
+      }
+
 broadcastFun(char,Char)
 broadcastFun(int,Int)
 broadcastFun(short,Short)
 broadcastFun(long,Long)
 broadcastFun(long long,LLong)
+
 #undef broadcastFun
