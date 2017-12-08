@@ -21,7 +21,8 @@ while [ $# -ge 1 ]; do
   shift
 done
 
-$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations  --keepunused --doprocessObliv --markImplicitCasts $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv $GCRYPT -pthread $CCARGS 
+set -e
+$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations --keepunused --doprocessObliv --markImplicitCasts $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv $GCRYPT -pthread $CCARGS
 
 if false; then
 while [ $# -ge 1 ]; do
@@ -59,4 +60,3 @@ done
 
 gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/_build $GCRYPT -pthread
 fi
-
