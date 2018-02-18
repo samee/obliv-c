@@ -145,7 +145,7 @@ let scan_oct_escape str =
  * We convert L"Hi" to "H\000i\000" *)
 let wbtowc wstr =
   let len = String.length wstr in 
-  let dest = String.make (len * 2) '\000' in 
+  let dest = Bytes.make (len * 2) '\000' in 
   for i = 0 to len-1 do 
     dest.[i*2] <- wstr.[i] ;
   done ;
