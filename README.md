@@ -8,8 +8,8 @@ Unfortunately, the instructions for Fedora and Mac OS might be a little out of d
 
 1. Installation of dependencies. 
   * For Ubuntu: `sudo apt-get install ocaml libgcrypt20-dev ocaml-findlib opam m4`.
+  * For Fedora 27: `sudo dnf install glibc-devel.i686 ocaml ocaml-ocamldoc ocaml-findlib ocaml-findlib-devel ocaml-ocamlbuild libgcrypt libgcrypt-devel perl-ExtUtils-MakeMaker perl-Data-Dumper`.
   * For Mac OS (with Macports): `sudo port install gcc5 ocaml ocaml-findlib opam libgcrypt +devel`.
-  * For Fedora: these instructions may be outdated. They worked as of [commit 6553c1f7c](https://github.com/samee/obliv-c/commit/6553c1f7c), but we haven't tested it since [OPAM](https://opam.ocaml.org/) became a hard dependency on other platforms. There doesn't seem to be a well-supported RPM for it either. Please let us know if that has changed, and we will update this text here. Here is the old instruction for reference: `sudo dnf install glibc-devel.i686 ocaml ocaml-ocamldoc ocaml-findlib ocaml-findlib-devel libgcrypt libgcrypt-devel perl-ExtUtils-MakeMaker perl-Data-Dumper`.
 
 2. If you are using OPAM as our package manager, and this is the first time you are using it, set it up:
    ```
@@ -19,6 +19,7 @@ Unfortunately, the instructions for Fedora and Mac OS might be a little out of d
    opam install camlp4 ocamlfind ocamlbuild batteries
    ```
    Version 4.06.0 just happened to be the most recent version when we tested. You can check what you have by running `opam switch list`, and try a more recent one.
+   Note that this step seems to be unnecessary under Fedora.
 
 3. Git-clone this repository, and compile:
   * For Linux: `./configure && make`.
