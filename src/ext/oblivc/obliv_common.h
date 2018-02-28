@@ -130,27 +130,9 @@ static inline bool getBit(const char* src,int ind)
   { return src[ind/8]&(1<<ind%8); }
 static inline void xorBit(char *dest,int ind,bool v)
   { dest[ind/8]^=(v<<ind%8); }
-static inline void memxor (void* dest, const void* src, size_t n)
-{
-  // xor the last n % 8 bytes; Compiler optimization will unroll this loop
-  size_t offset = n % sizeof(uint64_t);
-  for(size_t i = n - offset; i < n; i++) {
-    ((char *)dest)[i] ^= ((char *)src)[i];
-  }
-  n /= sizeof(uint64_t);
-  uint64_t *ldest = (uint64_t*) dest;
-  uint64_t *lsrc = (uint64_t*) src;
-  // make sure n is a multiple of 128 bits
-  if (n & 1) {
-    n--;
-    ldest[n] ^= lsrc[n];
-  }
-  // process the rest in batches of two uint64_t,
-  // allowing the compiler to use 128-bit pxor (SSE2)
-  while (n >= 2) {
-    n -= 2;
-    ldest[n+1] ^= lsrc[n+1];
-    ldest[n] ^= lsrc[n];
+static inline void memxor(void *restrict dest, const void *restrict src, size_t n) {
+  for(size_t i = 0; i < n; i++) {
+    ((char *) dest)[i] ^= ((char *)src)[i];
   }
 }
 
