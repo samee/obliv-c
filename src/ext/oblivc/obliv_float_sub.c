@@ -2067,7 +2067,6 @@ void obliv_float_sub_circuit(OblivBit* dest, const OblivBit* op1, const OblivBit
     __obliv_c__copyBit(&__obliv_29, op1+29);
     __obliv_c__copyBit(&__obliv_30, op1+30);
     __obliv_c__copyBit(&__obliv_31, op1+31);
-    __obliv_c__flipBit(&__obliv_31);
     __obliv_c__copyBit(&__obliv_32, op2+0);
     __obliv_c__copyBit(&__obliv_33, op2+1);
     __obliv_c__copyBit(&__obliv_34, op2+2);
@@ -2100,6 +2099,7 @@ void obliv_float_sub_circuit(OblivBit* dest, const OblivBit* op1, const OblivBit
     __obliv_c__copyBit(&__obliv_61, op2+29);
     __obliv_c__copyBit(&__obliv_62, op2+30);
     __obliv_c__copyBit(&__obliv_63, op2+31);
+    __obliv_c__flipBit(&__obliv_63);
     __obliv_c__setBitNot(&__obliv_64, &__obliv_30);
     __obliv_c__setBitAnd(&__obliv_65, &__obliv_62, &__obliv_64);
     __obliv_c__setBitNot(&__obliv_65, &__obliv_65);
