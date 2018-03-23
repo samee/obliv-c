@@ -6,7 +6,7 @@
 //FILE* transGetFile(ProtocolTransport* t); // Debugging API
 
 
-// Because I am evil and I do not like 
+// Because I am evil and I do not like
 // Java-style redundant "say the type twice" practice
 #define CAST(p) ((void*)p)
 
@@ -126,24 +126,14 @@ static inline void setBit(char *dest,int ind,bool v)
 { char mask = (1<<ind%8);
   dest[ind/8] = (dest[ind/8]&~mask)+(v?mask:0);
 }
-static inline bool getBit(const char* src,int ind) 
+static inline bool getBit(const char* src,int ind)
   { return src[ind/8]&(1<<ind%8); }
-static inline void xorBit(char *dest,int ind,bool v) 
+static inline void xorBit(char *dest,int ind,bool v)
   { dest[ind/8]^=(v<<ind%8); }
-static inline void memxor (void* dest, const void* src, size_t n)
-{ size_t i;
-  for(i=0;i+sizeof(uint64_t)<=n;i+=sizeof(uint64_t))
-    *((uint64_t*)((char*)dest+i)) ^= *((uint64_t*)((char*)src+i));
-  if(i+sizeof(uint32_t)<=n){
-    *((uint32_t*)((char*)dest+i)) ^= *((uint32_t*)((char*)src+i));
-   i+=sizeof(uint32_t);
+static inline void memxor(void *restrict dest, const void *restrict src, size_t n) {
+  for(size_t i = 0; i < n; i++) {
+    ((char *) dest)[i] ^= ((char *)src)[i];
   }
-  if(i+sizeof(uint16_t)<=n)  {
-    *((uint16_t*)((char*)dest+i)) ^= *((uint16_t*)((char*)src+i));
-   i+=sizeof(uint16_t);
-  }
-  if(i < n)
-    *((char*)dest+i) ^= *((char*)src+i);
 }
 
 #endif
