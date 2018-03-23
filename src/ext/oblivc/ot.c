@@ -1049,7 +1049,7 @@ bcipherCryptNoResize(BCipherRandomGen* gen,const char* key,int nonce,
 typedef struct
 { BCipherRandomGen *cipher;
   const char *box;
-  int n, rowBytes, *rows, k, nonce, nonceDelta, len, destParty, c;
+  int n, rowBytes, *rows, k, nonce, nonceDelta, destParty, c;
   size_t len;
   char *opt0, *opt1;
   const char *spack;
@@ -1144,7 +1144,7 @@ static void recvBufRecv(RecvMsgArgs* a,char* data)
 static void recvBufInit(RecvMsgArgs* a)
 {
   a->buf=malloc(a->len*MSGBUFFER_SIZE);
-  a->bufread=bufsize;
+  a->bufread=a->len*MSGBUFFER_SIZE;
   a->payloadLeft=(a->isCorr?a->n:2*a->n);
 }
 static void recvBufRelease(RecvMsgArgs* a) { free(a->buf); }
