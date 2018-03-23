@@ -1075,7 +1075,7 @@ static void sendBufSend(SendMsgArgs* a,const char* data)
 static void sendBufInit(SendMsgArgs* a)
 {
   size_t bufsize = a->len;
-  bufsize * = MSGBUFFER_SIZE;
+  bufsize *= MSGBUFFER_SIZE;
   a->buf=malloc(bufsize);
   a->bufused=0;
 }
