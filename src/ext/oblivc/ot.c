@@ -1053,7 +1053,7 @@ typedef struct
   char *opt0, *opt1;
   const char *spack;
   ProtocolTransport *trans;
-  char *buf; int bufused;
+  char *buf; size_t bufused;
   OcOtCorrelator corrFun; // Callback function
   void* corrArg;
   void* sender;
@@ -1068,13 +1068,15 @@ static void sendBufFlush(SendMsgArgs* a)
 
 static void sendBufSend(SendMsgArgs* a,const char* data)
 {
-  if(a->bufused>=a->len*MSGBUFFER_SIZE) sendBufFlush(a);
+  if(a->bufused>=(size_t)(a->len)*MSGBUFFER_SIZE) sendBufFlush(a);
   memcpy(a->buf+a->bufused,data,a->len);
   a->bufused+=a->len;
 }
 static void sendBufInit(SendMsgArgs* a)
 {
-  a->buf=malloc(a->len*MSGBUFFER_SIZE);
+  size_t bufsize = a->len;
+  bufsize * = MSGBUFFER_SIZE;
+  a->buf=malloc(bufsize);
   a->bufused=0;
 }
 static void sendBufRelease(SendMsgArgs* a) { sendBufFlush(a); free(a->buf); }
@@ -1121,28 +1123,30 @@ typedef struct
   char *msg;
   const char *mask; // Receiver's selections
   ProtocolTransport *trans;
-  char *buf; int bufread, payloadLeft;
+  char *buf; size_t bufread, payloadLeft;
   bool isCorr;
   void* recver;
 } RecvMsgArgs;
 static void recvBufFill(RecvMsgArgs* a)
 {
   int n = (a->payloadLeft<MSGBUFFER_SIZE?a->payloadLeft:MSGBUFFER_SIZE);
-  transRecv(a->trans,a->srcParty,a->buf,n*a->len);
+  transRecv(a->trans,a->srcParty,a->buf,n*(size_t)(a->len));
   a->bufread=0;
 }
 
 static void recvBufRecv(RecvMsgArgs* a,char* data)
 {
-  if(a->bufread>=a->len*MSGBUFFER_SIZE) recvBufFill(a);
+  if(a->bufread>=(size_t)(a->len)*MSGBUFFER_SIZE) recvBufFill(a);
   memcpy(data,a->buf+a->bufread,a->len);
   a->bufread+=a->len;
   a->payloadLeft--;
 }
 static void recvBufInit(RecvMsgArgs* a)
 {
-  a->buf=malloc(a->len*MSGBUFFER_SIZE);
-  a->bufread=a->len*MSGBUFFER_SIZE;
+  size_t bufsize = a->len;
+  bufsize *= MSGBUFFER_SIZE;
+  a->buf=malloc(bufsize);
+  a->bufread=bufsize;
   a->payloadLeft=(a->isCorr?a->n:2*a->n);
 }
 static void recvBufRelease(RecvMsgArgs* a) { free(a->buf); }
