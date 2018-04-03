@@ -1059,7 +1059,7 @@ typedef struct
   void* sender;
 } SendMsgArgs;
 
-#define MSGBUFFER_SIZE 10000
+#define MSGBUFFER_SIZE 2500
 static void sendBufFlush(SendMsgArgs* a)
 {
   transSend(a->trans,a->destParty,a->buf,a->bufused);

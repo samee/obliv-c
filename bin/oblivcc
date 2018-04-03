@@ -3,6 +3,7 @@ OCCPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/../ && pwd )"
 OCLIB=$OCCPATH/src/ext/oblivc
 COMPILE_ONLY=0
 CCARGS=""
+AFTERARGS=""
 CILLYARGS=""
 OCSRC=()
 GCRYPT="-lgcrypt"
@@ -12,26 +13,15 @@ else
   OBLIV_BITS="-include obliv_bits.h"
 fi
 
-while [ $# -ge 1 ]; do
-  if [ "$1" = "-static-gcrypt" ]; then
-    GCRYPT="/usr/lib/x86_64-linux-gnu/libgcrypt.a -lgpg-error"
-  else
-    CCARGS+="$1 "
-  fi
-  shift
-done
-
 set -e
-$OCCPATH/bin/cilly -Wno-format-security -Wno-deprecated-declarations --keepunused --doprocessObliv --markImplicitCasts $OBLIV_BITS -I $OCLIB -L$OCCPATH/_build -lobliv $GCRYPT -pthread $CCARGS
 
-if false; then
 while [ $# -ge 1 ]; do
   if [ "$1" = "-c" ]; then
     COMPILE_ONLY=1
     CCARGS+="-c "
   elif [ "$1" = "-static-gcrypt" ]; then
     GCRYPT="/usr/lib/x86_64-linux-gnu/libgcrypt.a -lgpg-error"
-  elif [ "${1%.oc}" != "$1" ]; then
+  elif [[ "$1" == *oc ]]; then
     OCSRC+=($1)
     CCARGS+="$1.cil.c "
   else
@@ -43,6 +33,9 @@ while [ $# -ge 1 ]; do
       CILLYARGS+="-I $2 "
       CCARGS+="-I $2 "
       shift
+    elif [[ "$1" == -l* ]]; then
+      CCARGS+="$1 "
+      AFTERARGS+="$1 "
     else
       CCARGS+="$1 "
     fi
@@ -58,5 +51,4 @@ for src in ${OCSRC[*]}; do
   $OCCPATH/bin/cilobliv $src -I $OCLIB $CILLYARGS || exit
 done
 
-gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/_build $GCRYPT -pthread
-fi
+gcc $CCARGS -I $OCLIB -Wno-format-security -Wno-deprecated-declarations -lobliv -O3 -L$OCCPATH/_build $GCRYPT $AFTERARGS -pthread
