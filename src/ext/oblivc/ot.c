@@ -1049,7 +1049,8 @@ bcipherCryptNoResize(BCipherRandomGen* gen,const char* key,int nonce,
 typedef struct
 { BCipherRandomGen *cipher;
   const char *box;
-  int n, rowBytes, *rows, k, nonce, nonceDelta, len, destParty, c;
+  int n, rowBytes, *rows, k, nonce, nonceDelta, destParty, c;
+  size_t len;
   char *opt0, *opt1;
   const char *spack;
   ProtocolTransport *trans;
@@ -1068,15 +1069,13 @@ static void sendBufFlush(SendMsgArgs* a)
 
 static void sendBufSend(SendMsgArgs* a,const char* data)
 {
-  if(a->bufused>=(size_t)(a->len)*MSGBUFFER_SIZE) sendBufFlush(a);
+  if(a->bufused>=a->len*MSGBUFFER_SIZE) sendBufFlush(a);
   memcpy(a->buf+a->bufused,data,a->len);
   a->bufused+=a->len;
 }
 static void sendBufInit(SendMsgArgs* a)
 {
-  size_t bufsize = a->len;
-  bufsize *= MSGBUFFER_SIZE;
-  a->buf=malloc(bufsize);
+  a->buf=malloc(a->len*MSGBUFFER_SIZE);
   a->bufused=0;
 }
 static void sendBufRelease(SendMsgArgs* a) { sendBufFlush(a); free(a->buf); }
@@ -1119,7 +1118,8 @@ senderExtensionBoxSendMsg(SendMsgArgs* a)
 typedef struct
 { BCipherRandomGen *cipher;
   const char *box;
-  int n, rowBytes, *rows, k, nonce, nonceDelta, len, srcParty, c;
+  int n, rowBytes, *rows, k, nonce, nonceDelta, srcParty, c;
+  size_t len;
   char *msg;
   const char *mask; // Receiver's selections
   ProtocolTransport *trans;
@@ -1130,23 +1130,21 @@ typedef struct
 static void recvBufFill(RecvMsgArgs* a)
 {
   int n = (a->payloadLeft<MSGBUFFER_SIZE?a->payloadLeft:MSGBUFFER_SIZE);
-  transRecv(a->trans,a->srcParty,a->buf,n*(size_t)(a->len));
+  transRecv(a->trans,a->srcParty,a->buf,n*a->len);
   a->bufread=0;
 }
 
 static void recvBufRecv(RecvMsgArgs* a,char* data)
 {
-  if(a->bufread>=(size_t)(a->len)*MSGBUFFER_SIZE) recvBufFill(a);
+  if(a->bufread>=a->len*MSGBUFFER_SIZE) recvBufFill(a);
   memcpy(data,a->buf+a->bufread,a->len);
   a->bufread+=a->len;
   a->payloadLeft--;
 }
 static void recvBufInit(RecvMsgArgs* a)
 {
-  size_t bufsize = a->len;
-  bufsize *= MSGBUFFER_SIZE;
-  a->buf=malloc(bufsize);
-  a->bufread=bufsize;
+  a->buf=malloc(a->len*MSGBUFFER_SIZE);
+  a->bufread=a->len*MSGBUFFER_SIZE;
   a->payloadLeft=(a->isCorr?a->n:2*a->n);
 }
 static void recvBufRelease(RecvMsgArgs* a) { free(a->buf); }
