@@ -1049,17 +1049,18 @@ bcipherCryptNoResize(BCipherRandomGen* gen,const char* key,int nonce,
 typedef struct
 { BCipherRandomGen *cipher;
   const char *box;
-  int n, rowBytes, *rows, k, nonce, nonceDelta, len, destParty, c;
+  int n, rowBytes, *rows, k, nonce, nonceDelta, destParty, c;
+  size_t len;
   char *opt0, *opt1;
   const char *spack;
   ProtocolTransport *trans;
-  char *buf; int bufused;
+  char *buf; size_t bufused;
   OcOtCorrelator corrFun; // Callback function
   void* corrArg;
   void* sender;
 } SendMsgArgs;
 
-#define MSGBUFFER_SIZE 10000
+#define MSGBUFFER_SIZE 2500
 static void sendBufFlush(SendMsgArgs* a)
 {
   transSend(a->trans,a->destParty,a->buf,a->bufused);
@@ -1117,11 +1118,12 @@ senderExtensionBoxSendMsg(SendMsgArgs* a)
 typedef struct
 { BCipherRandomGen *cipher;
   const char *box;
-  int n, rowBytes, *rows, k, nonce, nonceDelta, len, srcParty, c;
+  int n, rowBytes, *rows, k, nonce, nonceDelta, srcParty, c;
+  size_t len;
   char *msg;
   const char *mask; // Receiver's selections
   ProtocolTransport *trans;
-  char *buf; int bufread, payloadLeft;
+  char *buf; size_t bufread, payloadLeft;
   bool isCorr;
   void* recver;
 } RecvMsgArgs;
