@@ -1,5 +1,5 @@
 #!/bin/bash
-OCCPATH="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/../ && pwd )"
+OCCPATH="$(>/dev/null cd "$( dirname "${BASH_SOURCE[0]}" )"/../ && pwd )"
 OCLIB=$OCCPATH/src/ext/oblivc
 COMPILE_ONLY=0
 CCARGS=""
