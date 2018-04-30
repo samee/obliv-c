@@ -802,8 +802,11 @@ class codegenVisitor (curFunc : fundec) (dt:depthTracker) (curCond : lval)
     let isDeepVar v = dt#curDepth() = dt#varDepth v in
     match s.skind with
     | Instr ilist -> 
+        let mkStmtWithLabel (sk: stmtkind) (lb: label list) : stmt =
+          { (mkStmt sk) with labels = lb } in
+        let num = List.length ilist in
         let nestedGen = codegenInstr curCond tmpVar isDeepVar in
-        ChangeTo (mkStmt (Instr (mapcat nestedGen ilist)))
+        ChangeTo (mkStmtWithLabel (Instr (mapcat nestedGen ilist)) s.labels)
     | If(c,tb,fb,loc) when isOblivBlock tb ->
         let cond = "__obliv_c__cond" in
         let cv = var (tmpVar ~name:cond oblivBoolType) in
