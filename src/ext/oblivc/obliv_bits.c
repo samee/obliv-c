@@ -33,23 +33,30 @@ struct stdioTransport
 };
 
 // Ignores 'dest' parameter. So you can't osend to yourself
-static bool* stdioFlushFlag(ProtocolTransport* pt) 
+static bool* stdioFlushFlag(ProtocolTransport* pt)
   { return &((struct stdioTransport*)pt)->needFlush; }
 
 static int stdioSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { *stdioFlushFlag(pt)=true;
-  return fwrite(s,1,n,stdout); 
+  return fwrite(s,1,n,stdout);
 }
 
 static int stdioRecv(ProtocolTransport* pt,int src,void* s,size_t n)
-{ 
+{
   pt->flush(pt);
-  return fread(s,1,n,stdin); 
+  return fread(s,1,n,stdin);
 }
 
 static int stdioFlush(ProtocolTransport* pt) {
   bool *p = stdioFlushFlag(pt);
-  if(*p) { fflush(stdout); *p=false; }
+  int status = 0;
+  if(*p) {
+    status = fflush(stdout);
+    if(status == 0) {
+      *p=false;
+    }
+  }
+  return status;
 }
 
 static void stdioCleanup(ProtocolTransport* pt) {
@@ -87,7 +94,7 @@ size_t tcp2PBytesSent(ProtocolDesc* pd) { return ((tcp2PTransport*)(pd->trans))-
 size_t tcp2PFlushCount(ProtocolDesc* pd) { return ((tcp2PTransport*)(pd->trans))->flushCount; }
 
 static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
-{ 
+{
   struct tcp2PTransport* tcpt = CAST(pt);
   size_t n2=0;
   tcpt->needFlush=true;
@@ -108,7 +115,7 @@ static int tcp2PSendProfiled(ProtocolTransport* pt,int dest,const void* s,size_t
 }
 
 static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
-{ 
+{
   struct tcp2PTransport* tcpt = CAST(pt);
   int res=0,n2=0;
   if (tcpt->needFlush)
@@ -117,7 +124,7 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
     tcpt->needFlush=false;
   }
   while(n>n2)
-  { 
+  {
     res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
     if(res<0 || feof(tcpt->sockStream))
     {
@@ -143,7 +150,7 @@ static int tcp2PFlushProfiled(ProtocolTransport* pt)
 }
 
 static void tcp2PCleanup(ProtocolTransport* pt)
-{ 
+{
   tcp2PTransport* t = CAST(pt);
   fflush(t->sockStream);
   if(!t->keepAlive) fclose(t->sockStream);
@@ -190,7 +197,7 @@ static const tcp2PTransport tcp2PProfiledTransportTemplate
 static tcp2PTransport* tcp2PNew(int sock,bool isClient, bool isProfiled)
 { tcp2PTransport* trans = malloc(sizeof(*trans));
   if (isProfiled) {
-    *trans = tcp2PProfiledTransportTemplate;  
+    *trans = tcp2PProfiledTransportTemplate;
   } else {
     *trans = tcp2PTransportTemplate;
   }
@@ -206,22 +213,22 @@ static tcp2PTransport* tcp2PNew(int sock,bool isClient, bool isProfiled)
 }
 
 void protocolUseTcp2P(ProtocolDesc* pd,int sock,bool isClient)
-{ 
-  pd->trans = &tcp2PNew(sock,isClient, false)->cb; 
+{
+  pd->trans = &tcp2PNew(sock,isClient, false)->cb;
   tcp2PTransport* t = CAST(pd->trans);
   t->keepAlive = false;
 }
 
 void protocolUseTcp2PProfiled(ProtocolDesc* pd,int sock,bool isClient)
-{ 
-  pd->trans = &tcp2PNew(sock,isClient, true)->cb; 
+{
+  pd->trans = &tcp2PNew(sock,isClient, true)->cb;
   tcp2PTransport* t = CAST(pd->trans);
   t->keepAlive = false;
 }
 
 void protocolUseTcp2PKeepAlive(ProtocolDesc* pd,int sock,bool isClient)
-{ 
-  pd->trans = &tcp2PNew(sock,isClient, false)->cb; 
+{
+  pd->trans = &tcp2PNew(sock,isClient, false)->cb;
   tcp2PTransport* t = CAST(pd->trans);
   t->keepAlive = true;
 }
@@ -341,7 +348,7 @@ static int sockSplit(int sock,ProtocolTransport* t,bool isClient)
 static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
 {
   tcp2PTransport* t = CAST(tsrc);
-  transFlush(tsrc); 
+  transFlush(tsrc);
   // I should really rewrite sockSplit to use FILE* sockStream
   int newsock = sockSplit(t->sock,tsrc,t->isClient);
   if(newsock<0) { fprintf(stderr,"sockSplit() failed\n"); return NULL; }
@@ -350,15 +357,15 @@ static ProtocolTransport* tcp2PSplit(ProtocolTransport* tsrc)
   return CAST(tnew);
 }
 
-typedef struct 
-{ ProtocolTransport cb; 
-  ProtocolDesc pd; 
+typedef struct
+{ ProtocolTransport cb;
+  ProtocolDesc pd;
 } SizeCheckTransportAdapter; // spliced object
 
 static int sizeCheckSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 { int sent = osend(&((SizeCheckTransportAdapter*)pt)->pd,dest,s,n);
   if(sent==n) return n;
-  else 
+  else
   { fprintf(stderr,"Was going to send %zu bytes to %d, sent %d\n",
                    n,dest,sent);
     if(sent<0) fprintf(stderr,"That means %s\n",strerror(sent));
@@ -369,7 +376,7 @@ static int sizeCheckSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
 static int sizeCheckRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 { int recv = orecv(&((SizeCheckTransportAdapter*)pt)->pd,src,s,n);
   if(recv==n) return n;
-  else 
+  else
   { fprintf(stderr,"Was going to recv %zu bytes from %d, received %d\n",
                     n,src,recv);
     if(recv<0) fprintf(stderr,"That means %s\n",strerror(recv));
@@ -477,16 +484,16 @@ void dbgProtoSetBitNot(ProtocolDesc* pd,OblivBit* dest,const OblivBit* a)
   dest->knownValue= !a->knownValue;
   dest->unknown = a->unknown;
 }
-void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest) 
+void dbgProtoFlipBit(ProtocolDesc* pd,OblivBit* dest)
   { dest->knownValue = !dest->knownValue; }
 
 static void dbgFeedOblivBool(OblivBit* dest,int party,bool a)
-{ 
+{
   int curparty = ocCurrentParty();
-  
+
   dest->unknown=true;
   if(party==1) { if(curparty==1) dest->knownValue=a; }
-  else if(party==2 && curparty == 1) 
+  else if(party==2 && curparty == 1)
     orecv(currentProto,2,&dest->knownValue,sizeof(bool));
   else if(party==2 && curparty == 2) osend(currentProto,1,&a,sizeof(bool));
   else fprintf(stderr,"Error: This is a 2 party protocol\n");
@@ -497,7 +504,7 @@ void dbgProtoFeedOblivInputs(ProtocolDesc* pd,
 { while(count--)
   { int i;
     widest_t v = spec->src;
-    for(i=0;i<spec->size;++i) 
+    for(i=0;i<spec->size;++i)
     { dbgFeedOblivBool(spec->dest+i,party,v&1);
       v>>=1;
     }
@@ -549,7 +556,7 @@ GCRY_THREAD_OPTION_PTHREAD_IMPL;
 static void gcryDefaultLibInitAux(void)
 {
   if(!gcry_control(GCRYCTL_INITIALIZATION_FINISHED_P))
-  { 
+  {
     gcry_control(GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
     if(!gcry_check_version(NULL))
     { fprintf(stderr,"libgcrypt init failed\n");
@@ -574,7 +581,7 @@ static void yaoKeyDebug(const yao_key_t k)
 static void debugOblivBit(const OblivBit* o)
 {
   if(known(o)) fprintf(stderr,"Known value %d\n",(int)o->knownValue);
-  else 
+  else
   { fprintf(stderr,"inv %d, ",(int)o->yao.inverted);
     yaoKeyDebug(o->yao.w);
   }
@@ -738,7 +745,7 @@ void yaoSetBitNot(ProtocolDesc* pd,OblivBit* r,const OblivBit* a)
 
 void yaoGenrFeedOblivInputs(ProtocolDesc* pd
                            ,OblivInputs* oi,size_t n,int src)
-{ 
+{
   YaoProtocolDesc* ypd = pd->extra;
   yao_key_t w0,w1;
   OIBitSrc it = oiBitSrc(oi,n);
@@ -749,7 +756,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
     else osend(pd,2,w0,YAO_KEY_BYTES);
     o->yao.inverted = false; o->unknown = true;
     yaoKeyCopy(o->yao.w,w0);
-  }else 
+  }else
   { size_t bc = bitCount(&it);
     // limit memory usage
     size_t batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
@@ -757,7 +764,7 @@ void yaoGenrFeedOblivInputs(ProtocolDesc* pd
          *buf1 = malloc(batch*YAO_KEY_BYTES);
     size_t bp=0;
     for(;hasBit(&it);nextBit(&it))
-    { 
+    {
       OblivBit* o = curDestBit(&it);
       yaoKeyNewPair(ypd,w0,w1); // does ypd->icount++
       yaoKeyCopy(buf0+bp*YAO_KEY_BYTES,w0);
@@ -783,7 +790,7 @@ void yaoEvalFeedOblivInputs(ProtocolDesc* pd
     orecv(pd,1,o->yao.w,YAO_KEY_BYTES);
     o->unknown = true;
     ypd->icount++;
-  }else 
+  }else
   { size_t bc = bitCount(&it);
     // limit memory usage
     size_t batch = (bc<YAO_FEED_MAX_BATCH?bc:YAO_FEED_MAX_BATCH);
@@ -848,9 +855,9 @@ bool yaoEvalRevealOblivBits(ProtocolDesc* pd,
 }
 
 // Encodes a 2-input truth table for f(a,b) = (bool)(ttable&(1<<(2*a+b)))
-void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
+void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
     const OblivBit* a, const OblivBit* b)
-{ 
+{
   YaoProtocolDesc* ypd = pd->extra;
   uint64_t k = ypd->gcount;
   int im=0,i;
@@ -886,7 +893,7 @@ void yaoGenerateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   ypd->gcount++;
 }
 
-void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable, 
+void yaoEvaluateGate(ProtocolDesc* pd, OblivBit* r, char ttable,
   const OblivBit* a, const OblivBit* b)
 {
   int i=0,j;
@@ -970,7 +977,7 @@ void yaoGenerateHalfGatePair(ProtocolDesc* pd, OblivBit* r,
   r->yao.inverted = false; r->unknown = true;
 }
 
-void yaoGenerateAndPair(ProtocolDesc* pd, OblivBit* r, 
+void yaoGenerateAndPair(ProtocolDesc* pd, OblivBit* r,
                         const OblivBit* a, const OblivBit* b)
   { yaoGenerateHalfGatePair(pd,r,0,0,0,a,b); }
 
@@ -1108,7 +1115,7 @@ void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
     { ypd->ownOT=true;
       ypd->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
     }
-  }else 
+  }else
     if(ypd->recver.recver==NULL)
     { ypd->ownOT=true;
       ypd->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,1));
@@ -1144,7 +1151,7 @@ void execYaoProtocol_noHalf(ProtocolDesc* pd, protocol_run start, void* arg)
 // Special purpose gates, meant to be used if you like doing low-level
 // optimizations. Note: this one assumes constant propagation has already
 // been done, and 'a' is private to the generator.
-// TODO I should really find a better way to factor this out with 
+// TODO I should really find a better way to factor this out with
 // YaoGenerateHalfGatePair
 void yaoGenerateGenHalf(ProtocolDesc* pd,OblivBit* r,
     bool ac, bool bc, bool rc, const OblivBit* a, bool b)
@@ -1208,7 +1215,7 @@ void yaoGenerateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper* sw,
   args.w = malloc(n*sizeof(yao_key_t));
   args.flip = malloc(n*sizeof(bool));
   int i,j=0;
-  for(i=0;i<n;++i) 
+  for(i=0;i<n;++i)
     if(a[i].unknown)
     { yaoKeyCopy(args.w[j],a[i].yao.w);
       args.flip[j]=a[i].yao.inverted;
@@ -1260,7 +1267,7 @@ void yaoEvaluateEvalHalf(ProtocolDesc* pd,YaoEHalfSwapper* sw,
 void yaoGHalfAnd(ProtocolDesc* pd,OblivBit* r,const OblivBit* a,bool b)
 {
   __obliv_c__bool feedOblivBool(bool b,int party);
-  if(known(a)) 
+  if(known(a))
   { if(a->knownValue) *r=feedOblivBool(b,1).bits[0];
     else __obliv_c__assignBitKnown(r,false);
   }
@@ -1332,10 +1339,10 @@ void setupNnobProtocol(ProtocolDesc* pd) {
   pd->error = 0;
   pd->partyCount = 2;
   pd->currentParty = ocCurrentPartyDefault;
-  pd->feedOblivInputs = nnobFeedOblivInputs; 
-  pd->revealOblivBits = nnobRevealOblivInputs; 
+  pd->feedOblivInputs = nnobFeedOblivInputs;
+  pd->revealOblivBits = nnobRevealOblivInputs;
   pd->setBitAnd = nnobSetBitAnd;
-  pd->setBitOr  = nnobSetBitOr; 
+  pd->setBitOr  = nnobSetBitOr;
   pd->setBitXor = nnobSetBitXor;
   pd->setBitNot = nnobSetBitNot;
   pd->flipBit   = nnobFlipBit;
@@ -1346,7 +1353,7 @@ void mainNnobProtocol(ProtocolDesc* pd, int numOTs, OTExtValidation validation, 
   /*int denom = logfloor(numOTs, 2)+1;*/
   /*int bucketSize = (int)(1 + (NNOB_KEY_BYTES*8)/denom);*/
   int bucketSize = BUCKET_SIZE;
-  NnobProtocolDesc* npd = pd->extra; 
+  NnobProtocolDesc* npd = pd->extra;
   npd->bucketSize = bucketSize;
   int n = ((numOTs+7)/8)*8;
   int destparty = pd->thisParty==1?1:2;
@@ -1376,9 +1383,9 @@ void mainNnobProtocol(ProtocolDesc* pd, int numOTs, OTExtValidation validation, 
   char (*aBitFullKey)[A_BIT_PARAMETER_BYTES] = malloc(numOTs*A_BIT_PARAMETER_BYTES);
   if(destparty==1)
   {
-    npd->error |= !WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share, 
+    npd->error |= !WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share,
         mat1, aBitFullMac, numOTs, validation, destparty);
-    npd->error |= !WaBitBoxGetKey(pd, npd->globalDelta, 
+    npd->error |= !WaBitBoxGetKey(pd, npd->globalDelta,
         mat2, aBitFullKey, numOTs, validation, destparty);
     WaBitToaBit(npd->aBitsShareAndMac.mac, aBitFullMac, mat1, numOTs);
     WaBitToaBit(npd->aBitsKey.key, aBitFullKey, mat2, numOTs);
@@ -1389,9 +1396,9 @@ void mainNnobProtocol(ProtocolDesc* pd, int numOTs, OTExtValidation validation, 
   }
   else
   {
-    npd->error |= !WaBitBoxGetKey(pd, npd->globalDelta, 
+    npd->error |= !WaBitBoxGetKey(pd, npd->globalDelta,
         mat1, aBitFullKey, numOTs, validation, destparty);
-    npd->error |= !WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share, 
+    npd->error |= !WaBitBoxGetBitAndMac(pd, npd->aBitsShareAndMac.share,
         mat2, aBitFullMac, numOTs, validation, destparty);
     WaBitToaBit(npd->aBitsShareAndMac.mac, aBitFullMac, mat2, numOTs);
     WaBitToaBit(npd->aBitsKey.key, aBitFullKey, mat1, numOTs);
@@ -1411,12 +1418,12 @@ void cleanupNnobProtocol(ProtocolDesc* pd)
   NnobProtocolDesc* npd = pd->extra;
   releaseBCipherRandomGen(npd->gen);
   free(npd->aBitsShareAndMac.share);
-  free(npd->aBitsShareAndMac.mac); 
-  free(npd->aBitsKey.key); 
-  free(npd->FDeal.aOTShareAndMacOfZ.x0); 
-  free(npd->FDeal.aOTShareAndMacOfZ.x1); 
-  free(npd->FDeal.aOTShareAndMacOfZ.c); 
-  free(npd->FDeal.aOTShareAndMacOfZ.z); 
+  free(npd->aBitsShareAndMac.mac);
+  free(npd->aBitsKey.key);
+  free(npd->FDeal.aOTShareAndMacOfZ.x0);
+  free(npd->FDeal.aOTShareAndMacOfZ.x1);
+  free(npd->FDeal.aOTShareAndMacOfZ.c);
+  free(npd->FDeal.aOTShareAndMacOfZ.z);
   free(npd->FDeal.aOTKeyOfZ.x0);
   free(npd->FDeal.aOTKeyOfZ.x1);
   free(npd->FDeal.aOTKeyOfZ.c);
@@ -1484,15 +1491,15 @@ void __obliv_c__setBitXor(OblivBit* dest,const OblivBit* a,const OblivBit* b)
     v = a->knownValue;
     __obliv_c__copyBit(dest,b);
     if(v) __obliv_c__flipBit(dest);
-  }else currentProto->setBitXor(currentProto,dest,a,b); 
+  }else currentProto->setBitXor(currentProto,dest,a,b);
 }
 void __obliv_c__setBitNot(OblivBit* dest,const OblivBit* a)
 { if(known(a)){ *dest=*a; dest->knownValue=!dest->knownValue; }
-  else currentProto->setBitNot(currentProto,dest,a); 
+  else currentProto->setBitNot(currentProto,dest,a);
 }
-void __obliv_c__flipBit(OblivBit* dest) 
+void __obliv_c__flipBit(OblivBit* dest)
 { if(known(dest)) dest->knownValue = !dest->knownValue;
-  else currentProto->flipBit(currentProto,dest); 
+  else currentProto->flipBit(currentProto,dest);
 }
 
 void __obliv_c__setupOblivBits(OblivInputs* spec,OblivBit* dest
@@ -1533,7 +1540,7 @@ void __obliv_c__setFloatKnown(void* vdest, size_t size, float value) {
   unsigned char currentByte = floatBytes[j];
   while(size-- > 0)
   { __obliv_c__assignBitKnown(dest, currentByte & 0x01);
-    currentByte >>= 1; 
+    currentByte >>= 1;
     dest++;
     i++;
     if (i == 8)
@@ -1585,12 +1592,12 @@ void __obliv_c__setBitwiseXor (void* vdest
 void __obliv_c__setBitwiseNot (void* vdest,const void* vop,size_t size)
 { OblivBit *dest = vdest;
   const OblivBit *op = vop;
-  while(size-->0) __obliv_c__setBitNot(dest++,op++); 
+  while(size-->0) __obliv_c__setBitNot(dest++,op++);
 }
 
 void __obliv_c__setBitwiseNotInPlace (void* vdest,size_t size)
-{ OblivBit *dest=vdest; 
-  while(size-->0) __obliv_c__flipBit(dest++); 
+{ OblivBit *dest=vdest;
+  while(size-->0) __obliv_c__flipBit(dest++);
 }
 
 void __obliv_c__setLShift (void* vdest, const void* vsrc, size_t n,
@@ -1656,7 +1663,7 @@ void __obliv_c__setPlainAdd (void* vdest
                             ,const void* vop1 ,const void* vop2
                             ,size_t size)
   { __obliv_c__setBitsAdd (vdest,NULL,vop1,vop2,NULL,size); }
- 
+
 void __obliv_c__setPlainAddF (void* vdest
                           ,const void* vop1 ,const void* vop2
                           ,size_t size)
@@ -1893,7 +1900,7 @@ void __obliv_c__ifThenElse (void* vdest, const void* vtsrc
   }
 }
 
-void __obliv_c__condAssign (const void* cond,void* dest, const void* src, 
+void __obliv_c__condAssign (const void* cond,void* dest, const void* src,
                             size_t size)
 {
   __obliv_c__ifThenElse (dest,src,dest,size,cond);
