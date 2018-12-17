@@ -37,6 +37,7 @@ stamp-h: config.h.in config.status
 
 CC=@CC@
 CPP=@CPP@
+CFLAGS=@CFLAGS@
 @DEFAULT_COMPILER@=1
 
 # We have to use _build because of OCaml's bug #0004502
@@ -106,9 +107,9 @@ $(OCAMLBUILD_TARGETS): ocamlbuild
 
 # ------ these lines were added for obliv-C runtime -----------
 ifeq ($(DEBUG),1)
-  CFLAGS=-g
+  CFLAGS += -g
 else
-  CFLAGS=-O3
+  CFLAGS += -O3
 endif
 DEPENDDIR = $(OBJDIR)/depends
 OCSRCDIR = src/ext/oblivc
