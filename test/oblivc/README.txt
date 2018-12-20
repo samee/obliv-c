@@ -10,7 +10,7 @@ Folders:
 
 To run these tests (assuming the project has been already built), you should
 just go to the folder and run the respective Makefile. This should give you
-a self-contained 'a.out' executable. Run it without parameters to see usage 
+a self-contained 'a.out' executable. Run it without parameters to see usage
 details. E.g. to run editdist:
 
   $ cd editdist
@@ -22,6 +22,11 @@ details. E.g. to run editdist:
   $ ./a.out 1234 localhost left
   <...>
   Result: 2
+
+Note: For a non-standard library location for libgcrypt, you can pass a
+environment variable like this for MacOS:
+
+  $ CFLAGS="-I/opt/local/include -L/opt/local/lib" make
 
 The make command simply builds 'a.out'. When you run it, it complains about
 missing parameters, and then prints out the usage detail. The next two commands
@@ -38,7 +43,7 @@ for a connection. The second command starts up the client on the same machine
 and connects to the server on "localhost", port "1234". It uses the string
 "left" as its input. As a client, it is configured to act as the evaluator in
 the protocol.  They both output "Result: 2" with a bunch of other stats about
-the runtime. 
+the runtime.
 
 Currently, hamming test also asks for a <proto> parameter. For now, "yao" is the
 only valid value for this parameter. We sometimes use it to test out other
