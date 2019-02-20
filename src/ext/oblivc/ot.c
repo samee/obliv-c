@@ -116,7 +116,7 @@ void dhSend(gcry_mpi_point_t u,ProtocolDesc* pd,int party,
 }
 // Allocates a new gcry_mpi_t, and returns it
 gcry_mpi_point_t dhRecv(ProtocolDesc* pd,int party)
-{ char buf[DHEltSerialBytes];
+{ char buf[DHEltSerialBytes] = {};
   gcry_mpi_point_t x;
   orecv(pd,party,buf,DHEltSerialBytes);
   dhDeserialize(&x,buf);

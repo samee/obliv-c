@@ -2,6 +2,11 @@
 #define OBLIV_BITS_H
 #define __oblivious_c
 
+// To compile with x86_64-w64-mingw32-gcc.exe, it's necessary to explictly define the intrinsics from gcc builtins
+#ifdef __CIL_COMPABILITY__
+#include <gcc_builtins.h>
+#endif
+
 //void* memset(void* s, int c, size_t n); // Hack, had to declare memset
 #include<string.h> // memset to zero
 #include<stdbool.h>

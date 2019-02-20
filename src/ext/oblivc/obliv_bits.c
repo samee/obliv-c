@@ -9,9 +9,11 @@
 #include <inttypes.h>
 #include <stdio.h>      // for protoUseStdio()
 #include <string.h>
+#ifndef _WIN32
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
+#endif
 #include <pthread.h>
 #include <unistd.h>
 #include <gcrypt.h>
@@ -92,8 +94,13 @@ static int tcp2PSend(ProtocolTransport* pt,int dest,const void* s,size_t n)
   size_t n2=0;
   tcpt->needFlush=true;
   while(n>n2) {
+#ifdef _WIN32
+	int res = send(tcpt->sock, n2+(char*)s, n-n2, 0);
+	if(res<0) { perror("TCP write error: "); return res; }
+#else
     int res = fwrite(n2+(char*)s,1,n-n2,tcpt->sockStream);
     if(res<0) { perror("TCP write error: "); return res; }
+#endif
     n2+=res;
   }
   return n2;
@@ -118,12 +125,17 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
   }
   while(n>n2)
   { 
-    res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
-    if(res<0 || feof(tcpt->sockStream))
-    {
-      perror("TCP read error: ");
-      return res;
-    }
+	#ifdef _WIN32
+		res = recv(tcpt->sock, n2+(char*)s, n-n2, 0);
+		if(res<0) { perror("TCP read error: "); return res; }
+	#else
+		res = fread(n2+(char*)s,1,n-n2, tcpt->sockStream);
+		if(res<0 || feof(tcpt->sockStream))
+		{
+		  perror("TCP read error: ");
+		  return res;
+		}
+	#endif
     n2+=res;
   }
   return res;
@@ -132,7 +144,11 @@ static int tcp2PRecv(ProtocolTransport* pt,int src,void* s,size_t n)
 static int tcp2PFlush(ProtocolTransport* pt)
 {
   struct tcp2PTransport* tcpt = CAST(pt);
+#ifndef _WIN32
   return fflush(tcpt->sockStream);
+#else
+  return 0;
+#endif
 }
 
 static int tcp2PFlushProfiled(ProtocolTransport* pt)
@@ -145,8 +161,13 @@ static int tcp2PFlushProfiled(ProtocolTransport* pt)
 static void tcp2PCleanup(ProtocolTransport* pt)
 { 
   tcp2PTransport* t = CAST(pt);
+#ifdef _WIN32
+  shutdown(t->sock, SD_SEND);
+  if(!t->keepAlive) closesocket(t->sock);
+#else
   fflush(t->sockStream);
   if(!t->keepAlive) fclose(t->sockStream);
+#endif
   free(pt);
 }
 
@@ -197,10 +218,12 @@ static tcp2PTransport* tcp2PNew(int sock,bool isClient, bool isProfiled)
   trans->sock = sock;
   trans->isProfiled=isProfiled;
   trans->isClient=isClient;
+#ifndef _WIN32
   trans->sockStream=fdopen(sock, "rb+");
+#endif
   trans->sinceFlush = 0;
   const int one=1;
-  setsockopt(sock,IPPROTO_TCP,TCP_NODELAY,&one,sizeof(one));
+  setsockopt(sock,IPPROTO_TCP,TCP_NODELAY,(const char*)&one,sizeof(one));
   /*setvbuf(trans->sockStream, trans->buffer, _IOFBF, BUFFER_SIZE);*/
   return trans;
 }
@@ -248,6 +271,12 @@ static int tcpConnect(struct sockaddr_in* sa)
 int protocolConnectTcp2P(ProtocolDesc* pd,const char* server,const char* port)
 {
   struct sockaddr_in sa;
+#ifdef _WIN32
+  WORD wVersionRequested;
+  WSADATA wsaData;
+  wVersionRequested = MAKEWORD(2, 0);
+  WSAStartup(wVersionRequested, &wsaData);
+#endif
   if(getsockaddr(server,port,(struct sockaddr*)&sa)<0) return -1; // dns error
   int sock=tcpConnect(&sa); if(sock<0) return -1;
   protocolUseTcp2P(pd,sock,true);
@@ -266,10 +295,24 @@ int protocolConnectTcp2PProfiled(ProtocolDesc* pd,const char* server,const char*
 // used as sock=tcpListenAny(...); sock2=accept(sock); ...; close(both);
 static int tcpListenAny(const char* portn)
 {
+#ifdef _WIN32
+  uint16_t port;
+#else
   in_port_t port;
+#endif
   int outsock;
+#ifdef _WIN32
+  WORD wVersionRequested;
+  WSADATA wsaData;
+  wVersionRequested = MAKEWORD(2, 0);
+  WSAStartup(wVersionRequested, &wsaData);
+#endif
   if(sscanf(portn,"%hu",&port)<1) return -1;
+#ifdef _WIN32
+  if((outsock=socket(PF_INET,SOCK_STREAM,IPPROTO_TCP))<0) return -1;
+#else
   if((outsock=socket(AF_INET,SOCK_STREAM,0))<0) return -1;
+#endif
   int reuse = 1;
   if (setsockopt(outsock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse)) < 0)
   { fprintf(stderr,"setsockopt(SO_REUSEADDR) failed\n"); return -1; }
@@ -287,7 +330,11 @@ int protocolAcceptTcp2P(ProtocolDesc* pd,const char* port)
   listenSock = tcpListenAny(port);
   if((sock=accept(listenSock,0,0))<0) return -1;
   protocolUseTcp2P(pd,sock,false);
+#ifdef WIN32
+  closesocket(listenSock);
+#else
   close(listenSock);
+#endif
   return 0;
 }
 
@@ -333,7 +380,12 @@ static int sockSplit(int sock,ProtocolTransport* t,bool isClient)
     if(transSend(t,0,&sa.sin_port,sizeof(sa.sin_port))<0) return -1;
     transFlush(t);
     int newsock = accept(listenSock,0,0);
-    close(listenSock);
+#ifdef _WIN32
+    shutdown(listenSock, SD_SEND);
+    closesocket(listenSock);
+#else
+	close(listenSock);
+#endif
     return newsock;
   }
 }
@@ -1118,6 +1170,43 @@ void mainYaoProtocol(ProtocolDesc* pd, bool point_and_permute,
   start(arg);
 }
 
+void mainYaoProtocol_Init(ProtocolDesc* pd, bool point_and_permute,
+                     protocol_run start, void* arg)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  int me = pd->thisParty;
+  ypd->ownOT=false;
+  ypd->gcount = ypd->gcount_offset = ypd->icount = ypd->ocount = 0;
+  if(me==1)
+  {
+    gcry_randomize(ypd->R,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    gcry_randomize(ypd->I,YAO_KEY_BYTES,GCRY_STRONG_RANDOM);
+    if(point_and_permute) ypd->R[0] |= 1;   // flipper bit
+
+    if(ypd->sender.sender==NULL)
+    { ypd->ownOT=true;
+      ypd->sender = honestOTExtSenderAbstract(honestOTExtSenderNew(pd,2));
+    }
+  }else 
+    if(ypd->recver.recver==NULL)
+    { ypd->ownOT=true;
+      ypd->recver = honestOTExtRecverAbstract(honestOTExtRecverNew(pd,1));
+    }
+
+  currentProto = pd;
+}
+
+void mainYaoProtocol_End(ProtocolDesc* pd, bool point_and_permute,
+                     protocol_run start, void* arg)
+{
+  YaoProtocolDesc* ypd = pd->extra;
+  int me = pd->thisParty;
+  //if(ownOT)
+  { if(me==1) otSenderRelease(&ypd->sender);
+    else otRecverRelease(&ypd->recver);
+  }
+}
+
 void cleanupYaoProtocol(ProtocolDesc* pd)
 {
   YaoProtocolDesc* ypd = pd->extra;
@@ -1131,6 +1220,18 @@ void execYaoProtocol(ProtocolDesc* pd, protocol_run start, void* arg)
 {
   setupYaoProtocol(pd,true);
   mainYaoProtocol(pd,true,start,arg);
+  cleanupYaoProtocol(pd);
+}
+
+void execYaoProtocol_Init(ProtocolDesc* pd, protocol_run start, void* arg)
+{
+  setupYaoProtocol(pd,true);
+  mainYaoProtocol_Init(pd,true,start,arg);
+}
+
+void execYaoProtocol_End(ProtocolDesc* pd, protocol_run start, void* arg)
+{
+  mainYaoProtocol_End(pd,true,start,arg);
   cleanupYaoProtocol(pd);
 }
 

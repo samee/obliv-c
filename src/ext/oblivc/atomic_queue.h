@@ -1,5 +1,6 @@
 #pragma once
 #include<semaphore.h>
+#include<stddef.h>
 #include<stdbool.h>
 
 // What the heck! Why is there no small library already out there for this?
