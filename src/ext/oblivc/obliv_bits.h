@@ -192,9 +192,9 @@ void __obliv_c__condAssignKnown(const void* cond, void* dest, size_t size
 // Conditionals (TODO other operators) that may be faster at times
 static inline 
 void __obliv_c__condAssignKnownF(const void* cond, void* dest, size_t size
-                                ,widest_t val)
+                                ,float val)
 {
-  OblivBit ov[__bitsize(widest_t)];
+  OblivBit ov[__bitsize(float)];
   __obliv_c__setFloatKnown(ov,size,val);
   __obliv_c__ifThenElse(dest,ov,dest,size,cond);
 }

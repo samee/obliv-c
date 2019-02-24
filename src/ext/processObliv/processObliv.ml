@@ -562,22 +562,22 @@ let condSetKnownInt c v k x loc =
 let setKnownFloat v k x loc =
   let fargTypes = ["dest",TPtr(typeOfLval v,[]),[]
                 ;"bitcount",!typeOfSizeOf,[]
-                ;"value",widestType,[]
+                ;"value",TFloat(k,[]),[]
                 ] in
   let func = voidFunc "__obliv_c__setFloatKnown" fargTypes in
   Call(None,func,[ AddrOf v; xoBitsSizeOf (TFloat(k,[]))
-               ; CastE(widestType,CastE(TFloat(k,[]),x))
+               ; CastE(TFloat(k,[]),x)
                ],loc)
 
 let condSetKnownFloat c v k x loc =
   let fargTypes = ["cond",TPtr(oblivBoolType,[]),[]
                   ;"dest",TPtr(typeOfLval v,[]),[]
                   ;"size",!typeOfSizeOf,[]
-                  ;"val",widestType,[]
+                  ;"val",TFloat(k,[]),[]
                   ] in
   let func = voidFunc "__obliv_c__condAssignKnownF" fargTypes in
   Call(None,func,[ mkAddrOf c; mkAddrOf v; xoBitsSizeOf (TFloat(k,[]))
-                 ; CastE(widestType,CastE(TFloat(k,[]),x))
+                 ; CastE(TFloat(k,[]),x)
                  ],loc)
 
 let setIfThenElse dest c ts fs loc = 
