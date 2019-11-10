@@ -20,12 +20,18 @@ int testSorterMain(int argc,char* argv[])
 double lap;
 int testPsiMain(int argc,char* argv[])
 {
+  // Usage:
+  //   ./a.out -- 1234 &
+  //   ./a.out localhost 1234
+  // The first command starts out a background server listening on port 1234.
+  // The second command connects to this server, which is localhost at port 1234
   extern void randomPsi(void*);
   ProtocolDesc pd;
   //protocolUseStdio(&pd);
-  ocTestUtilTcpOrDie(&pd,argv[2][0]=='1',argv[1]);
+  const char* remote_host = (strcmp(argv[2],"--")?argv[2]:NULL);
+  ocTestUtilTcpOrDie(&pd,remote_host,argv[1]);
   lap = wallClock();
-  setCurrentParty(&pd,argv[2][0]=='1'?1:2);
+  setCurrentParty(&pd,remote_host?2:1);
   execYaoProtocol(&pd,randomPsi,NULL);
   fprintf(stderr,"Total time: %lf s\n",wallClock()-lap);
   cleanupProtocol(&pd);
