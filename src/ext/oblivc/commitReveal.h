@@ -7,8 +7,8 @@
 #define COMMIT_HASH_ALGO GCRY_MD_SHA256
 #define COMMIT_HASH_BYTES 32
 
-// 64-bit key for commitment hash
-#define COMMIT_KEY_SIZE 8
+// 128-bit key for commitment hash
+#define COMMIT_KEY_SIZE 16
 
 // Simply hash-based commitment
 typedef struct 

@@ -25,7 +25,7 @@ typedef struct OblivBit OblivBit;
 //   Add a new entry in OblivBit union
 //   Assign proper hooks to these callbacks in ProtocolDesc
 
-#define YAO_KEY_BITS 80
+#define YAO_KEY_BITS 128
 #define YAO_KEY_BYTES ((YAO_KEY_BITS+7)/8)
 #if YAO_KEY_BITS!=(YAO_KEY_BYTES*8)
 #error "Yao key size needs to be a multiple of 8 bits"
@@ -112,6 +112,7 @@ typedef struct YaoProtocolDesc {
   yao_key_t R,I; // LSB of R needs to be 1
   uint64_t gcount, gcount_offset;
   uint64_t icount, ocount;
+  char yaoFixedKey[YAO_KEY_BYTES];
   bool ownOT;
   void (*nonFreeGate)(struct ProtocolDesc*,OblivBit*,char,
       const OblivBit*,const OblivBit*);
