@@ -398,3 +398,5 @@
 /test/small2/merge-ar
 /test/small2/libmerge.a
 
+*.o
+*.oo
