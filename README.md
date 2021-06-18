@@ -26,6 +26,7 @@ Unfortunately, the instructions for Fedora and Mac OS might be a little out of d
   * For Linux: `./configure && make`.
   * For Mac OS (with Macports): `CC=/opt/local/bin/gcc-mp-5 CPP=/opt/local/bin/cpp-mp-5 CFLAGS=/opt/local/include LIBRARY_PATH=/opt/local/lib ./configure && make`.
   * For Mac OS 11 (with homebrew): `export CPATH=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ ; export LIBRARY_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib ; CC=/usr/local/bin/gcc-5 CPP=/usr/local/bin/cpp-5 ./configure && make`.
+    (Note: if online the Xcode command line tools are installed, set `CPATH` to `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/` instead.)
 
 4. Start using it! The compiler is a GCC wrapper script found in `bin/oblivcc`. Example codes are in `test/oblivc`. A language tutorial is found [here](http://goo.gl/TXzxD0).
 
