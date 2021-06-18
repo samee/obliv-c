@@ -10,7 +10,7 @@ Unfortunately, the instructions for Fedora and Mac OS might be a little out of d
   * For Ubuntu: `sudo apt-get install ocaml libgcrypt20-dev ocaml-findlib opam m4`.
   * For Fedora 27: `sudo dnf install glibc-devel.i686 ocaml ocaml-ocamldoc ocaml-findlib ocaml-findlib-devel ocaml-ocamlbuild libgcrypt libgcrypt-devel perl-ExtUtils-MakeMaker perl-Data-Dumper`.
   * For Mac OS (with Macports): `sudo port install gcc5 ocaml ocaml-findlib opam libgcrypt +devel`.
-  * For Mac OS 11 (with homebrew): `brew install gcc5 ocaml ocaml-findlib opam libgcrypt +devel`.
+  * For Mac OS 10.15/11 (with homebrew): `brew install gcc5 ocaml ocaml-findlib opam libgcrypt +devel`. (`+devel` does not seem to be required on Mac OS 10.15).
 
 2. If you are using OPAM as our package manager, and this is the first time you are using it, set it up:
    ```
@@ -25,8 +25,8 @@ Unfortunately, the instructions for Fedora and Mac OS might be a little out of d
 3. Git-clone this repository, and compile:
   * For Linux: `./configure && make`.
   * For Mac OS (with Macports): `CC=/opt/local/bin/gcc-mp-5 CPP=/opt/local/bin/cpp-mp-5 CFLAGS=/opt/local/include LIBRARY_PATH=/opt/local/lib ./configure && make`.
-  * For Mac OS 11 (with homebrew): `export CPATH=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ ; export LIBRARY_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib ; CC=/usr/local/bin/gcc-5 CPP=/usr/local/bin/cpp-5 ./configure && make`.
-    (Note: if online the Xcode command line tools are installed, set `CPATH` to `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/` instead.)
+  * For Mac OS 10.15/11 (with homebrew): `export CPATH=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ ; export LIBRARY_PATH=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib ; CC=/usr/local/bin/gcc-5 CPP=/usr/local/bin/cpp-5 ./configure && make`.
+    (Note: if only the Xcode command line tools are installed, set `CPATH` to `/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/` instead.)
 
 4. Start using it! The compiler is a GCC wrapper script found in `bin/oblivcc`. Example codes are in `test/oblivc`. A language tutorial is found [here](http://goo.gl/TXzxD0).
 
