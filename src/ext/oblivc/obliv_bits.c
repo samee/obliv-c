@@ -2119,8 +2119,12 @@ bool revealOblivBool(bool * dest, __obliv_c__bool src, int party)
 bool revealOblivBoolArray(bool *dest, const __obliv_c__bool * src,
                               size_t n, int party)
 { bool rv = true;
-  for (size_t ii = 0; ii < n; ii++)
-    { rv &= revealOblivBool(&dest[ii], src[ii], party); }
+  if(party != 1) 
+    for (size_t ii = 0; ii < n; ii++) 
+      { rv &= revealOblivBool(&dest[ii], src[ii], 2); }
+  if(party != 2)
+    for (size_t ii = 0; ii < n; ii++)
+      { rv &= revealOblivBool(&dest[ii], src[ii], 1); }
   return rv;
 }
 
