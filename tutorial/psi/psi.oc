@@ -1,0 +1,246 @@
+#include<limits.h>
+#include<stdbool.h>
+#include<stdio.h>
+#include<stdlib.h>
+
+#include<bcrandom.h>
+#include<obliv.oh>
+
+#include<waksman.h>
+#include<../common/util.h>
+
+// ------------------ Batcher sorting -----------------------------------------
+
+// TODO time with and without obliv functions. You can use non-obliv to build
+//   obliv versions quite easily
+void batcherSwap(unsigned char* data,size_t n,size_t w,
+                 void (*cmpswap)(void*,void*,void*),void* arg)
+{
+  size_t i;
+  for(i=0;i+1<n;i+=2) cmpswap(data+w*i,data+w*(i+1),arg);
+}
+void batcherMerge(unsigned char* data,size_t n1,size_t n2,size_t w,
+                  void (*cmpswap)(void*,void*,void*),void* arg)
+{
+  if(n1+n2<=1) return;
+  int odd = n1%2;
+  batcherMerge(data,(n1+1)/2,(n2+!odd)/2,w*2,cmpswap,arg);
+  batcherMerge(data+w,n1/2,  (n2+odd)/2,  w*2,cmpswap,arg);
+  batcherSwap(data+w*!odd,n1+n2-!odd,w,cmpswap,arg);
+}
+
+// w is width in bits
+void batcherSort(void* data,size_t n,size_t w,
+                 void (*cmpswap)(void*,void*,void*),void* arg)
+{
+  if(n<=1) return;
+  batcherSort(data,n/2,w,cmpswap,arg);
+  batcherSort((unsigned char*)data+w*(n/2),(n+1)/2,w,cmpswap,arg);
+  batcherMerge(data,n/2,(n+1)/2,w,cmpswap,arg);
+}
+
+// -------------------- PSI main ---------------------------------------------
+
+int intCompare(const void* a, const void* b) { return *(int*)a-*(int*)b; }
+
+int cmpZeroLarge(const void* ap,const void* bp)
+{
+  int a=*(int*)ap,b=*(int*)bp;
+  if(a==0) a=INT_MAX; else if(a>0) a--;
+  if(b==0) b=INT_MAX; else if(b>0) b--;
+  return a-b;
+}
+
+void swapInt(obliv int* a,obliv int* b) obliv
+{
+  ~obliv(en) {
+    obliv int t = 0;
+    obliv if(en) t=*a^*b;
+    *a^=t;
+    *b^=t;
+  }
+}
+void cmpswapInt(void* va,void* vb,void* arg)
+{
+  obliv int *a=va,*b=vb;
+  obliv if(*a>*b) swapInt(a,b);
+}
+
+void feedOblivBoolArr(obliv bool* dest,size_t n,bool* src,int srcParty)
+{
+  size_t i,p=ocCurrentParty();
+  for(i=0;i<n;++i) dest[i]=feedOblivBool(p==srcParty?src[i]:false,srcParty);
+}
+void feedOblivIntArr(obliv int* dest,size_t n,int* src,int srcParty)
+{
+  size_t i,p=ocCurrentParty();
+  OblivInputs* spec = malloc(sizeof(OblivInputs)*n);
+  for(i=0;i<n;++i) setupOblivInt(spec+i,dest+i,(p==srcParty?src[i]:0));
+  feedOblivInputs(spec,n,srcParty);
+    //dest[i]=feedOblivInt(p==srcParty?src[i]:0,srcParty); FIXME What..?!
+  free(spec);
+}
+void revealOblivIntArr(int* dest,size_t n,obliv int* src,int destParty)
+{
+  size_t i,p=ocCurrentParty();
+  for(i=0;i<n;++i) revealOblivInt(dest+i,src[i],destParty);
+}
+
+void randomShuffleControl(obliv bool* doSwap,size_t n,int party)
+{
+  size_t sc = waksmanSwapCount(n);
+  if(ocCurrentParty()==party)
+  { BCipherRandomGen *gen=newBCipherRandomGen();
+    unsigned *perm=malloc(sizeof(unsigned)*n);
+    bcRandomPermutation(gen,perm,n);
+    bool *c=malloc(sizeof(bool)*sc);
+    waksmanSwitches(perm,n,c);
+    free(perm);
+    releaseBCipherRandomGen(gen);
+    feedOblivBoolArr(doSwap,sc,c,party);
+    free(c);
+  }else feedOblivBoolArr(doSwap,sc,NULL,party); // both parties do this
+}
+
+void party1Shuffle(obliv int* arr,size_t n)
+{
+  size_t sc = waksmanSwapCount(n);
+  unsigned *a=malloc(sizeof(unsigned)*sc),*b=malloc(sizeof(unsigned)*sc);
+  bool *c;
+  unsigned i;
+  obliv bool *oc=calloc(sc,sizeof(obliv bool));
+  randomShuffleControl(oc,n,1);
+  waksmanNetwork(a,b,n);
+  for(i=0;i<sc;++i) obliv if(oc[i]) swapInt(arr+a[i],arr+b[i]);
+  free(a); free(b); free(oc);
+}
+
+size_t minZ(size_t a,size_t b) { return a<b?a:b; }
+
+// does not support overlapping ranges
+static void memswap(void* d1, void* d2,size_t n)
+{
+  char *c1=d1, *c2=d2, t;
+  size_t i;
+  for(i=0;i<n;++i) { t=c1[i]; c1[i]=c2[i]; c2[i]=t; }
+}
+
+// Runs qsort, and then "removes" duplicate data by moving them to the end
+// Returns the number of elements in the resulting sequence (or equivalently,
+//   the index at which "removed" data starts
+size_t qsortUniq(void* data,size_t n,size_t w,
+                 int (*cmp)(const void *,const void *))
+{
+  unsigned char *cdata=data;
+  size_t i,j;
+  qsort(data,n,w,cmp);
+  for(i=j=1;j<n;j++) if(cmp(cdata+(i-1)*w,cdata+j*w)!=0)
+  { if(i<j) memswap(cdata+i*w,cdata+j*w,w);
+    i++;
+  }
+  return i;
+}
+// returns the actual number of elements written
+// Input elements with value 0 are assumed to be 'empty' values, and are
+// never reported as part of the intersection
+// input pointer is not const, since it will get sorted before being input
+//   into the protocol.
+// In case oN is not big enough, the output is truncated
+// If the two parties have different oN values, the smaller one is used
+size_t privateSetIntersection(int *output,size_t oN,int *input,size_t iN)
+{
+  size_t a,b;
+  unsigned i;
+  double lap2;
+  fprintf(stderr,"Started psi\n");
+  iN = qsortUniq(input,iN,sizeof(*input),intCompare);
+  a = ocBroadcastLong(iN,1);
+  b = ocBroadcastLong(iN,2);
+
+  obliv int *arr=calloc(a+b,sizeof(obliv int));
+  obliv int *out=calloc((a+b)/2,sizeof(obliv int));
+  fprintf(stderr,"Started extending OT\n");
+  feedOblivIntArr(arr,a,input,1);
+  feedOblivIntArr(arr+a,b,input,2);
+  lap2 = wallClock();
+  fprintf(stderr,"starting gates\n");
+  batcherMerge(arr,a,b,sizeof(*arr),cmpswapInt,NULL);
+
+  for(i=1;i<a+b;i+=2) 
+  { // FIXME: arr[i-1]==arr[i] && (i>=a+b || arr[i]==arr[i+1]) this is tricky
+    // I should just say that logical binary ops are not yet implemented
+    obliv bool eq=(arr[i-1]==arr[i]);
+    if(i+1<a+b) eq=(eq|(arr[i]==arr[i+1]));
+    obliv if(eq) out[i/2]=arr[i];
+  }
+  
+  party1Shuffle(out,(a+b)/2);
+  fprintf(stderr,"Gate exec time: %lf\n",wallClock()-lap2);
+
+  // Party2 receives and sorts the output
+  size_t p,q;
+  p = ocBroadcastLong(oN,1);
+  q = ocBroadcastLong(oN,2);
+  oN = minZ(minZ(p,q),(a+b)/2);
+  revealOblivIntArr(output,oN,out,2);
+  free(out);
+  free(arr);
+  if(ocCurrentParty()==2)
+  { qsort(output,oN,sizeof(*output),cmpZeroLarge);
+    for(i=oN;i-->0;) if(output[i]) break;
+  }
+
+  // Finally, Party1 gets it too
+  oN = ocBroadcastInt(i+1,2);
+  for(i=oN;i-->0;) output[i]=ocBroadcastInt(output[i],2);
+  return oN;
+}
+
+// -----------------  test harness --------------------------------------------
+#ifndef SIZE
+#define SIZE 101
+#endif
+
+bool testSorterResult;
+
+void testSorter(void* arg)
+{
+  obliv int arr[SIZE];
+  int i;
+  obliv bool res = true;
+  BCipherRandomGen* gen = newBCipherRandomGen();
+  for(i=0;i<SIZE;++i) arr[i]=bcRandomInt(gen,SIZE);
+  batcherSort(arr,SIZE,sizeof(obliv int),cmpswapInt,NULL);
+  for(i=1;i<SIZE;++i) res = (res & (arr[i-1]<=arr[i]));
+  revealOblivBool(&testSorterResult,res,0);
+  releaseBCipherRandomGen(gen);
+}
+
+void randomPsi(void* arg)
+{
+  // randomly select 69 random numbers from range [1..100]
+  // On average, intersection of two such sets should be of about size 25
+  const int maxval=100000;
+  extern double lap;
+  // const int n=69;
+  const int n=1024;
+  int on;
+  int *arr=malloc(sizeof(int)*n), *res=malloc(sizeof(int)*n);
+  fprintf(stderr,"Base OT time: %lf s\n",wallClock()-lap);
+  BCipherRandomGen *gen = newBCipherRandomGen();
+  unsigned i;
+  for(i=0;i<n;++i) 
+  { arr[i]=bcRandomInt(gen,maxval)+1;
+    // fprintf(stderr,"%d ",arr[i]);
+  }
+//  fprintf(stderr,"\n");
+  fprintf(stderr,"Done with random generation\n");
+  on=privateSetIntersection(res,n,arr,n);
+  /*
+  for(i=0;i<on;++i) fprintf(stderr,"%d ",res[i]);
+  fprintf(stderr,"\n");
+  */
+  releaseBCipherRandomGen(gen);
+  free(arr);
+  free(res);
+}
