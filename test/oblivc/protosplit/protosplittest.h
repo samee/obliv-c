@@ -3,9 +3,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define ELCT 2000
+typedef void (* split_fn)(void *, uint32_t *, size_t, size_t, void *);
 
-typedef void (* split_fn)(void *, uint32_t *, int, void *);
+struct args {
+  size_t threads;
+  size_t elct;
+};
 
-void parallelize(split_fn fn, void * output1, void * output2, void * output3, uint32_t * input, int leneach, void * pd1, void* pd2);
+void parallelize(split_fn fn, void * output, uint32_t * input, size_t leneach, size_t threads, void * pds);
 void goprotosplit(void* vargs);
